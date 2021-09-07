@@ -10,7 +10,8 @@ name = "dune"
 path = "src/bin.rs"
 
 [dependencies]
-nom = "7"
+prettytable-rs = "0.8"
+nom = "7.0"
 rand = "0.8"
 ctrlc = "3.2"
 os_info = "3.0"

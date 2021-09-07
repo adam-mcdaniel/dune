@@ -8,6 +8,8 @@ use std::{
     process::Command,
 };
 
+use prettytable::{row, cell, Table, format::{LinePosition, LineSeparator}};
+
 impl From<Int> for Expression {
     fn from(x: Int) -> Self {
         Self::Integer(x)
@@ -131,6 +133,7 @@ impl fmt::Debug for Expression {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
+
             Self::Map(exprs) => write!(
                 f,
                 "{{{}}}",
@@ -192,15 +195,33 @@ impl fmt::Display for Expression {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
-            Self::Map(exprs) => write!(
-                f,
-                "{{{}}}",
-                exprs
-                    .iter()
-                    .map(|(k, e)| format!("{}: {:?}", k, e))
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            ),
+            // Self::Map(exprs) => write!(
+            //     f,
+            //     "{{{}}}",
+            //     exprs
+            //         .iter()
+            //         .map(|(k, e)| format!("{}: {:?}", k, e))
+            //         .collect::<Vec<String>>()
+            //         .join(", ")
+            // ),
+            Self::Map(exprs) => {
+                let mut t = Table::new();
+                let fmt = t.get_format();
+                fmt.padding(1, 1);
+                fmt.borders('│');
+                fmt.separator(LinePosition::Top, LineSeparator::new('═', '╤', '╒', '╕'));
+                fmt.separator(LinePosition::Title, LineSeparator::new('═', '╪', '╞', '╡'));
+                fmt.separator(LinePosition::Intern, LineSeparator::new('─', '┼', '├', '┤'));
+                fmt.separator(LinePosition::Bottom, LineSeparator::new('─', '┴', '└', '┘'));
+                for (key, val) in exprs {
+                    if let Self::Builtin(_, _, help) = &val {
+                        t.add_row(row!(key, format!("{}", val), help));
+                    } else {
+                        t.add_row(row!(key, format!("{}", val)));
+                    }
+                }
+                write!(f, "{}", t)
+            }
 
             Self::None => write!(f, "None"),
             Self::Lambda(param, body, _) => write!(f, "{} -> {:?}", param, body),

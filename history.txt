@@ -1,101 +1,101 @@
 #V2
+time
+fs
 clear
-nano conway.ok
+os
+time
+fs
 clear
-sleep 10
-sleep 1000
-print test
-sleep 1000
-sleep
+let test = fs
+test
 clear
-time@sleep 500
-time@sleep 1000
-let x = 1000
-time@sleep 10000
-la
-time@sleep 10000
-ls
-bat coins.py
-q
+test
+insert
+test
+echo test
+let test = insert fs "os" os
 clear
-ls
+let test = insert fs "os" os
+let test = insert fs "os" (insert os "time" time)
 clear
-time@sleep 10000
-exi t0
-bat coins.py
-q
+let test = insert fs "os" (insert os "time" time)
 clear
 ls
-cat fun.c
 clear
-ls
-./test
-nano test.ok
-exit
-ls
-./main
-nano test.ok
-nano main.ok
-oak c main.ok
+widget
+echo widget
 clear
-./main
 ls
 clear
 ls
-exit
 clear
 ls
-nano main.ok
-ls
-nano str.ok
-cd DOCS/oak
-cd DOCS
-cd oak
+clear
+env
+clear
+fmt
+clear
+math
 clear
 ls
-cd oakc
-ls
-cd examples/
-ls
-oak c input.ok
-./main
-ls
-./main
-ls
-nano structure.ok
+cat mymalloc.c
+clear
+bash
 clear
 ls
-cat and_or.ok
-cat and_or.ok -lrs
+ls Music/
+clear
+env
+clear
+echo (rand@choose CATS)
+echo (rand@choose CATS
+clear
+echo (rand@choose CATS
+clear
+echo (rand@choose CATS
+clear
+echo {cat: (rand@choose CATS)}
+clear
+echo {cat: (rand@choose CATS)}
+widget@create "Cat" (rand@choose CATS) 20 9
+echo (widget@create "Cat" (rand@choose CATS) 20 9)
+clear
+echo (widget@create "Cat" (rand@choose CATS) 20 9)
+clear
+for _ in 0 to 10 {echo (widget@create "Cat" (rand@choose CATS) 20 9)}
+clear
+for _ in 0 to 10 {echo (widget@create "Cat" (rand@choose CATS) 20 9)}
+clear
+for _ in 0 to 3 {echo (widget@create "Cat" (rand@choose CATS) 20 9)}
+clear
+for _ in 0 to 3 {echo (widget@create "Cat" (rand@choose CATS) 20 9)}
+clear
+cat
+ls
+cat discord_setup.sh
 clear
 ls
-cd type
-cd typecheck/
-ls
-oak c nested_if_return.ok
-./main
-nano nested_if_return.ok
+cat lbl.gg
 clear
 ls
-nano literal_ptr.ok
-oak c literal_ptr.ok
-oak c bad_return
-oak c bad_return.ok
-oak c bad_return_multi.ok
+cd Documents/r
+cd Documents/rust/
+clear
+ls
+cd industry-lang/
+ls
 cd ..
 ls
-cd tests/
+clear
 ls
+clear
 cd ..
+cd dune
 clear
-ls
-cd tests/
-cat README.md
-cd ..
-ls
-cd DOCS
-cd HOME
+cd rust/dune
 clear
-ls
-clear
-cargo run
+git add .
+git 'add .
+git
+git -a .
+git -A .

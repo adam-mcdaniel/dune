@@ -415,7 +415,7 @@ fn parse_group(input: &str) -> IResult<&str, Expression, SyntaxError> {
     let (input, _) = tag("(")(input)?;
     let (input, expr) = parse_expression(input)?;
     let (input, _) = try_parse_ws(input)?;
-    let (input, _) = match tag::<&str, &str, SyntaxError>(")")(input) {
+    let (input, _) = match alt((tag::<&str, &str, SyntaxError>(")"), eof))(input) {
         Ok(result) => result,
         Err(_) => {
             return SyntaxError::unrecoverable(

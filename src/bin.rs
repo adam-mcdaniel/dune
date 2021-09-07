@@ -1314,6 +1314,39 @@ fn main() -> Result<(), Error> {
     );
 
     env.define_builtin(
+        "insert",
+        |args, env| {
+            check_exact_args_len("insert", &args, 3)?;
+            let mut arr = args[0].eval(env)?;
+            let idx = args[1].eval(env)?;
+            let val = args[2].eval(env)?;
+            match (&mut arr, &idx) {
+                (Expression::Map(exprs), Expression::String(key)) => {
+                    exprs.insert(key.clone(), val);
+                }
+                (Expression::List(exprs), Expression::Integer(i)) => {
+                    if *i as usize <= exprs.len() {
+                        exprs.insert(*i as usize, val);
+                    } else {
+                        return Err(Error::CustomError(format!("index {} out of bounds for {:?}", idx, arr)))
+                    }
+                }
+                (Expression::String(s), Expression::Integer(i)) => {
+                    if *i as usize <= s.len() {
+                        s.insert_str(*i as usize, &val.to_string());
+                    } else {
+                        return Err(Error::CustomError(format!("index {} out of bounds for {:?}", idx, arr)))
+                    }
+                }
+                _ => return Err(Error::CustomError(format!("cannot insert {:?} into {:?} with index {:?}", val, arr, idx)))
+            }
+
+            Ok(arr)
+        },
+        "insert an item a dictionary or list",
+    );
+
+    env.define_builtin(
         "len",
         |args, env| match args[0].eval(env)? {
             Expression::Map(m) => Ok(Expression::Integer(m.len() as Int)),
@@ -1440,11 +1473,12 @@ fn main() -> Result<(), Error> {
     env.define_builtin(
         "report",
         |args, env| {
-            // match args[0].clone().eval(env)? {
-            //     Expression::None => {},
-            //     other => println!("{:?}", other),
-            // }
-            println!("{:?}", args[0].clone().eval(env)?);
+            let val = args[0].eval(env)?;
+            match val {
+                Expression::Map(_) => println!("{}", val),
+                Expression::None => {},
+                otherwise => println!("{:?}", otherwise)
+            }
 
             Ok(Expression::None)
         },
