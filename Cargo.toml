@@ -1,0 +1,23 @@
+[package]
+name = "dune"
+version = "0.1.0"
+authors = ["Adam McDaniel <adam.mcdaniel17@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[[bin]]
+name = "dune"
+path = "src/bin.rs"
+
+[dependencies]
+nom = "7"
+rand = "0.8"
+ctrlc = "3.2"
+os_info = "3.0"
+common_macros = "0.1"
+snailquote = "0.3"
+rustyline = "8.2"
+rustyline-derive = "0.5"
+lazy_static = "1.4"
+dirs = "3.0"
+dunce = "1.0"

@@ -1,0 +1,101 @@
+#V2
+ls
+clear
+nano conway.ok
+clear
+sleep 10
+sleep 1000
+print test
+sleep 1000
+sleep
+clear
+time@sleep 500
+time@sleep 1000
+let x = 1000
+time@sleep 10000
+la
+time@sleep 10000
+ls
+bat coins.py
+q
+clear
+ls
+clear
+time@sleep 10000
+exi t0
+bat coins.py
+q
+clear
+ls
+cat fun.c
+clear
+ls
+./test
+nano test.ok
+exit
+ls
+./main
+nano test.ok
+nano main.ok
+oak c main.ok
+clear
+./main
+ls
+clear
+ls
+exit
+clear
+ls
+nano main.ok
+ls
+nano str.ok
+cd DOCS/oak
+cd DOCS
+cd oak
+clear
+ls
+cd oakc
+ls
+cd examples/
+ls
+oak c input.ok
+./main
+ls
+./main
+ls
+nano structure.ok
+clear
+ls
+cat and_or.ok
+cat and_or.ok -lrs
+clear
+ls
+cd type
+cd typecheck/
+ls
+oak c nested_if_return.ok
+./main
+nano nested_if_return.ok
+clear
+ls
+nano literal_ptr.ok
+oak c literal_ptr.ok
+oak c bad_return
+oak c bad_return.ok
+oak c bad_return_multi.ok
+cd ..
+ls
+cd tests/
+ls
+cd ..
+clear
+ls
+cd tests/
+cat README.md
+cd ..
+ls
+cd DOCS
+cd HOME
+clear
+ls
+clear
