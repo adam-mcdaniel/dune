@@ -1,8 +1,8 @@
 use nom::{
     branch::alt,
-    bytes::complete::{tag, take_while_m_n},
+    bytes::complete::{tag},
     character::complete::one_of,
-    combinator::{eof, map, map_res, not, opt, peek},
+    combinator::{eof, map, opt},
     error::{ErrorKind, ParseError},
     multi::{count, many0, many1, separated_list0},
     sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
@@ -11,7 +11,7 @@ use nom::{
 
 use std::collections::BTreeMap;
 
-use super::{Environment, Error, Expression, Int};
+use super::{Environment, Expression, Int};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SyntaxError {
@@ -323,7 +323,7 @@ fn parse_string(input: &str) -> IResult<&str, String, SyntaxError> {
     let old_input = input;
     let (input, _) = tag("\"")(input)?;
 
-    let (input, inner) = parse_string_inner(input)?;
+    let (input, _) = parse_string_inner(input)?;
 
     let (input, _) = alt((tag("\""), eof))(input)?;
 
@@ -385,7 +385,7 @@ fn parse_assign(input: &str) -> IResult<&str, Expression, SyntaxError> {
     let (input, _) = try_parse_ws(input)?;
     let (input, symbol) = match parse_symbol(input) {
         Ok(result) => result,
-        Err(e) => {
+        Err(_) => {
             return SyntaxError::unrecoverable(
                 input,
                 "symbol",
@@ -911,25 +911,6 @@ fn parse_expression_prec_three(input: &str) -> IResult<&str, Expression, SyntaxE
             Box::new(op_fun.clone()),
             vec![head, result],
         ))),
-    ))
-}
-
-fn parse_index(input: &str) -> IResult<&str, Expression, SyntaxError> {
-    let (input, head) = parse_expression_prec_one(input)?;
-    let (input, args) = many1(preceded(
-        tag("@"),
-        alt((
-            map(parse_symbol, |name| Expression::Symbol(name)),
-            map(parse_integer, |n| Expression::Integer(n)),
-        )),
-    ))(input)?;
-
-    let mut result = vec![head];
-    result.extend(args.into_iter());
-
-    Ok((
-        input,
-        Expression::Apply(Box::new(Expression::Symbol("index".to_string())), result),
     ))
 }
 

@@ -4,7 +4,7 @@ use std::{
     collections::BTreeMap,
     fmt,
     io::ErrorKind,
-    ops::{Add, Div, Index, IndexMut, Mul, Rem, Sub},
+    ops::{Add, Div, Index, Mul, Rem, Sub},
     process::Command,
 };
 
@@ -531,7 +531,7 @@ impl Add for Expression {
                 a.extend(b);
                 Self::List(a)
             }
-            (a, b) => Self::None,
+            _ => Self::None,
         }
     }
 }
@@ -552,7 +552,7 @@ impl Sub for Expression {
                 None => Self::None,
             },
             (Self::List(mut m), Self::Integer(n)) if m.len() > n as usize => m.remove(n as usize),
-            (a, b) => Self::None,
+            _ => Self::None,
         }
     }
 }
@@ -578,7 +578,7 @@ impl Mul for Expression {
                 }
                 Self::List(result)
             }
-            (a, b) => Self::None,
+            _ => Self::None,
         }
     }
 }
@@ -594,7 +594,7 @@ impl Div for Expression {
             (Self::Integer(m), Self::Float(n)) => Self::Float(m as f64 / n),
             (Self::Float(m), Self::Integer(n)) => Self::Float(m / n as f64),
             (Self::Float(m), Self::Float(n)) => Self::Float(m / n),
-            (a, b) => Self::None,
+            _ => Self::None,
         }
     }
 }
@@ -604,7 +604,7 @@ impl Rem for Expression {
     fn rem(self, other: Self) -> Self {
         match (self, other) {
             (Self::Integer(m), Self::Integer(n)) => Self::Integer(m % n),
-            (a, b) => Self::None,
+            _ => Self::None,
         }
     }
 }

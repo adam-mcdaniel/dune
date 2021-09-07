@@ -1,5 +1,4 @@
 #V2
-ls
 clear
 nano conway.ok
 clear
@@ -99,3 +98,4 @@ cd HOME
 clear
 ls
 clear
+cargo run

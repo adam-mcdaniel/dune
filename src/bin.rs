@@ -1,7 +1,6 @@
 use dune::{parse_script, Environment, Error, Expression, Int, SyntaxError};
 
-use rustyline::{error::ReadlineError, Cmd, Editor, Helper, KeyEvent, Modifiers};
-
+use rustyline::{error::ReadlineError, Editor, Helper};
 use rustyline::completion::{Completer, FilenameCompleter, Pair as PairComplete};
 use rustyline::config::OutputStreamType;
 use rustyline::highlight::{Highlighter, MatchingBracketHighlighter};
@@ -12,7 +11,6 @@ use rustyline::validate::{
 use rustyline::{CompletionType, Config, Context, EditMode};
 use rustyline_derive::Helper;
 
-use lazy_static::lazy_static;
 
 use common_macros::b_tree_map;
 
@@ -20,12 +18,7 @@ use rand::{distributions::Uniform, seq::SliceRandom, thread_rng, Rng};
 
 use std::{
     borrow::Cow::{self, Borrowed, Owned},
-    collections::BTreeMap,
-    env::{current_dir, current_exe},
-    fs::{read_to_string, write},
-    io::{stdin, stdout, Write},
-    path::{Component, PathBuf},
-    process::exit,
+    path::PathBuf,
     sync::{Arc, Mutex},
     thread::sleep,
     time::Duration,
@@ -153,7 +146,7 @@ impl Highlighter for DuneHelper {
     fn highlight_prompt<'b, 's: 'b, 'p: 'b>(
         &'s self,
         prompt: &'p str,
-        default: bool,
+        _default: bool,
     ) -> Cow<'b, str> {
         // if default {
         //     Borrowed(&self.colored_prompt)
@@ -389,7 +382,7 @@ fn parse(input: impl ToString) -> Result<Expression, Error> {
             Ok(result)
         }
         Err(nom::Err::Error(e)) | Err(nom::Err::Failure(e)) => Err(Error::SyntaxError(e)),
-        Err(nom::Err::Incomplete(needed)) => Err(Error::SyntaxError(SyntaxError::InternalError)),
+        Err(nom::Err::Incomplete(_)) => Err(Error::SyntaxError(SyntaxError::InternalError)),
     }
 }
 
@@ -453,12 +446,11 @@ fn repl(
             .expect("No helper")
             .set_prompt(format!("{}", prompt));
         rl.helper_mut().expect("No helper").update_env(&env);
-        let mut text = readline(prompt, &mut rl);
+        let text = readline(prompt, &mut rl);
         let x = text.trim();
 
         match parse(&text) {
             Ok(expr) => {
-                lines = vec![];
                 match expr.eval(&mut env) {
                     Ok(Expression::Symbol(name)) => {
                         if let Err(e) =
@@ -486,10 +478,9 @@ fn repl(
 
             Err(e) => {
                 if !x.is_empty() {
-                    lines.push(x.clone())
+                    lines.push(x.to_string())
                 } else {
                     eprintln!("{}", e);
-                    lines = vec![];
                 }
             }
         }
@@ -880,21 +871,21 @@ fn main() -> Result<(), Error> {
         b_tree_map! {
             String::from("exists") => Expression::builtin("exists", |args, env| {
                 check_exact_args_len("exists", &args, 1)?;
-                let mut path = PathBuf::from(env.get_cwd());
+                let path = PathBuf::from(env.get_cwd());
 
                 Ok(path.join(args[0].eval(env)?.to_string()).exists().into())
             }, "check if a given file path exists"),
 
             String::from("isdir") => Expression::builtin("isdir", |args, env| {
                 check_exact_args_len("isdir", &args, 1)?;
-                let mut path = PathBuf::from(env.get_cwd());
+                let path = PathBuf::from(env.get_cwd());
 
                 Ok(path.join(args[0].eval(env)?.to_string()).is_dir().into())
             }, "check if a given path is a directory"),
 
             String::from("isfile") => Expression::builtin("isfile", |args, env| {
                 check_exact_args_len("isfile", &args, 1)?;
-                let mut path = PathBuf::from(env.get_cwd());
+                let path = PathBuf::from(env.get_cwd());
 
                 Ok(path.join(args[0].eval(env)?.to_string()).is_file().into())
             }, "check if a given path is a file"),
@@ -1491,14 +1482,14 @@ fn main() -> Result<(), Error> {
     rl.set_helper(Some(h));
     if rl.load_history("history.txt").is_err() {}
 
-    let mut editor_ref = Arc::new(Mutex::new(rl));
+    let editor_ref = Arc::new(Mutex::new(rl));
     let editor_ref_copy = editor_ref.clone();
 
-    let mut env_ref = Arc::new(Mutex::new(env));
+    let env_ref = Arc::new(Mutex::new(env));
     let env_ref_copy = env_ref.clone();
 
     ctrlc::set_handler(move || {
-        repl(editor_ref_copy.clone(), env_ref_copy.clone());
+        repl(editor_ref_copy.clone(), env_ref_copy.clone()).expect("Error in REPL");
     })
     .expect("Error setting Ctrl-C handler");
     repl(editor_ref, env_ref)?;
