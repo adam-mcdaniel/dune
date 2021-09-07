@@ -209,6 +209,7 @@ impl fmt::Display for Expression {
                 let fmt = t.get_format();
                 fmt.padding(1, 1);
                 fmt.borders('│');
+                fmt.column_separator('│');
                 fmt.separator(LinePosition::Top, LineSeparator::new('═', '╤', '╒', '╕'));
                 fmt.separator(LinePosition::Title, LineSeparator::new('═', '╪', '╞', '╡'));
                 fmt.separator(LinePosition::Intern, LineSeparator::new('─', '┼', '├', '┤'));

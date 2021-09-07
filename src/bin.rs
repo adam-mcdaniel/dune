@@ -972,7 +972,7 @@ fn main() -> Result<(), Error> {
             }, "convert text to magenta on the console"),
 
             String::from("cyan") => Expression::builtin("cyan", |args, env| {
-                Ok(format!("\x1b[35;1m{}\x1b[m\x6b[0m", args[0].eval(env)?).into())
+                Ok(format!("\x1b[36;1m{}\x1b[m\x1b[0m", args[0].eval(env)?).into())
             }, "convert text to cyan on the console"),
 
             String::from("white") => Expression::builtin("white", |args, env| {
@@ -1005,7 +1005,7 @@ fn main() -> Result<(), Error> {
                 }, "convert text to magenta on the console"),
 
                 String::from("cyan") => Expression::builtin("cyan", |args, env| {
-                    Ok(format!("\x1b[35m{}\x1b[m\x6b[0m", args[0].eval(env)?).into())
+                    Ok(format!("\x1b[36m{}\x1b[m\x1b[0m", args[0].eval(env)?).into())
                 }, "convert text to cyan on the console"),
 
                 String::from("white") => Expression::builtin("white", |args, env| {
@@ -1476,6 +1476,7 @@ fn main() -> Result<(), Error> {
             let val = args[0].eval(env)?;
             match val {
                 Expression::Map(_) => println!("{}", val),
+                Expression::String(s) => println!("{}", s),
                 Expression::None => {},
                 otherwise => println!("{:?}", otherwise)
             }
