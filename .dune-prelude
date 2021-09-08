@@ -1,0 +1,171 @@
+
+let CATS = ["
+     _
+   |\\'/-..--.
+  / _ _   ,  ;
+ `~=`Y'~_<._./
+  <`-....__.'",
+"
+
+ |\\__/,|   (`\\
+ |_ _  |.--.) )
+ ( T   )     /
+(((^_(((/(((_/",
+"
+
+    \\    /\\
+     )  ( ')
+    (  /  )
+     \\(__)|",
+"
+
+      ^~^  ,
+     ('Y') )
+     /   \\/ 
+    (\\|||/)",
+"   .       .
+   \\`-\"'\"-'/
+    } 6 6 {
+   =.  Y  ,=
+     /^^^\\  .
+    /     \\  )
+   (  )-(  )/
+    \"\"   \"\"",
+"
+
+         /\\_/\\
+    ____/ o o \\
+  /~____  =Y= /
+ (______)__m_m)"
+];
+
+let map = f -> list -> {
+    for item in list {
+        f item
+    }
+};
+
+let reduce = f -> acc -> list -> {
+    for item in list {
+        let acc = f acc item
+    }
+    acc
+};
+
+let sum = reduce add 0;
+let product = reduce mul 1;
+let prod = product;
+
+let join = sep -> list -> {
+    let out = "";
+    let count = 0;
+    let size = len list;
+
+    for item in list {
+        let count = count + 1;
+        let out = out + item;
+        if count < size {
+            let out = out + sep;
+        }
+    }
+
+    out
+};
+
+let fact = n -> prod (2 to n + 1);
+
+
+let inc = n -> n + 1;
+let dec = n -> n - 1;
+
+let double = n -> n * 2;
+let triple = n -> n * 3;
+
+let half = n -> n // 2;
+let third = n -> n // 3;
+let quarter = n -> n // 4;
+
+let ls = 'lsd;
+let cat = 'bat;
+
+
+let prompt = cwd -> (fmt@blue "(dune) ") + (fmt@italics (fmt@green cwd)) + (fmt@blue "$ ");
+let incomplete_prompt = cwd -> ((len cwd) + (len "(dune) ")) * " " + (fmt@yellow "> ");
+
+
+let lib = {
+  fs: fs,
+  os: os,
+  fmt: fmt,
+  time: time,
+  rand: rand,
+  math: math,
+  widget: widget
+};
+
+
+let about = _ -> {
+  clear ();
+  echo (
+    widget@joiny
+      (widget@create "About"
+"        Hello, welcome to " + (fmt@yellow "Dune Shell!") + "
+      Written by: " + (fmt@magenta "http://adam-mcdaniel.net") + "\n
+I wrote Dune to blah blah blah"
+50 10)
+
+      (widget@joinx
+        (widget@create "Features"
+"Dune has a wide set of
+features, it's basically a
+full blown language!
+
+It supports several uncommon
+features in a shell, such as:
+operator overloading,
+lambdas, macros, quoted
+expressions like Lisp, and
+more!
+
+Dune's libraries are very
+extensive. There are
+libraries for:
+
+ ☞ A simple widget system🪟
+ ☞ OS information        💽
+ ☞ Basic Math, trig, etc.🧮
+ ☞ File system operations📂
+ ☞ Text color and styling📝
+ ☞ Functional programming🔗
+
+And more!"
+30 26)
+
+        (widget@joiny
+          (widget@create "About the Author" "I'm a sophomore at\nthe University of\nTennessee🏴󠁵󠁳󠁴󠁮󠁿\nstudying Computer💻\nScience🧪.\n\nI'm extremely \ninterested in\nlanguage design\n& compiler design.\nCheck out my other\nprojects on GitHub:\nadam-mcdaniel" 20 16)
+          (widget@create "Cat" (rand@choose CATS) 20 10)
+)))
+};
+
+clear ();
+let logo = "
+        ██████╗ ██╗   ██╗███╗   ██╗███████╗
+        ██╔══██╗██║   ██║████╗  ██║██╔════╝
+        ██║  ██║██║   ██║██╔██╗ ██║█████╗  
+        ██║  ██║██║   ██║██║╚██╗██║██╔══╝  
+        ██████╔╝╚██████╔╝██║ ╚████║███████╗
+        ╚═════╝  ╚═════╝ ╚═╝  ╚═══╝╚══════╝
+                                     ";
+
+
+
+echo "┌─────────────────Welcome to ...─────────────────┐";
+for ch in (chars logo) {
+    print (fmt@bold (if ch == "█" {
+       fmt@yellow ch
+    } else {
+       fmt@faint (fmt@yellow ch)
+    }));
+}
+echo "";
+echo "└────────────────────────────────────────────────┘";
