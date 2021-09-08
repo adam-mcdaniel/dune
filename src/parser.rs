@@ -572,24 +572,29 @@ fn parse_if(input: &str) -> IResult<&str, Expression, SyntaxError> {
 
     let (input, maybe_e) = opt(preceded(
         pair(try_parse_ws, tag("else")),
-        alt((parse_block, parse_expression_prec_four)),
+        alt((parse_block, parse_expression_prec_four, parse_if)),
     ))(input)?;
-    Ok((
-        input,
-        Expression::If(
-            Box::new(cond),
-            Box::new(t),
-            Box::new(match maybe_e {
-                Some(expr) => expr,
-                None => Expression::None,
-            }),
-        ),
-    ))
+
+    let result = Expression::If(
+        Box::new(cond),
+        Box::new(t),
+        Box::new(match maybe_e {
+            Some(expr) => Expression::Group(Box::new(expr)),
+            None => Expression::None,
+        }),
+    );
+
+    Ok((input, result))
+
 }
 
 fn parse_callable(input: &str) -> IResult<&str, Expression, SyntaxError> {
     let (input, _) = try_parse_ws(input)?;
-    let (input, arg) = parse_symbol(input)?;
+    let (input, arg) = match parse_symbol(input) {
+        Ok((input, symbol)) => (input, symbol),
+        Err(nom::Err::Failure(e)) => return Err(nom::Err::Error(e)),
+        Err(e) => return Err(e)
+    };
     let (input, _) = try_parse_ws(input)?;
     let (input, fn_type) = alt((tag("->"), tag("~>")))(input)?;
     let (input, body) = match parse_expression(input) {
@@ -945,10 +950,10 @@ fn parse_expression_prec_one(input: &str) -> IResult<&str, Expression, SyntaxErr
         parse_map,
         parse_block,
         parse_list,
+        map(parse_boolean, |b| Expression::Boolean(b)),
         map(parse_none, |_| Expression::None),
         map(parse_float, |n| Expression::Float(n)),
         map(parse_integer, |n| Expression::Integer(n)),
-        map(parse_boolean, |b| Expression::Boolean(b)),
         map(parse_string, |x| Expression::String(x)),
         map(parse_symbol, |x| Expression::Symbol(x)),
     ))(input)

@@ -639,16 +639,16 @@ where
 
     fn index(&self, idx: T) -> &Self {
         match (self, idx.into()) {
-            (Self::Map(m), Self::Symbol(name)) => match m.get(&name) {
+            (Self::Map(m), Self::Symbol(name))
+                | (Self::Map(m), Self::String(name))=> match m.get(&name) {
                 Some(val) => val,
                 None => &Self::None,
             },
-            (Self::Map(m), Self::String(name)) => match m.get(&name) {
-                Some(val) => val,
-                None => &Self::None,
-            },
+
             (Self::List(list), Self::Integer(n)) if list.len() > n as usize => &list[n as usize],
-            _ => &Self::None,
+            _ => {
+                &Self::None
+            },
         }
     }
 }

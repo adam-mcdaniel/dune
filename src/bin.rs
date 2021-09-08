@@ -254,122 +254,7 @@ fn get_os_family(t: &Type) -> String {
     .to_string()
 }
 
-const PRELUDE: &'static str = r#"
-let CATS = ["
-     _
-   |\\'/-..--.
-  / _ _   ,  ;
- `~=`Y'~_<._./
-  <`-....__.'",
-"
 
- |\\__/,|   (`\\
- |_ _  |.--.) )
- ( T   )     /
-(((^_(((/(((_/",
-"
-
-    \\    /\\
-     )  ( ')
-    (  /  )
-     \\(__)|",
-"
-
-      ^~^  ,
-     ('Y') )
-     /   \\/ 
-    (\\|||/)",
-"   .       .
-   \\`-\"'\"-'/
-    } 6 6 {
-   =.  Y  ,=
-     /^^^\\  .
-    /     \\  )
-   (  )-(  )/
-    \"\"   \"\"",
-"
-
-         /\\_/\\
-    ____/ o o \\
-  /~____  =Y= /
- (______)__m_m)"
-];
-
-let map = f -> list -> {
-    for item in list {
-        f item
-    }
-};
-
-let reduce = f -> acc -> list -> {
-    for item in list {
-        let acc = f acc item
-    }
-    acc
-};
-
-let sum = reduce add 0;
-let product = reduce mul 1;
-let prod = product;
-
-let join = sep -> list -> {
-    let out = "";
-    let count = 0;
-    let size = len list;
-
-    for item in list {
-        let count = count + 1;
-        let out = out + item;
-        if count < size {
-            let out = out + sep;
-        }
-    }
-
-    out
-};
-
-let fact = n -> prod (2 to n + 1);
-
-
-let inc = n -> n + 1;
-let dec = n -> n - 1;
-
-let double = n -> n * 2;
-let triple = n -> n * 3;
-
-let half = n -> n // 2;
-let third = n -> n // 3;
-let quarter = n -> n // 4;
-
-let ls = 'lsd;
-let cat = 'bat;
-
-
-let prompt = cwd -> (fmt@blue "(dune) ") + (fmt@green (fmt@italics cwd)) + (fmt@blue "$ ");
-let incomplete_prompt = cwd -> ((len cwd) + (len "(dune) ")) * " " + (fmt@yellow "> ");
-
-
-let about = _ -> {
-  clear ();
-  echo (
-    widget@joiny
-      (widget@create "About"
-"        Hello, welcome to " + (fmt@blue "⚛Atom⚛ Shell!") + "
-      Written by: " + (fmt@magenta "http://adam-mcdaniel.net") + "\n
-The goal of atom shell is to make shell scriptingmuch more powerful and formal. Most shells don't\noffer powerful libraries or good enough language\nfeatures to make scripting easy."
-50 10)
-
-      (widget@joinx
-        (widget@create "Features"
-"Atom offers a (very simple)\nwidget system. The entire\nsplash page is made using it!\nIt supports lambda calculus, macros, and traditional\niterative constructs.\n\nAtom's libraries are also\nextremely extensive.\nThere are libraries for:\n * Date and time\n * OS information\n * Shell information\n * File operations\nAnd much more. Atom even has\nlibraries for things like\ncard games and chess!\n\nAnd remember, if atom can do\nall of that, just imagine\nwhat it could do for your\nbuild scripts."
-30 26)
-
-        (widget@joiny
-          (widget@create "About the Author" "I'm a freshman at\nthe University of\nTennessee🏴󠁵󠁳󠁴󠁮󠁿\nstudying Computer💻\nScience🧪.\n\nI'm extremely \ninterested in\nlanguage design\n& compiler design.\nCheck out my other\nprojects on GitHub:\nadam-mcdaniel" 20 16)
-          (widget@create "Cat" (rand@choose CATS) 20 10)
-)))
-};
-"#;
 
 fn parse(input: impl ToString) -> Result<Expression, Error> {
     let input = input.to_string();
@@ -421,10 +306,10 @@ fn repl(
     atomic_rl: Arc<Mutex<Editor<DuneHelper>>>,
     atomic_env: Arc<Mutex<Environment>>,
 ) -> Result<(), Error> {
+    let mut lines = vec![];
     loop {
         let mut env = atomic_env.lock().unwrap();
         let mut rl = atomic_rl.lock().unwrap();
-        let mut lines = vec![];
         let cwd = env.get_cwd();
         // let prompt = format!("{}", Expression::Apply(Box::new(env.get("prompt").unwrap()), vec![env.get_cwd().into()]).eval(&mut env)?);
 
@@ -446,8 +331,9 @@ fn repl(
             .expect("No helper")
             .set_prompt(format!("{}", prompt));
         rl.helper_mut().expect("No helper").update_env(&env);
-        let text = readline(prompt, &mut rl);
-        let x = text.trim();
+        let line = readline(prompt, &mut rl);
+        lines.push(line.clone());
+        let text = lines.join("\n");
 
         match parse(&text) {
             Ok(expr) => {
@@ -474,13 +360,13 @@ fn repl(
                 }
                 rl.add_history_entry(text.as_str());
                 rl.save_history("history.txt").unwrap();
+                lines = vec![];
             }
 
             Err(e) => {
-                if !x.is_empty() {
-                    lines.push(x.to_string())
-                } else {
+                if line.is_empty() {
                     eprintln!("{}", e);
+                    lines = vec![];
                 }
             }
         }
@@ -908,7 +794,7 @@ fn main() -> Result<(), Error> {
                 let file = args[0].eval(env)?;
                 path = path.join(file.to_string());
                 match std::fs::write(path, args[1].eval(env)?.to_string()) {
-                    Ok(()) => Ok(file),
+                    Ok(()) => Ok(Expression::None),
                     Err(_) => Err(Error::CustomError(format!("could not write to file {}", file)))
                 }
             }, "write to a file"),
@@ -1168,15 +1054,32 @@ fn main() -> Result<(), Error> {
                 if i < args.len() - 1 {
                     print!("{} ", x)
                 } else {
+                    print!("{}", x)
+                }
+            }
+
+            Ok(Expression::None)
+        },
+        "print the arguments without a newline",
+    );
+
+    env.define_builtin(
+        "println",
+        |args, env| {
+            for (i, arg) in args.iter().enumerate() {
+                let x = arg.clone().eval(env)?;
+                if i < args.len() - 1 {
+                    print!("{} ", x)
+                } else {
                     println!("{}", x)
                 }
             }
 
             Ok(Expression::None)
         },
-        "print the arguments",
+        "print the arguments and a newline",
     );
-    env.define("echo", env.get("print").unwrap());
+    env.define("echo", env.get("println").unwrap());
 
     env.define_builtin(
         "range",
@@ -1306,7 +1209,7 @@ fn main() -> Result<(), Error> {
         |args, env| {
             let mut val = args[0].eval(env)?;
             for arg in &args[1..] {
-                val = val[arg.eval(env)?].clone()
+                val = val[arg.clone()].clone()
             }
             Ok(val)
         },
@@ -1396,17 +1299,7 @@ fn main() -> Result<(), Error> {
         "execute a program",
     );
 
-    env.define_builtin(
-        "list",
-        |args, env| {
-            Ok(Expression::List(
-                args.into_iter()
-                    .map(|x| x.eval(env))
-                    .collect::<Result<Vec<Expression>, Error>>()?,
-            ))
-        },
-        "create a list from the given arguments",
-    );
+
 
     if let Some(home_dir) = dirs::home_dir() {
         let home_dir = home_dir.into_os_string().into_string().unwrap();
@@ -1486,14 +1379,22 @@ fn main() -> Result<(), Error> {
         "default function for reporting values",
     );
 
-    match parse(PRELUDE) {
-        Ok(expr) => {
-            let _ = expr.eval(&mut env);
-        }
-        Err(e) => {
-            eprintln!("{}", e)
+
+    if let Some(home_dir) = dirs::home_dir() {
+        let prelude_path = home_dir.join(".dune-prelude");
+        match std::fs::read_to_string(&prelude_path) {
+            Ok(prelude) => match parse(&prelude) {
+                Ok(expr) => {
+                    let _ = expr.eval(&mut env);
+                }
+                Err(e) => {
+                    eprintln!("error while running {:?}: {}", prelude_path, e)
+                }
+            }
+            Err(e) => eprintln!("could not open {:?}: {}", prelude_path, e)
         }
     }
+
 
     let config = Config::builder()
         .history_ignore_dups(true)
