@@ -390,7 +390,7 @@ impl Expression {
                 Self::Assign(name, expr) => {
                     let x = expr.eval_mut(env)?;
                     env.define(&name, x.clone());
-                    return Ok(x);
+                    return Ok(Self::None);
                 }
 
                 Self::For(name, list, body) => {
@@ -441,7 +441,7 @@ impl Expression {
                             Err(e) => {
                                 return Err(match e.kind() {
                                     ErrorKind::NotFound => {
-                                        Error::CustomError(format!("\"{}\" not found", name))
+                                        Error::CustomError(format!("program \"{}\" not found", name))
                                     }
                                     ErrorKind::PermissionDenied => Error::CustomError(format!(
                                         "permission to execute \"{}\" denied",

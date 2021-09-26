@@ -1,4 +1,4 @@
-use dune::{parse_script, Environment, Error, Expression, Int, SyntaxError};
+use dune::{parse_script, VERSION, Environment, Error, Expression, Int, SyntaxError};
 
 use rustyline::{error::ReadlineError, Editor, Helper};
 use rustyline::completion::{Completer, FilenameCompleter, Pair as PairComplete};
@@ -13,18 +13,448 @@ use rustyline_derive::Helper;
 
 
 use common_macros::b_tree_map;
+use os_info::Type;
+use chrono::{Local, Timelike, Datelike};
 
 use rand::{distributions::Uniform, seq::SliceRandom, thread_rng, Rng};
 
 use std::{
     borrow::Cow::{self, Borrowed, Owned},
     path::PathBuf,
+    env::current_exe,
     sync::{Arc, Mutex},
     thread::sleep,
     time::Duration,
 };
 
-use os_info::Type;
+
+
+const DEFAULT_PRELUDE: &'static str = r#"
+
+
+let CATS = ["
+     _
+   |\\'/-..--.
+  / _ _   ,  ;
+ `~=`Y'~_<._./
+  <`-....__.'",
+"
+
+ |\\__/,|   (`\\
+ |_ _  |.--.) )
+ ( T   )     /
+(((^_(((/(((_/",
+"
+
+    \\    /\\
+     )  ( ')
+    (  /  )
+     \\(__)|",
+"
+
+      ^~^  ,
+     ('Y') )
+     /   \\/ 
+    (\\|||/)",
+"   .       .
+   \\`-\"'\"-'/
+    } 6 6 {
+   =.  Y  ,=
+     /^^^\\  .
+    /     \\  )
+   (  )-(  )/
+    \"\"   \"\"",
+"
+
+         /\\_/\\
+    ____/ o o \\
+  /~____  =Y= /
+ (______)__m_m)"
+];
+
+let prompt = cwd -> fmt@bold ((fmt@dark@blue "(dune) ") + (fmt@bold (fmt@dark@green cwd)) + (fmt@bold (fmt@dark@blue "$ ")));
+let incomplete_prompt = cwd -> ((len cwd) + (len "(dune) ")) * " " + (fmt@bold (fmt@dark@yellow "> "));
+
+let shrew = _ ~> {
+"
+          _,____ c--.
+        /`  \\   ` _^_\\
+    `~~~\\  _/---'\\\\  ^
+         `~~~     ~~
+    ─────────────────────
+"
+};
+
+let turnedshrew = _ ~> {
+"
+      .--p_____,_
+     /_^_ `   /  `\\
+     ^  //'---\\_  /~~~
+       ~~     ~~~`
+     ──────────────────
+"
+};
+
+let shrewsay = text -> {
+    let title = "Wild Dune Shrew";
+
+
+    let cols = 22;
+    let text = fmt@wrap text cols;
+    let text-lines = lines text;
+    if (len text-lines) == 1 {
+        if (len text) < cols {
+            let cols = len text;
+        }
+    }
+    let rows = len text-lines;
+    let spacing = 25;
+
+    for line in (lines (widget@create title text cols + 2 rows + 2)) {
+        echo " " * spacing line;
+    }
+
+    for i in 0 to 2 {
+        echo " " * (spacing - i) "╱";
+    }
+
+    echo (shrew ());
+};
+
+let turnedshrewsay = text -> {
+    let title = "Wild Dune Shrew";
+
+    let cols = 27;
+    let text = fmt@wrap text cols;
+    let text-lines = lines text;
+    if (len text-lines) == 1 {
+        if (len text) < cols {
+            let cols = len text;
+        }
+    }
+    let rows = len text-lines;
+    let spacing = 20;
+
+    for line in (lines (widget@create title text cols + 2 rows + 2)) {
+        echo " " * spacing line;
+    }
+
+    for i in 0 to 2 {
+        echo " " * (spacing - i) "╱";
+    }
+
+    echo (turnedshrew ());
+};
+
+
+let about = _ -> {
+    echo (
+      widget@joiny
+        (widget@create "About"
+  "        Hello, welcome to " + (fmt@yellow "Dune Shell!") + "
+        Written by: " + (fmt@magenta "http://adam-mcdaniel.net") + "\n
+  I wrote Dune to blah blah blah"
+  50 10)
+  
+        (widget@joinx
+          (widget@create "Features"
+"Dune has a wide set of
+features, it's basically a
+full blown language!
+
+It supports several uncommon
+features in a shell, such as:
+operator overloading,
+lambdas, macros, quoted
+expressions like Lisp, and
+more!
+
+Dune's libraries are very
+extensive. There are
+libraries for:
+
+☞ A simple widget system🪟
+☞ OS information        💽
+☞ Randomness            🔀
+☞ Basic math, trig, etc.🧮
+☞ File system operations📂
+☞ Text color and styling📝
+☞ Functional programming🔗
+☞ Date and time         🕒
+
+And more!"
+  30 28)
+  
+          (widget@joiny
+            (widget@create "About the Author" "I'm a sophomore at\nthe University of\nTennessee🏴󠁵󠁳󠁴󠁮󠁿\nstudying Computer💻\nScience🧪.\n\nI'm extremely \ninterested in\nlanguage design\n& compiler design.\nCheck out my other\nprojects on GitHub:\n\nadam-mcdaniel" 20 18)
+            (widget@create "Cat" (rand@choose CATS) 20 10)
+  )))
+};
+
+
+let welcomebanner = _ ~> {
+
+
+    let logo = "
+        ██████╗ ██╗   ██╗███╗   ██╗███████╗
+        ██╔══██╗██║   ██║████╗  ██║██╔════╝
+        ██║  ██║██║   ██║██╔██╗ ██║█████╗  
+        ██║  ██║██║   ██║██║╚██╗██║██╔══╝  
+        ██████╔╝╚██████╔╝██║ ╚████║███████╗
+        ╚═════╝  ╚═════╝ ╚═╝  ╚═══╝╚══════╝
+                                     ";
+
+    let logo = "
+
+        ██████╗░██╗░░░██╗███╗░░██╗███████╗
+        ██╔══██╗██║░░░██║████╗░██║██╔════╝
+        ██║░░██║██║░░░██║██╔██╗██║█████╗░░
+        ██║░░██║██║░░░██║██║╚████║██╔══╝░░
+        ██████╔╝╚██████╔╝██║░╚███║███████╗
+        ╚═════╝░░╚═════╝░╚═╝░░╚══╝╚══════╝
+";
+
+    (_ -> {
+        let now = time@now ();
+        let time-emoji = if now@hour <= 6 "🌃"
+            else if now@hour <= 10 "🌅"
+            else if now@hour <= 18 "🌤️ "
+            else "🌃";
+        let date-emoji = if now@month == 1 "⛄"
+            else if now@month == 2 "💖"
+            else if now@month == 3 "🍀"
+            else if now@month == 4 "🌂"
+            else if now@month == 5 "🌻"
+            else if now@month == 6 "🌞"
+            else if now@month == 7 "🌊"
+            else if now@month == 8 "📝"
+            else if now@month == 9 "🍎"
+            else if now@month == 10 "🎃"
+            else if now@month == 11 "🍂"
+            else if now@month == 12 "🌨️"
+            else "📅";
+        let zodiac-emoji = if now@month == 1 (if now@day < 20 "🐐" else "🏺")
+            else if now@month == 2 (if now@day < 19 "🏺" else "🐟")
+            else if now@month == 3 (if now@day < 21 "🐟" else "🐏")
+            else if now@month == 4 (if now@day < 20 "🐏" else "🐂")
+            else if now@month == 5 (if now@day < 21 "🐂" else "👬")
+            else if now@month == 6 (if now@day < 21 "👬" else "🦀")
+            else if now@month == 7 (if now@day < 23 "🦀" else "🦁")
+            else if now@month == 8 (if now@day < 23 "🦁" else "👩")
+            else if now@month == 9 (if now@day < 23 "👩" else "⚖️")
+            else if now@month == 10 (if now@day < 23 "⚖️" else "🦂")
+            else if now@month == 11 (if now@day < 22 "🦂" else "🏹")
+            else if now@month == 12 (if now@day < 22 "🏹" else "🐐")
+            else "⭐";
+        echo "┌─────────────────Welcome to ...─────────────────┐";
+        for ch in (chars logo) {
+            print (fmt@bold (if ch == "█" {
+               fmt@faint (fmt@red ch)
+            } else {
+               fmt@faint (fmt@dark@blue ch)
+            }));
+        }
+        echo "";
+        echo "        The time is " + (fmt@magenta now@time@str) + " " + time-emoji + " on " + (fmt@cyan now@date@str);
+        echo "└────────────────────────────────────────────────┘";
+    }) ();
+
+};
+
+
+let is-leapyear = year -> {
+    if year % 4 == 0 && year % 100 != 0 {
+        True
+    } else if year % 100 == 0 && year % 400 == 0 {
+        True
+    } else {
+        False
+    }
+};
+
+let days-in-month = month -> year -> {
+    if month == 2 {
+        28 + (if (is-leapyear year) 1 else 0)
+    } else {
+        31 - (((month - 1) % 7) % 2)
+    }
+};
+
+let day-of-week = m -> d -> y -> {
+    let t = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4];
+
+    if m < 3 {
+        let y = y - 1
+    }
+
+    (((y + (int(y // 4.0))) - (int(y // 100.0))) + (int(y // 400.0)) + t@(m - 1) + d) % 7
+};
+
+let WEEKDAYS = [
+	"Sunday",
+	"Monday",
+	"Tuesday",
+	"Wednesday",
+	"Thursday",
+	"Friday",
+	"Saturday"
+];
+
+let MONTHS = [
+	"January",
+	"February",
+	"March",
+	"April",
+	"May",
+	"June",
+	"July",
+	"August",
+	"September",
+	"October",
+	"November",
+	"December"
+];
+
+let make-calendar = m -> d -> y -> {
+    let now = {month: m, day: d, year: y};
+    let result = MONTHS@(now@month - 1) + " " + (str now@day) + ", " + (str now@year) + "\n";
+	let result = " " * ((28 - (len result)) // 2 + 1) + result;
+    let result = result + " Su  Mo  Tu  We  Th  Fr  Sa\n";
+
+    let dof = day-of-week now@month 1 now@year;
+    let dim = days-in-month now@month now@year;
+
+    for i in 0 to dof {
+        let result = result + "    ";
+    }
+
+    for i in 1 to dim + 1 {
+        let num = str i;
+        if (len num) < 2 {
+            let num = (if now@day == i " *" else "  ") + num
+        } else {
+            let num = (if now@day == i "*" else " ") + num
+        }
+
+        let result = result + num + (if (i + dof) % 7 == 0 "\n" else " ")
+    }
+    widget@create "Calendar" result 30 10
+};
+
+let cal = _ ~> {
+    (_ -> {
+        let now = time@now ();
+        make-calendar now@month now@day now@year
+    }) ();
+};
+
+
+
+let welcome = _ ~> {
+    welcomebanner ();
+    (_ -> {
+        let now = time@now ();
+        echo (widget@joinx
+            (make-calendar now@month now@day now@year)
+            (widget@create "Cat" (rand@choose CATS) 20 10));
+    }) ();
+};
+
+
+let yesorno = _ -> {
+    (input (fmt@blue "(y/n) ")) != "n"
+};
+
+let wait = _ -> {
+   input (fmt@italics (fmt@blue "(Press enter to continue) "));
+};
+
+
+let intro = _ ~> {
+
+    clear ();
+    welcomebanner ();
+
+
+    shrewsay "Hey there! Is this your first time using Dune?";
+    if (yesorno ()) {
+        clear ();
+        welcomebanner ();
+        shrewsay "Then let's get started!";
+        wait ();
+        
+        clear ();
+        welcomebanner ();
+        about ();
+        turnedshrewsay "First off, here's some background information about Dune!";
+        wait ();
+
+
+        clear ();
+        welcomebanner ();
+        shrewsay "To execute a program in Dune, simply call the program the same way you would in bash or Powershell!\n\n\n$ prog arg1 arg2 ...";
+        wait ();
+        
+        clear ();
+        welcomebanner ();
+        turnedshrewsay "You can also define macros for Dune, and call them the same way you would a program! (Macros called without arguments are implicitly passed the current working directory as an argument)\n\n\n$ cd ..";
+        wait ();
+        
+        clear ();
+        welcomebanner ();
+        shrewsay "To define variables (which also act as environment variables), simply use the `let` keyword!\n\n\n$ let x = 5";
+        wait ();
+        
+        clear ();
+        welcomebanner ();
+        turnedshrewsay "That should be enough to get you started! If you have any questions, just call the `help` macro! To ask for general help, run `help me`!\n\n\n$ help me";
+        wait ();
+        
+        clear ();
+        welcomebanner ();
+        turnedshrewsay "Good luck! I really hope you enjoy my shell!😄❤️";
+        wait ();
+
+    } else {
+        clear ();
+        welcomebanner ();
+        turnedshrewsay "Oh good! I'll assume you know your way around. To write your own startup script, instead of this default script, write a `.dune-prelude` file in your home directory! Bye!";
+        wait ();
+    }
+
+    clear ();
+    welcome ();
+};
+
+intro ();
+
+"#;
+
+
+fn new_editor(env: &Environment) -> Editor<DuneHelper> {
+    let config = Config::builder()
+        .history_ignore_dups(true)
+        .history_ignore_space(true)
+        .auto_add_history(false)
+        .completion_type(CompletionType::List)
+        .edit_mode(EditMode::Emacs)
+        .output_stream(OutputStreamType::Stdout)
+        .build();
+
+    let mut rl = Editor::with_config(config);
+
+    let h = DuneHelper {
+        completer: FilenameCompleter::new(),
+        highlighter: MatchingBracketHighlighter::new(),
+        hinter: HistoryHinter {},
+        colored_prompt: "".to_string(),
+        validator: MatchingBracketValidator::new(),
+        env: env.clone(),
+    };
+    rl.set_helper(Some(h));
+    rl
+}
+
 
 #[derive(Helper)]
 struct DuneHelper {
@@ -35,6 +465,7 @@ struct DuneHelper {
     colored_prompt: String,
     env: Environment,
 }
+
 
 impl DuneHelper {
     fn set_prompt(&mut self, prompt: impl ToString) {
@@ -161,11 +592,105 @@ impl Highlighter for DuneHelper {
     }
 
     fn highlight<'l>(&self, line: &'l str, pos: usize) -> Cow<'l, str> {
-        self.highlighter.highlight(line, pos)
+        let line = line
+            .replace("False", "\x1b[95mFalse\x1b[m\x1b[0m")
+            .replace("True", "\x1b[95mTrue\x1b[m\x1b[0m")
+            
+            .replace("None", "\x1b[91mNone\x1b[m\x1b[0m")
+            .replace("()", "\x1b[91m()\x1b[m\x1b[0m")
+
+            .replace("clear ",   "\x1b[94mclear \x1b[m\x1b[0m")
+            .replace("echo ",   "\x1b[94mecho \x1b[m\x1b[0m")
+            .replace("exit ",   "\x1b[94mexit \x1b[m\x1b[0m")
+            .replace("cd ",   "\x1b[94mcd \x1b[m\x1b[0m")
+            .replace("rm ",   "\x1b[94mrm \x1b[m\x1b[0m")
+
+
+            .replace("else ",   "\x1b[94melse\x1b[m\x1b[0m")
+            .replace("let ", "\x1b[94mlet\x1b[m\x1b[0m")
+            .replace("for ",   "\x1b[94mfor\x1b[m\x1b[0m")
+            .replace("if ",   "\x1b[94mif\x1b[m\x1b[0m")
+            .replace(" in ",   "\x1b[94m in \x1b[m\x1b[0m")
+            .replace(" to ",   "\x1b[94m to \x1b[m\x1b[0m")
+
+            .replace(" == ",   "\x1b[96m == \x1b[m\x1b[0m")
+            .replace(" != ",   "\x1b[96m != \x1b[m\x1b[0m")
+            .replace(" <= ",   "\x1b[96m <= \x1b[m\x1b[0m")
+            .replace(" >= ",   "\x1b[96m >= \x1b[m\x1b[0m")
+            .replace(" && ",   "\x1b[96m && \x1b[m\x1b[0m")
+            .replace(" || ",   "\x1b[96m || \x1b[m\x1b[0m")
+
+            .replace("@",   "\x1b[96m@\x1b[m\x1b[0m")
+            .replace("'",   "\x1b[96m'\x1b[m\x1b[0m")
+
+            .replace("->",   "\x1b[95m->\x1b[m\x1b[0m")
+            .replace("~>",   "\x1b[95m~>\x1b[m\x1b[0m")
+
+
+            .replace(" > ",   "\x1b[96m > \x1b[m\x1b[0m")
+            .replace(" < ",   "\x1b[96m < \x1b[m\x1b[0m")
+
+            .replace(" + ",   "\x1b[96m + \x1b[m\x1b[0m")
+            .replace(" - ",   "\x1b[96m - \x1b[m\x1b[0m")
+            .replace(" * ",   "\x1b[96m * \x1b[m\x1b[0m")
+            .replace(" // ",   "\x1b[96m // \x1b[m\x1b[0m")
+            ;
+        match self.highlighter.highlight(&line, pos) {
+            Owned(x) => Owned(x),
+            Borrowed(x) => Owned(x.to_owned())
+        }
     }
 
     fn highlight_char(&self, line: &str, pos: usize) -> bool {
-        self.highlighter.highlight_char(line, pos)
+        if self.highlighter.highlight_char(line, pos) {
+            return true;
+        }
+        let old_line = line;
+        let line = line
+            .replace("False", "\x1b[95mFalse\x1b[m\x1b[0m")
+            .replace("True", "\x1b[95mTrue\x1b[m\x1b[0m")
+
+            .replace("None", "\x1b[91mNone\x1b[m\x1b[0m")
+            .replace("()", "\x1b[91m()\x1b[m\x1b[0m")
+
+            .replace("clear ",   "\x1b[94mclear \x1b[m\x1b[0m")
+            .replace("echo ",   "\x1b[94mecho \x1b[m\x1b[0m")
+            .replace("exit ",   "\x1b[94mexit \x1b[m\x1b[0m")
+            .replace("cd ",   "\x1b[94mcd \x1b[m\x1b[0m")
+            .replace("rm ",   "\x1b[94mrm \x1b[m\x1b[0m")
+
+
+            .replace("else ",   "\x1b[94melse\x1b[m\x1b[0m")
+            .replace("let ", "\x1b[94mlet\x1b[m\x1b[0m")
+            .replace("for ",   "\x1b[94mfor\x1b[m\x1b[0m")
+            .replace("if ",   "\x1b[94mif\x1b[m\x1b[0m")
+            .replace(" in ",   "\x1b[94m in \x1b[m\x1b[0m")
+            .replace(" to ",   "\x1b[94m to \x1b[m\x1b[0m")
+
+            .replace(" == ",   "\x1b[96m == \x1b[m\x1b[0m")
+            .replace(" != ",   "\x1b[96m != \x1b[m\x1b[0m")
+            .replace(" <= ",   "\x1b[96m <= \x1b[m\x1b[0m")
+            .replace(" >= ",   "\x1b[96m >= \x1b[m\x1b[0m")
+            .replace(" && ",   "\x1b[96m && \x1b[m\x1b[0m")
+            .replace(" || ",   "\x1b[96m || \x1b[m\x1b[0m")
+
+            .replace("@",   "\x1b[96m + \x1b[m\x1b[0m")
+            .replace("'",   "\x1b[96m'\x1b[m\x1b[0m")
+
+            .replace("->",   "\x1b[95m->\x1b[m\x1b[0m")
+            .replace("~>",   "\x1b[95m~>\x1b[m\x1b[0m")
+
+
+            .replace(" > ",   "\x1b[96m > \x1b[m\x1b[0m")
+            .replace(" < ",   "\x1b[96m < \x1b[m\x1b[0m")
+
+            .replace(" + ",   "\x1b[96m + \x1b[m\x1b[0m")
+            .replace(" - ",   "\x1b[96m - \x1b[m\x1b[0m")
+            .replace(" * ",   "\x1b[96m * \x1b[m\x1b[0m")
+            .replace(" // ",   "\x1b[96m // \x1b[m\x1b[0m")
+            ;
+
+        old_line != line
     }
 }
 
@@ -257,17 +782,20 @@ fn get_os_family(t: &Type) -> String {
 
 
 fn parse(input: impl ToString) -> Result<Expression, Error> {
-    let input = input.to_string();
-    match parse_script(input.as_str(), true) {
-        Ok((unparsed, result)) => {
-            if !unparsed.is_empty() {
-                eprintln!("UNPARSED: `{}`", unparsed);
-                return Err(Error::CustomError("incomplete input".to_string()));
+    if let Ok(input) = comment::python::strip(input) {
+        match parse_script(input.as_str(), true) {
+            Ok((unparsed, result)) => {
+                if !unparsed.is_empty() {
+                    eprintln!("UNPARSED: `{}`", unparsed);
+                    return Err(Error::CustomError("incomplete input".to_string()));
+                }
+                Ok(result)
             }
-            Ok(result)
+            Err(nom::Err::Error(e)) | Err(nom::Err::Failure(e)) => Err(Error::SyntaxError(e)),
+            Err(nom::Err::Incomplete(_)) => Err(Error::SyntaxError(SyntaxError::InternalError)),
         }
-        Err(nom::Err::Error(e)) | Err(nom::Err::Failure(e)) => Err(Error::SyntaxError(e)),
-        Err(nom::Err::Incomplete(_)) => Err(Error::SyntaxError(SyntaxError::InternalError)),
+    } else {
+        Err(Error::CustomError("could not strip comments from command".to_string()))
     }
 }
 
@@ -337,7 +865,10 @@ fn repl(
 
         match parse(&text) {
             Ok(expr) => {
-                match expr.eval(&mut env) {
+                rl.add_history_entry(text.as_str());
+                rl.save_history("history.txt").unwrap();
+                let val = expr.eval(&mut env);
+                match val.clone() {
                     Ok(Expression::Symbol(name)) => {
                         if let Err(e) =
                             Expression::Apply(Box::new(Expression::Symbol(name)), vec![])
@@ -347,6 +878,19 @@ fn repl(
                         }
                     }
                     Ok(Expression::None) => {}
+                    Ok(Expression::Macro(_, _)) => {
+                        let _ = Expression::Apply(
+                            Box::new(Expression::Symbol("report".to_string())),
+                            vec![
+                                Expression::Apply(
+                                    Box::new(val.unwrap().clone()),
+                                    vec![
+                                        env.get_cwd().into()
+                                    ]
+                                )
+                            ],
+                        ).eval(&mut env);
+                    }
                     Ok(val) => {
                         let _ = Expression::Apply(
                             Box::new(Expression::Symbol("report".to_string())),
@@ -358,8 +902,6 @@ fn repl(
                         eprintln!("{}", e)
                     }
                 }
-                rl.add_history_entry(text.as_str());
-                rl.save_history("history.txt").unwrap();
                 lines = vec![];
             }
 
@@ -382,6 +924,24 @@ fn main() -> Result<(), Error> {
             String::from("PI")  => std::f64::consts::PI.into(),
             String::from("TAU") => std::f64::consts::TAU.into(),
 
+            String::from("isodd") => Expression::builtin("isodd", |args, env| {
+                check_exact_args_len("odd", &args, 1)?;
+                Ok(match args[0].eval(env)? {
+                    Expression::Integer(i) => i % 2 == 1,
+                    Expression::Float(f) => (f as Int) % 2 == 1,
+                    e => return Err(Error::CustomError(format!("invalid isodd argument {}", e)))
+                }.into())
+            }, "is a number odd?"),
+
+            String::from("iseven") => Expression::builtin("iseven", |args, env| {
+                check_exact_args_len("even", &args, 1)?;
+                Ok(match args[0].eval(env)? {
+                    Expression::Integer(i) => i % 2 == 0,
+                    Expression::Float(f) => (f as Int) % 2 == 0,
+                    e => return Err(Error::CustomError(format!("invalid iseven argument {}", e)))
+                }.into())
+            }, "is a number even?"),
+
             String::from("pow") => Expression::builtin("pow", |args, env| {
                 check_exact_args_len("pow", &args, 2)?;
                 match (args[0].eval(env)?, args[1].eval(env)?) {
@@ -390,7 +950,7 @@ fn main() -> Result<(), Error> {
                     (Expression::Integer(base), Expression::Float(exponent)) => Ok((base as f64).powf(exponent).into()),
                     (Expression::Integer(base), Expression::Integer(exponent)) => match base.checked_pow(exponent as u32) {
                         Some(n) => Ok(n.into()),
-                        None => Err(Error::CustomError(format!("overflow when raisint {} to the power {}", base, exponent)))
+                        None => Err(Error::CustomError(format!("overflow when raising int {} to the power {}", base, exponent)))
                     },
                     (a, b) => Err(Error::CustomError(format!("cannot raise {} to the power {}", a, b)))
                 }
@@ -562,6 +1122,22 @@ fn main() -> Result<(), Error> {
     let os_type = os.os_type();
 
     env.define(
+        "shell",
+        b_tree_map! {
+            String::from("author") => Expression::String("Adam McDaniel (adam-mcdaniel.net)".to_string()),
+            String::from("version") => Expression::String(VERSION.to_string()),
+            String::from("path") => {
+                if let Ok(path) = current_exe() {
+                    Expression::String(path.to_str().unwrap().to_string())
+                } else {
+                    Expression::None
+                }
+            }
+        }
+        .into(),
+    );
+
+    env.define(
         "os",
         b_tree_map! {
             String::from("name") => Expression::from(get_os_name(&os_type)),
@@ -579,11 +1155,13 @@ fn main() -> Result<(), Error> {
                 let title = args[0].eval(env)?.to_string();
                 let title_len = title.chars().collect::<Vec<char>>().len();
 
-                let text = args[1].eval(env)?.to_string();
                 let text_width = match args[2].eval(env)? {
                     Expression::Integer(n) if n > 4 => n,
                     otherwise => return Err(Error::CustomError(format!("expected width argument to be integer greater than 4, but got {}", otherwise)))
                 } as usize - 2;
+
+                let text = textwrap::fill(&args[1].eval(env)?.to_string(), text_width);
+
                 let widget_height = match args[3].eval(env)? {
                     Expression::Integer(n) if n >= 3 => n,
                     otherwise => return Err(Error::CustomError(format!("expected height argument to be an integer greater than 2, but got {}", otherwise)))
@@ -602,6 +1180,7 @@ fn main() -> Result<(), Error> {
                     let mut result = format!("┌{left_side}{}{right_side}┐\n", title, left_side=left_border_half, right_side=right_border_half);
                     let width = result.chars().collect::<Vec<char>>().len() - 1;
 
+                    let mut lines = 1;
                     let mut i = 0;
                     for ch in text.chars() {
                         if i == 0 {
@@ -610,10 +1189,15 @@ fn main() -> Result<(), Error> {
                         }
 
                         if ch == '\n' {
+                            lines += 1;
                             result += &" ".repeat(width-i);
                             i = width;
                         } else {
                             result.push(ch);
+                        }
+
+                        if lines == widget_height - 1 {
+                            break
                         }
 
                         if i >= width-1 {
@@ -707,7 +1291,23 @@ fn main() -> Result<(), Error> {
                 }
 
                 Ok(Expression::None)
-            }, "sleep for a given number of milliseconds")
+            }, "sleep for a given number of milliseconds"),
+            String::from("now") => Expression::builtin("now", |_, _| {
+                let now = Local::now();
+
+                Ok(Expression::Map(b_tree_map! {
+                    String::from("year") => Expression::Integer(now.year() as i64),
+                    String::from("month") => Expression::Integer(now.month() as i64),
+                    String::from("day") => Expression::Integer(now.day() as i64),
+                    String::from("hour") => Expression::Integer(now.hour() as i64),
+                    String::from("time") => Expression::Map(b_tree_map! {
+                        String::from("str") => Expression::String(now.time().format("%-I:%M %p").to_string()),
+                    }.into()),
+                    String::from("date") => Expression::Map(b_tree_map! {
+                        String::from("str") => Expression::String(now.format("%D").to_string()),
+                    }.into()),
+                }))
+            }, "get information about the current time")
         }.into()
     );
 
@@ -752,9 +1352,48 @@ fn main() -> Result<(), Error> {
         }.into()
     );
 
+    let mut dir_tree = b_tree_map! {};
+
+    if let Some(home_dir) = dirs::home_dir() {
+        let home_dir = home_dir.into_os_string().into_string().unwrap();
+        env.set_cwd(&home_dir);
+
+        dir_tree.insert("home".to_string(), Expression::from(home_dir.clone()));
+        env.define("HOME", Expression::String(home_dir));
+    }
+
+    if let Some(desk_dir) = dirs::desktop_dir() {
+        let desk_dir = desk_dir.into_os_string().into_string().unwrap();
+        dir_tree.insert("desk".to_string(), desk_dir.clone().into());
+        env.define(
+            "DESK",
+            Expression::String(desk_dir),
+        );
+    }
+
+    if let Some(docs_dir) = dirs::document_dir() {
+        let docs_dir = docs_dir.into_os_string().into_string().unwrap();
+        dir_tree.insert("docs".to_string(), docs_dir.clone().into());
+        env.define(
+            "DOCS",
+            Expression::String(docs_dir),
+        );
+    }
+
+    if let Some(down_dir) = dirs::download_dir() {
+        let down_dir = down_dir.into_os_string().into_string().unwrap();
+        dir_tree.insert("down".to_string(), down_dir.clone().into());
+        env.define(
+            "DOWN",
+            Expression::String(down_dir),
+        );
+    }
+
+
     env.define(
         "fs",
         b_tree_map! {
+            String::from("dirs") => dir_tree.into(),
             String::from("exists") => Expression::builtin("exists", |args, env| {
                 check_exact_args_len("exists", &args, 1)?;
                 let path = PathBuf::from(env.get_cwd());
@@ -802,9 +1441,128 @@ fn main() -> Result<(), Error> {
         .into(),
     );
 
+
+    env.define(
+        "fn",
+        b_tree_map! {
+            String::from("map") => Expression::builtin("map", |args, env| {
+                if !(1..=2).contains(&args.len()) {
+                    return Err(Error::CustomError(if args.len() > 2 {
+                        "too many arguments to function map"
+                    } else {
+                        "too few arguments to function map"
+                    }.to_string()))
+                }
+
+                if args.len() == 1 {
+                    Expression::Apply(
+                        Box::new(parse("f -> list -> for item in list {f item}")?),
+                        args.clone()
+                    ).eval(env)
+                } else if let Expression::List(list) = args[1].eval(env)? {
+                    let f = args[0].eval(env)?;
+                    let mut result = vec![];
+                    for item in list {
+                        result.push(Expression::Apply(
+                            Box::new(f.clone()),
+                            vec![item]
+                        ).eval(env)?)
+                    }
+                    Ok(result.into())
+                } else {
+                    Err(Error::CustomError(format!("invalid arguments to map: {}", Expression::from(args))))
+                }
+            }, "map a function over a list of values"),
+
+            String::from("filter") => Expression::builtin("filter", |args, env| {
+                if !(1..=2).contains(&args.len()) {
+                    return Err(Error::CustomError(if args.len() > 2 {
+                        "too many arguments to function filter"
+                    } else {
+                        "too few arguments to function filter"
+                    }.to_string()))
+                }
+
+                if args.len() == 1 {
+                    Expression::Apply(
+                        Box::new(parse("f -> list -> { let result = []; for item in list { if (f item) { let result = result + item }} result}")?),
+                        args.clone()
+                    ).eval(env)
+                } else if let Expression::List(list) = args[1].eval(env)? {
+                    let f = args[0].eval(env)?;
+                    let mut result = vec![];
+                    for item in list {
+                        if Expression::Apply(
+                            Box::new(f.clone()),
+                            vec![item.clone()]
+                        ).eval(env)?.is_truthy() {
+                            result.push(item)
+                        }
+                    }
+                    Ok(result.into())
+                } else {
+                    Err(Error::CustomError(format!("invalid arguments to filter: {}", Expression::from(args))))
+                }
+            }, "filter a list of values with a condition function"),
+
+            String::from("reduce") => Expression::builtin("reduce", |args, env| {
+                if !(1..=3).contains(&args.len()) {
+                    return Err(Error::CustomError(if args.len() > 3 {
+                        "too many arguments to function reduce"
+                    } else {
+                        "too few arguments to function reduce"
+                    }.to_string()))
+                }
+
+                if args.len() < 3 {
+                    Expression::Apply(
+                        Box::new(parse("f -> acc -> list -> { for item in list { let acc = f acc item } acc }")?),
+                        args.clone()
+                    ).eval(env)
+                } else if let Expression::List(list) = args[2].eval(env)? {
+                    let f = args[0].eval(env)?;
+                    let mut acc = args[1].eval(env)?;
+                    for item in list {
+                        acc = Expression::Apply(
+                            Box::new(f.clone()),
+                            vec![acc, item]
+                        ).eval(env)?
+                    }
+                    Ok(acc)
+                } else {
+                    Err(Error::CustomError(format!("invalid arguments to reduce: {}", Expression::from(args))))
+                }
+            }, "reduce a function over a list of values")
+        }
+        .into(),
+    );
+
+    env.define(
+	"console",
+	b_tree_map! {
+		String::from("write") => Expression::builtin("write", |args, env| {
+			check_exact_args_len("write", &args, 3)?;
+        	        print!("\x1b[s\x1b[{line};{column}H\x1b[{line};{column}f{content}\x1b[u",
+				line=args[1].eval(env)?,
+				column=args[0].eval(env)?,
+				content=args[2].eval(env)?
+			);
+			Ok(Expression::None)
+	        }, "write text to a specific position in the console"),
+	}.into()
+    );
+
     env.define(
         "fmt",
         b_tree_map! {
+            String::from("wrap") => Expression::builtin("wrap", |args, env| {
+                check_exact_args_len("wrap", &args, 2)?;
+                match args[1].eval(env)? {
+                    Expression::Integer(columns) => Ok(textwrap::fill(&args[0].eval(env)?.to_string(), columns as usize).into()),
+                    otherwise => Err(Error::CustomError(format!("expected number of columns in wrap, but got {}", otherwise)))
+                }
+            }, "wrap text such that it fits in a specific number of columns"),
+
             String::from("bold") => Expression::builtin("bold", |args, env| {
                 Ok(format!("\x1b[1m{}\x1b[m\x1b[0m", args[0].eval(env)?).into())
             }, "convert text to bold on the console"),
@@ -834,35 +1592,35 @@ fn main() -> Result<(), Error> {
             }, "strike out text on the console"),
 
             String::from("black") => Expression::builtin("black", |args, env| {
-                Ok(format!("\x1b[30;1m{}\x1b[m\x1b[0m", args[0].eval(env)?).into())
+                Ok(format!("\x1b[90m{}\x1b[m\x1b[0m", args[0].eval(env)?).into())
             }, "convert text to black on the console"),
 
             String::from("red") => Expression::builtin("red", |args, env| {
-                Ok(format!("\x1b[31;1m{}\x1b[m\x1b[0m", args[0].eval(env)?).into())
+                Ok(format!("\x1b[91m{}\x1b[m\x1b[0m", args[0].eval(env)?).into())
             }, "convert text to red on the console"),
 
             String::from("green") => Expression::builtin("green", |args, env| {
-                Ok(format!("\x1b[32;1m{}\x1b[m\x1b[0m", args[0].eval(env)?).into())
+                Ok(format!("\x1b[92m{}\x1b[m\x1b[0m", args[0].eval(env)?).into())
             }, "convert text to green on the console"),
 
             String::from("yellow") => Expression::builtin("yellow", |args, env| {
-                Ok(format!("\x1b[33;1m{}\x1b[m\x1b[0m", args[0].eval(env)?).into())
+                Ok(format!("\x1b[93m{}\x1b[m\x1b[0m", args[0].eval(env)?).into())
             }, "convert text to yellow on the console"),
 
             String::from("blue") => Expression::builtin("blue", |args, env| {
-                Ok(format!("\x1b[34;1m{}\x1b[m\x1b[0m", args[0].eval(env)?).into())
+                Ok(format!("\x1b[94m{}\x1b[m\x1b[0m", args[0].eval(env)?).into())
             }, "convert text to blue on the console"),
 
             String::from("magenta") => Expression::builtin("magenta", |args, env| {
-                Ok(format!("\x1b[35;1m{}\x1b[m\x1b[0m", args[0].eval(env)?).into())
+                Ok(format!("\x1b[95m{}\x1b[m\x1b[0m", args[0].eval(env)?).into())
             }, "convert text to magenta on the console"),
 
             String::from("cyan") => Expression::builtin("cyan", |args, env| {
-                Ok(format!("\x1b[36;1m{}\x1b[m\x1b[0m", args[0].eval(env)?).into())
+                Ok(format!("\x1b[96m{}\x1b[m\x1b[0m", args[0].eval(env)?).into())
             }, "convert text to cyan on the console"),
 
             String::from("white") => Expression::builtin("white", |args, env| {
-                Ok(format!("\x1b[36;1m{}\x1b[m\x6b[0m", args[0].eval(env)?).into())
+                Ok(format!("\x1b[97m{}\x1b[m\x6b[0m", args[0].eval(env)?).into())
             }, "convert text to white on the console"),
 
             String::from("dark") => b_tree_map! {
@@ -895,7 +1653,7 @@ fn main() -> Result<(), Error> {
                 }, "convert text to cyan on the console"),
 
                 String::from("white") => Expression::builtin("white", |args, env| {
-                    Ok(format!("\x1b[36m{}\x1b[m\x6b[0m", args[0].eval(env)?).into())
+                    Ok(format!("\x1b[37m{}\x1b[m\x6b[0m", args[0].eval(env)?).into())
                 }, "convert text to white on the console"),
             }.into()
         }
@@ -1034,16 +1792,176 @@ fn main() -> Result<(), Error> {
         "help",
         |args, env| {
             for arg in args {
-                match arg.eval(env)? {
-                    Expression::Builtin(_, _, help) => {
-                        println!("{}", help)
+                match &arg {
+                    Expression::Symbol(name) if name == "me" => {
+                        println!("Hello, welcome to Dune's help macro!
+
+To find information on various topics,
+run `help` with the following arguments!
+1. `builtin`: to learn about the builtin functions
+2. `lib`: to find out about the various builtin libraries
+3. `syntax`: to find out about the syntax of Dune
+4. `types`: to find out about the various types Dune supports
+5. `scripting`: to learn about scripting in Dune");
                     }
-                    _ => {}
+                    Expression::Symbol(name) if name == "builtin" => {
+                        println!("Hello, welcome to Dune's help macro!
+
+Dune offers the following builtin functions:
+
+1. `echo`: prints the given arguments to the console with a newline
+2. `println`: identical to `echo`
+3. `print`: prints the given arguments to the console without a newline
+4. `help`: prints this message
+5. `exit`: exits the shell
+6. `quit`: identical to `exit`
+7. `neg`: negates a number.
+8. `add`: adds two numbers, strings, lists, etc.
+9. `sub`: subtracts two numbers.
+10. `div`: divides two numbers.
+11. `mul`: multiplies two numbers, a number and a string, or a number and a list.
+12. `mod`: calculates the remainder of two numbers.
+13. `input`: reads input from the console with a prompt and returns it as a string.
+14. `range`: returns a list of integers from the given start to the given end.
+15. `len`: returns the length of a list, string, or dictionary.
+16. `insert`: insert an item into a list or dictionary with a given key or position.
+17. `remove`: remove an item from a list or dictionary with a given key or position.
+18. `index`: returns the item at an index in a list or dictionary.
+19. `chars`: returns a list of characters from a string.
+20. `lines`: returns a list of lines from a string.
+21. `eval`: evaluates a quoted Dune expression.
+22. `cd`: changes the current working directory in the current scope.
+23. `prompt`: returns the prompt as a string given the current working directory.
+24. `incomplete_prompt`: returns the prompt for incomplete expressions as a string given the current working directory.
+25. `report`: prints the result of a user-entered expression to the console.
+26. `and`: returns the logical and of two expressions.
+27. `or`: returns the logical or of two expressions.
+28. `not`: returns the logical not of a boolean expression.
+29. `eq`: returns true if two expressions are equal.
+30. `neq`: returns true if two expressions are not equal.
+31. `lt`: returns true if the first expression is less than the second.
+32. `gt`: returns true if the first expression is greater than the second.
+33. `lte`: returns true if the first expression is less than or equal to the second.
+34. `gte`: returns true if the first expression is greater than or equal to the second.
+35. `str`: returns the string representation of an expression.");
+                    }
+                    Expression::Symbol(name) if name == "lib" => {
+                        println!("Hello, welcome to Dune's help macro!
+
+Dune offers the following builtin libraries:
+1. `math`: a library with several math helper functions.
+2. `time`: a library with time related functions.
+3. `rand`: a library with random number generation functions.
+4. `os`: a library with operating system related functions.
+5. `fs`: a library with file system related functions.
+6. `fn`: a library with functional programming constructs.
+7. `fmt`: a library with color, formatting, and other text functions.
+8. `widget`: a library for creating widgets on the console.");
+                    }
+                    Expression::Symbol(name) if name == "syntax" => {
+                        println!("Hello, welcome to Dune's help macro!
+
+Dune has a very simple syntax.
+To apply functions, macros, or programs to arguments, simply juxtapose them!
+
+$ echo 1 2 + 3
+
+To write anonymous functions and macros, use the arrow syntax:
+
+$ # an anonymous incrementing function
+$ x -> x + 1
+$ # an anonymous incrementing macro
+$ x ~> x + 1
+$
+$ let identity = x -> x
+$
+$ # an anonymous function that returns the sum of two numbers
+$ x -> y -> {{
+>    echo \"your numbers are \" x \"and\" y
+>    x + y
+> }}
+
+To make lists, use the `[]` or the `to` syntax:
+
+$ [1, 2, 3, 2 + 2, \"testing!\"]
+$ # lists are zero indexed
+$ echo [1, 2, 3]@0
+$ # lists can also be made using the `to` syntax
+$ echo 0 to 5
+
+To make dictionaries, use the `{{}}` syntax:
+
+$ let origin = {{x: 0, y: 0}}
+$ # use the `@` syntax to index a list or dictionary
+$ echo origin@x origin@y
+
+To write an expression that is the result of many statements, use the following syntax:
+
+$ let x = {{
+>     let y = 1;
+>     let z = 2;
+>     y + z
+> }}
+
+To write math expressions, use the following operators:
+
+$ # addition
+$ x + y
+$ # subtraction
+$ x - y
+$ # multiplication
+$ x + y
+$ # division
+$ x // y
+$ # remainder
+$ x % y
+$ # logical and
+$ x && y
+$ # logical or
+$ x || y
+$ # logical not
+$ !x
+
+Dune also supports if statements and for loops.
+
+$ if True 1 else if False 2 else 3
+$ if x > y {{
+>     echo \"x is greater than y\"
+> }} else {{
+>     echo \"x is not greater than y\"
+> }}
+$
+$ for item in [1, 2, 3, 4] {{
+>     echo item
+> }}
+$ for x in 0 to 5 {{
+>     echo x
+> }}
+
+If you're a fan of Lisp, you can also try quoting expressions!
+
+$ # when evaluated, a quoted expression returns its expression
+$ let expression = '(x + y)
+$ let x = 5
+$ let y = 6
+$ # this will evaluate the expression stored in `expression`
+$ echo (eval expression)
+$
+$ # make `cat` an alias for the program `bat`
+$ let cat = 'bat
+
+");
+                    }
+                    otherwise => {
+                        if let Expression::Builtin(_, _, help) = otherwise.eval(env)? {
+                            println!("{}", help)
+                        }
+                    }
                 }
             }
             Ok(Expression::None)
         },
-        "read the purpose of builtin functions",
+        "run `help me`",
     );
 
     env.define_builtin(
@@ -1080,6 +1998,24 @@ fn main() -> Result<(), Error> {
         "print the arguments and a newline",
     );
     env.define("echo", env.get("println").unwrap());
+
+    env.define_builtin(
+        "input",
+        |args, env| {
+            let mut prompt = String::new();
+            for (i, arg) in args.iter().enumerate() {
+                let x = arg.clone().eval(env)?;
+                if i < args.len() - 1 {
+                    prompt += &format!("{} ", x)
+                } else {
+                    prompt += &format!("{}", x)
+                }
+            }
+            let mut rl = new_editor(env);
+            Ok(Expression::String(readline(&prompt, &mut rl)))
+        },
+        "get user input",
+    );
 
     env.define_builtin(
         "range",
@@ -1148,7 +2084,7 @@ fn main() -> Result<(), Error> {
         "eq",
         |args, env| {
             Ok(Expression::Boolean(
-                args[0].clone().eval(env)? == args[1].clone().eval(env)?,
+                args[0].eval(env)? == args[1].eval(env)?,
             ))
         },
         "compare two values for equality",
@@ -1158,7 +2094,7 @@ fn main() -> Result<(), Error> {
         "neq",
         |args, env| {
             Ok(Expression::Boolean(
-                args[0].clone().eval(env)? != args[1].clone().eval(env)?,
+                args[0].eval(env)? != args[1].eval(env)?,
             ))
         },
         "compare two values for inequality",
@@ -1209,11 +2145,43 @@ fn main() -> Result<(), Error> {
         |args, env| {
             let mut val = args[0].eval(env)?;
             for arg in &args[1..] {
-                val = val[arg.clone()].clone()
+                val = match arg {
+                    Expression::Integer(_) | Expression::Symbol(_) => {
+                        &val[arg.clone()]
+                    }
+                    otherwise => {
+                        &val[otherwise.eval(env)?]
+                    }
+                }.clone()
             }
             Ok(val)
         },
         "index a dictionary or list",
+    );
+
+    env.define_builtin(
+        "str",
+        |args, env| {
+            Ok(Expression::String(args[0].eval(env)?.to_string()))
+        },
+        "format an expression to a string",
+    );
+
+    env.define_builtin(
+        "int",
+        |args, env| {
+            match args[0].eval(env)? {
+                Expression::Integer(x) => Ok(Expression::Integer(x)),
+                Expression::Float(x) => Ok(Expression::Integer(x as Int)),
+                Expression::String(x) => if let Ok(n) = x.parse::<Int>() {
+                    Ok(Expression::Integer(n))
+                } else {
+                    Err(Error::CustomError(format!("could not convert {:?} to an integer", x)))
+                },
+                otherwise => Err(Error::CustomError(format!("could not convert {:?} to an integer", otherwise)))
+            }
+        },
+        "format an expression to a string",
     );
 
     env.define_builtin(
@@ -1282,52 +2250,26 @@ fn main() -> Result<(), Error> {
     );
 
     env.define_builtin(
+        "lines",
+        |args, env| match args[0].eval(env)? {
+            Expression::String(x) => Ok(Expression::List(
+                x.lines()
+                    .map(|ch| Expression::String(ch.to_string()))
+                    .collect::<Vec<Expression>>(),
+            )),
+            otherwise => Err(Error::CustomError(format!(
+                "cannot get lines of non-string {}",
+                otherwise
+            ))),
+        },
+        "get the list of lines in a string",
+    );
+
+    env.define_builtin(
         "eval",
         |args, env| args[0].clone().eval(env)?.eval(env),
         "evaluate an expression",
     );
-
-    env.define_builtin(
-        "exec",
-        |args, env| {
-            if args.is_empty() {
-                Err(Error::CustomError(format!("too few arguments")))
-            } else {
-                Expression::Apply(Box::new(args[0].clone()), args[1..].to_vec()).eval(env)
-            }
-        },
-        "execute a program",
-    );
-
-
-
-    if let Some(home_dir) = dirs::home_dir() {
-        let home_dir = home_dir.into_os_string().into_string().unwrap();
-
-        env.set_cwd(&home_dir);
-        env.define("HOME", Expression::String(home_dir));
-    }
-
-    if let Some(desk_dir) = dirs::desktop_dir() {
-        env.define(
-            "DESK",
-            Expression::String(desk_dir.into_os_string().into_string().unwrap()),
-        );
-    }
-
-    if let Some(docs_dir) = dirs::document_dir() {
-        env.define(
-            "DOCS",
-            Expression::String(docs_dir.into_os_string().into_string().unwrap()),
-        );
-    }
-
-    if let Some(down_dir) = dirs::download_dir() {
-        env.define(
-            "DOWN",
-            Expression::String(down_dir.into_os_string().into_string().unwrap()),
-        );
-    }
 
     env.define_builtin(
         "cd",
@@ -1346,22 +2288,27 @@ fn main() -> Result<(), Error> {
         "change directories",
     );
 
-    env.define_builtin(
-        "prompt",
-        |_, env| Ok(Expression::String(format!("{}$ ", env.get_cwd()))),
-        "default prompt",
-    );
-
-    env.define_builtin(
-        "incomplete_prompt",
-        |_, env| {
-            Ok(Expression::String(format!(
-                "{}> ",
-                " ".repeat(env.get_cwd().len())
-            )))
-        },
-        "default prompt for incomplete commands",
-    );
+    // env.define_builtin(
+    //     "prompt",
+    //     |_, env| Ok(Expression::String(format!("{}$ ", env.get_cwd()))),
+    //     "default prompt",
+    // );
+    
+    // env.define_builtin(
+    //     "incomplete_prompt",
+    //     |_, env| {
+    //         Ok(Expression::String(format!(
+    //             "{}> ",
+    //             " ".repeat(env.get_cwd().len())
+    //         )))
+    //     },
+    //     "default prompt for incomplete commands",
+    // );
+    // let prompt = cwd -> fmt@bold ((fmt@dark@blue "(dune) ") + (fmt@bold (fmt@dark@green cwd)) + (fmt@bold (fmt@dark@blue "$ ")));
+    // let incomplete_prompt = cwd -> ((len cwd) + (len "(dune) ")) * " " + (fmt@bold (fmt@dark@yellow "> "));
+    
+    parse(r#"let prompt = cwd -> fmt@bold ((fmt@dark@blue "(dune) ") + (fmt@bold (fmt@dark@green cwd)) + (fmt@bold (fmt@dark@blue "$ ")))"#)?.eval(&mut env)?;
+    parse(r#"let incomplete_prompt = cwd -> ((len cwd) + (len "(dune) ")) * " " + (fmt@bold (fmt@dark@yellow "> "));"#)?.eval(&mut env)?;
 
     env.define_builtin(
         "report",
@@ -1385,37 +2332,30 @@ fn main() -> Result<(), Error> {
         match std::fs::read_to_string(&prelude_path) {
             Ok(prelude) => match parse(&prelude) {
                 Ok(expr) => {
-                    let _ = expr.eval(&mut env);
+                    if let Err(e) = expr.eval(&mut env) {
+                        eprintln!("error while running {:?}: {}", prelude_path, e)
+                    }
                 }
                 Err(e) => {
                     eprintln!("error while running {:?}: {}", prelude_path, e)
                 }
             }
-            Err(e) => eprintln!("could not open {:?}: {}", prelude_path, e)
+            Err(_) => {
+                match parse(DEFAULT_PRELUDE) {
+                    Ok(expr) => {
+                        if let Err(e) = expr.eval(&mut env) {
+                            eprintln!("error while running default prelude: {}", e)
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("error while running default prelude: {}", e)
+                    }
+                }
+            }
         }
     }
 
-
-    let config = Config::builder()
-        .history_ignore_dups(true)
-        .history_ignore_space(true)
-        .auto_add_history(false)
-        .completion_type(CompletionType::List)
-        .edit_mode(EditMode::Emacs)
-        .output_stream(OutputStreamType::Stdout)
-        .build();
-
-    let mut rl = Editor::with_config(config);
-
-    let h = DuneHelper {
-        completer: FilenameCompleter::new(),
-        highlighter: MatchingBracketHighlighter::new(),
-        hinter: HistoryHinter {},
-        colored_prompt: "".to_string(),
-        validator: MatchingBracketValidator::new(),
-        env: env.clone(),
-    };
-    rl.set_helper(Some(h));
+    let mut rl = new_editor(&env);
     if rl.load_history("history.txt").is_err() {}
 
     let editor_ref = Arc::new(Mutex::new(rl));

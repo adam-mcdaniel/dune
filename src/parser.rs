@@ -158,6 +158,7 @@ fn parse_keyword(input: &str) -> IResult<&str, &str, SyntaxError> {
         tag("~>"),
         alt((
             tag("=="),
+            tag("!="),
             tag(">="),
             tag("<="),
             tag("&&"),
@@ -229,6 +230,19 @@ fn parse_digits(input: &str) -> IResult<&str, String, SyntaxError> {
     ))(input)
 }
 
+fn parse_any_digits(input: &str) -> IResult<&str, String, SyntaxError> {
+    map(
+        many1(one_of(ASCII_DIGIT)),
+        |digits| {
+            let mut result = String::new();
+            for ch in digits {
+                result.push(ch)
+            }
+            result
+        },
+    )(input)
+}
+
 fn parse_integer(input: &str) -> IResult<&str, Int, SyntaxError> {
     let (input, is_positive) = map(opt(tag("-")), |x| x.is_none())(input)?;
 
@@ -252,7 +266,7 @@ fn parse_float(input: &str) -> IResult<&str, f64, SyntaxError> {
         Ok((input, first_digits)) => {
             let (input, _) = tag(".")(input)?;
 
-            match parse_digits(input) {
+            match parse_any_digits(input) {
                 Ok((input, last_digits)) => {
                     match format!("{}.{}", first_digits, last_digits).parse::<f64>() {
                         Ok(n) => Ok((input, sign * n)),
@@ -741,10 +755,6 @@ fn parse_expression_prec_five(input: &str) -> IResult<&str, Expression, SyntaxEr
         return Ok(result);
     }
 
-    if let Ok(result) = parse_not(input) {
-        return Ok(result);
-    }
-
     let (input, head) = expr_parser(input)?;
 
     let (input, mut list) = many0(pair(
@@ -764,6 +774,10 @@ fn parse_expression_prec_five(input: &str) -> IResult<&str, Expression, SyntaxEr
     ))(input)?;
 
     if list.is_empty() {
+        if let Ok(result) = parse_not(input) {
+            return Ok(result);
+        }
+
         return Ok((input, head));
     }
 
@@ -922,11 +936,7 @@ fn parse_expression_prec_three(input: &str) -> IResult<&str, Expression, SyntaxE
 fn parse_expression_prec_two(input: &str) -> IResult<&str, Expression, SyntaxError> {
     let (input, head) = parse_expression_prec_one(input)?;
     let (input, args) = many0(preceded(
-        tag("@"),
-        alt((
-            map(parse_symbol, |name| Expression::Symbol(name)),
-            map(parse_integer, |n| Expression::Integer(n)),
-        )),
+        tag("@"), parse_expression_prec_one,
     ))(input)?;
 
     if args.is_empty() {
