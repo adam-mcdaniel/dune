@@ -133,6 +133,7 @@ let cat = 'bat;
 
 
 let lib = {
+  fn: fn,
   fs: fs,
   os: os,
   fmt: fmt,
@@ -143,17 +144,17 @@ let lib = {
 };
 
 
-let about = _ -> {
-  echo (
-    widget@joiny
-      (widget@create "About"
-"        Hello, welcome to " + (fmt@yellow "Dune Shell!") + "
-      Written by: " + (fmt@magenta "http://adam-mcdaniel.net") + "\n
-I wrote Dune to blah blah blah"
-50 10)
-
-      (widget@joinx
-        (widget@create "Features"
+let about = _ ~> {
+    echo (
+      widget@joiny
+        (widget@create "About"
+  "          Hello, welcome to " + (fmt@yellow "Dune Shell!") + "
+      Written by: " + (fmt@magenta "http://adam-mcdaniel.net") + "
+I wrote Dune to be a nice environment for devs while they work! It's a very cozy shell with high customizability, so you can make it how you'd like."
+  50 10)
+  
+        (widget@joinx
+          (widget@create "Features"
 "Dune has a wide set of
 features, it's basically a
 full blown language!
@@ -169,20 +170,22 @@ Dune's libraries are very
 extensive. There are
 libraries for:
 
- ☞ A simple widget system🪟
- ☞ OS information        💽
- ☞ Basic Math, trig, etc.🧮
- ☞ File system operations📂
- ☞ Text color and styling📝
- ☞ Functional programming🔗
+☞ A simple widget system🪟
+☞ OS information        💽
+☞ Randomness            🔀
+☞ Basic math, trig, etc.🧮
+☞ File system operations📂
+☞ Text color and styling📝
+☞ Functional programming🔗
+☞ Date and time         🕒
 
 And more!"
-30 26)
-
-        (widget@joiny
-          (widget@create "About the Author" "I'm a sophomore at\nthe University of\nTennessee🏴󠁵󠁳󠁴󠁮󠁿\nstudying Computer💻\nScience🧪.\n\nI'm extremely \ninterested in\nlanguage design\n& compiler design.\nCheck out my other\nprojects on GitHub:\nadam-mcdaniel" 20 16)
-          (widget@create "Cat" (rand@choose CATS) 20 10)
-)))
+  30 28)
+  
+          (widget@joiny
+            (widget@create "About the Author" "I'm a sophomore at\nthe University of\nTennessee🏴󠁵󠁳󠁴󠁮󠁿\nstudying Computer💻\nScience🧪.\n\nI'm extremely \ninterested in\nlanguage design\n& compiler design.\nCheck out my other\nprojects on GitHub:\n\nadam-mcdaniel" 20 18)
+            (widget@create "Cat" (rand@choose CATS) 20 10)
+  )))
 };
 
 

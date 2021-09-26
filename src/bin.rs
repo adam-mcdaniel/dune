@@ -147,13 +147,13 @@ let turnedshrewsay = text -> {
 };
 
 
-let about = _ -> {
+let about = _ ~> {
     echo (
       widget@joiny
         (widget@create "About"
-  "        Hello, welcome to " + (fmt@yellow "Dune Shell!") + "
-        Written by: " + (fmt@magenta "http://adam-mcdaniel.net") + "\n
-  I wrote Dune to blah blah blah"
+  "          Hello, welcome to " + (fmt@yellow "Dune Shell!") + "
+      Written by: " + (fmt@magenta "http://adam-mcdaniel.net") + "
+I wrote Dune to be a nice environment for devs while they work! It's a very cozy shell with high customizability, so you can make it how you'd like."
   50 10)
   
         (widget@joinx
@@ -412,7 +412,7 @@ let intro = _ ~> {
         
         clear ();
         welcomebanner ();
-        turnedshrewsay "Good luck! I really hope you enjoy my shell!😄❤️";
+        turnedshrewsay "Good luck! I really hope you enjoy my shell! 😄❤️";
         wait ();
 
     } else {
@@ -606,10 +606,10 @@ impl Highlighter for DuneHelper {
             .replace("rm ",   "\x1b[94mrm \x1b[m\x1b[0m")
 
 
-            .replace("else ",   "\x1b[94melse\x1b[m\x1b[0m")
-            .replace("let ", "\x1b[94mlet\x1b[m\x1b[0m")
-            .replace("for ",   "\x1b[94mfor\x1b[m\x1b[0m")
-            .replace("if ",   "\x1b[94mif\x1b[m\x1b[0m")
+            .replace("else ",   "\x1b[94melse \x1b[m\x1b[0m")
+            .replace("let ", "\x1b[94mlet \x1b[m\x1b[0m")
+            .replace("for ",   "\x1b[94mfor \x1b[m\x1b[0m")
+            .replace("if ",   "\x1b[94mif \x1b[m\x1b[0m")
             .replace(" in ",   "\x1b[94m in \x1b[m\x1b[0m")
             .replace(" to ",   "\x1b[94m to \x1b[m\x1b[0m")
 
@@ -661,9 +661,9 @@ impl Highlighter for DuneHelper {
 
 
             .replace("else ",   "\x1b[94melse\x1b[m\x1b[0m")
-            .replace("let ", "\x1b[94mlet\x1b[m\x1b[0m")
-            .replace("for ",   "\x1b[94mfor\x1b[m\x1b[0m")
-            .replace("if ",   "\x1b[94mif\x1b[m\x1b[0m")
+            .replace("let ", "\x1b[94mlet \x1b[m\x1b[0m")
+            .replace("for ",   "\x1b[94mfor \x1b[m\x1b[0m")
+            .replace("if ",   "\x1b[94mif \x1b[m\x1b[0m")
             .replace(" in ",   "\x1b[94m in \x1b[m\x1b[0m")
             .replace(" to ",   "\x1b[94m to \x1b[m\x1b[0m")
 
@@ -1161,7 +1161,7 @@ fn main() -> Result<(), Error> {
                 } as usize - 2;
 
                 let text = textwrap::fill(&args[1].eval(env)?.to_string(), text_width);
-
+                
                 let widget_height = match args[3].eval(env)? {
                     Expression::Integer(n) if n >= 3 => n,
                     otherwise => return Err(Error::CustomError(format!("expected height argument to be an integer greater than 2, but got {}", otherwise)))
@@ -1802,7 +1802,19 @@ run `help` with the following arguments!
 2. `lib`: to find out about the various builtin libraries
 3. `syntax`: to find out about the syntax of Dune
 4. `types`: to find out about the various types Dune supports
-5. `scripting`: to learn about scripting in Dune");
+5. `scripting`: to learn about scripting in Dune
+6. `prelude`: to learn about the prelude
+
+You can also call `help` on any builtin function:
+
+$ help echo");
+                    }
+                    Expression::Symbol(name) if name == "prelude" => {
+                        println!("Hello, welcome to Dune's help macro!
+
+The `prelude` is the startup file that Dune runs before executing
+interactive mode. This file is stored at `.dune-prelude` in your home
+directory. To do anything on Dune's startup, add it to the prelude!");
                     }
                     Expression::Symbol(name) if name == "types" => {
                         println!("Hello, welcome to Dune's help macro!
