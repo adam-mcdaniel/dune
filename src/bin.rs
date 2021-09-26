@@ -1804,6 +1804,60 @@ run `help` with the following arguments!
 4. `types`: to find out about the various types Dune supports
 5. `scripting`: to learn about scripting in Dune");
                     }
+                    Expression::Symbol(name) if name == "types" => {
+                        println!("Hello, welcome to Dune's help macro!
+
+Dune has the following types in its typesystem:
+1. `Integer`: a signed integer
+2. `Float`: a floating point number
+3. `String`: a string
+4. `Boolean`: a boolean
+5. `None`: a null value
+6. `List`: a list of expressions
+7. `Map`: a table of expressions
+8. `Lambda`: a function
+9. `Macro`: a macro (exactly like a function, but executes within the current scope)
+10. `Builtin`: a builtin function");
+                    }
+                    Expression::Symbol(name) if name == "scripting" => {
+                        println!("Hello, welcome to Dune's help macro!
+
+Dune has two modes: interactive, and scripting.
+In interactive mode, commands are interpreted in the following way:
+1. If the command is an expression, it is evaluated.
+2. If the result of the evaluation is an undefined symbol,
+   Dune executes the program with that name.
+3. If the result of the evaluation is the application of undefined symbol,
+   Dune executes the program with that name, and gives it the arguments
+   of the application.
+4. If the result of the evaluation is a macro, Dune executes the macro
+   with the argument of the current working directory.
+
+In scripting mode, you MUST pass arguments to macros and programs explicitly.
+For example, if you want to run the program `ls` with no arguments, you must
+call it like so:
+
+```
+# Pass `None` to `ls`
+ls ();
+```
+
+All statements in the script are also separated by semicolons.
+
+```
+echo \"Hmm!\";
+if True {{
+    echo \"True is True!\";
+    # The last expression in a block statement does not need semicolons
+    echo \"Hello, world!\"
+}}
+for i in 0 to 10 {{
+    echo i
+}}
+# The last statement in a script does not require a semicolon either
+echo \"Wow!\"
+```");
+                    }
                     Expression::Symbol(name) if name == "builtin" => {
                         println!("Hello, welcome to Dune's help macro!
 
@@ -1856,7 +1910,12 @@ Dune offers the following builtin libraries:
 5. `fs`: a library with file system related functions.
 6. `fn`: a library with functional programming constructs.
 7. `fmt`: a library with color, formatting, and other text functions.
-8. `widget`: a library for creating widgets on the console.");
+8. `widget`: a library for creating widgets on the console.
+
+To see all the different functions and constants for each library,
+simply print the library itself!
+
+$ echo math");
                     }
                     Expression::Symbol(name) if name == "syntax" => {
                         println!("Hello, welcome to Dune's help macro!
@@ -1871,6 +1930,8 @@ To write anonymous functions and macros, use the arrow syntax:
 $ # an anonymous incrementing function
 $ x -> x + 1
 $ # an anonymous incrementing macro
+$ # (macros are just like functions,
+$ # but they are executed within the current scope)
 $ x ~> x + 1
 $
 $ let identity = x -> x
