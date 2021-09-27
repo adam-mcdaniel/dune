@@ -12,4 +12,4 @@ pub use error::*;
 mod parser;
 pub use parser::*;
 
-pub const VERSION: &'static str = "0.1.2";
+pub const VERSION: &'static str = "0.1.3";

@@ -473,6 +473,8 @@ let help = val ~> {
         old-help scripting;
     } else if val == 'prelude {
         old-help prelude;
+    } else {
+        old-help val;
     }
 };
 
