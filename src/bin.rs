@@ -1129,6 +1129,7 @@ fn main() -> Result<(), Error> {
     let os = os_info::get();
     let os_type = os.os_type();
 
+
     env.define(
         "shell",
         b_tree_map! {
@@ -2403,6 +2404,85 @@ $ let cat = 'bat
     // let prompt = cwd -> fmt@bold ((fmt@dark@blue "(dune) ") + (fmt@bold (fmt@dark@green cwd)) + (fmt@bold (fmt@dark@blue "$ ")));
     // let incomplete_prompt = cwd -> ((len cwd) + (len "(dune) ")) * " " + (fmt@bold (fmt@dark@yellow "> "));
     
+    env.define_builtin(
+        "chess",
+        |args, env| {
+            let mut won = false;
+            
+            let player_color = match &args[0] {
+                Expression::String(color) | Expression::Symbol(color) if color == "white" => {
+                    chess_engine::WHITE
+                },
+                Expression::String(color) | Expression::Symbol(color) if color == "black" => {
+                    chess_engine::BLACK
+                },
+                _ => {
+                    return Err(Error::CustomError("call chess with a color, like \"black\" or \"white\"".to_string()))
+                }
+            };
+
+            let mut board = chess_engine::Board::default();
+            let mut history = vec![];
+            loop {
+                use chess_engine::Evaluate;
+                use std::convert::TryFrom;
+
+                let m = if player_color != board.get_turn_color() {
+                    println!("Waiting for CPU to annihilate your position...");
+                    board.get_best_next_move(4).0
+                } else {
+                    println!("Your move!\n{}", board);
+                    let mut rl = new_editor(env);
+                    let mut s = readline("Enter move: ", &mut rl);
+                    s = s.trim().to_string();
+
+                    if s.is_empty() {
+                        eprintln!("That's not a move!");
+                        continue;
+                    } else if s == "q" || s == "quit" || s == "exit" {
+                        println!("Bye!");
+                        break;
+                    } else {
+                        match chess_engine::Move::try_from(s) {
+                            Ok(m) => m,
+                            Err(e) => {
+                                eprintln!("{}", e);
+                                continue;
+                            }
+                        }
+                    }
+                };
+
+                match board.play_move(m) {
+                    chess_engine::GameResult::Continuing(next_board) => {
+                        board = next_board;
+                        history.push(m);
+                    }
+
+                    chess_engine::GameResult::Victory(winner) => {
+                        println!("{}", board);
+                        println!("Checkmate! {} loses. {} is victorious!", !winner, winner);
+
+                        won = player_color == winner;
+                        break;
+                    }
+
+                    chess_engine::GameResult::IllegalMove(x) => {
+                        eprintln!("{} is an illegal move.", x);
+                    }
+
+                    chess_engine::GameResult::Stalemate => {
+                        println!("Drawn game.");
+                        break;
+                    }
+                }
+            }
+
+            Ok(Expression::Boolean(won))
+        },
+        "a fun builtin function for playing chess!",
+    );
+
     parse(r#"let prompt = cwd -> fmt@bold ((fmt@dark@blue "(dune) ") + (fmt@bold (fmt@dark@green cwd)) + (fmt@bold (fmt@dark@blue "$ ")))"#)?.eval(&mut env)?;
     parse(r#"let incomplete_prompt = cwd -> ((len cwd) + (len "(dune) ")) * " " + (fmt@bold (fmt@dark@yellow "> "));"#)?.eval(&mut env)?;
 
@@ -2421,6 +2501,7 @@ $ let cat = 'bat
         },
         "default function for reporting values",
     );
+
 
 
     if let Some(home_dir) = dirs::home_dir() {
