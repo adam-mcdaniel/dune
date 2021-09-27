@@ -23,20 +23,41 @@
 #
 # Overview:
 #   Splash screen:
-#     welcome() # Prints splash screen
-#   Rummy commands:
-#     rummy@play()
+#     welcome  # Prints splash screen
+#     about    # Prints info about the shell
+#     donate   # Prints donation message
+#
 #   Calendar widget:
-#     cal()
-#   Cat widget:
-#     cats()
-#   Todo app commands:
-#     todo@add("Add a task")
-#     todo@rm(3)    # Finish task no. 3
-#     todo@clear()  # Clear todo list
+#     cal      # Print a calendar
+#
+#   Shrew:
+#     shrewsay "Message to print"        # Makes a wild dune shrew appear!
+#     turnedshrewsay "Message to print"  # Makes a left-facing wild dune shrew appear!
 #
 # Have fun, scripters!
 
+console@title "Dune";
+
+let donate = _ ~> {
+        echo "                     ┌──────Wild Dune Shrew──────┐
+                      Hello, how is Dune working  
+                      for you so far? If you like 
+                      it, consider starring our   
+                      GitHub page and donating!";
+        echo "                     " (fmt@italics "(To remove this message,\n                      write your own prelude)\n");
+        echo "                     " (fmt@href "https://github.com/adam-mcdaniel/dune" "Thank You❤️");
+
+        echo "                     └───────────────────────────┘
+                     ╱
+                    ╱
+
+          _,____ c--.
+        /`  \\   ` _^_\\
+    `~~~\\  _/---'\\\\  ^
+         `~~~     ~~
+    ─────────────────────
+"
+};
 
 let CATS = ["
      _
@@ -78,69 +99,78 @@ let CATS = ["
  (______)__m_m)"
 ];
 
-let map = f -> list -> {
-    for item in list {
-        f item
-    }
+let prompt = cwd -> fmt@bold ((fmt@dark@blue "(dune) ") + (fmt@bold (fmt@dark@green cwd)) + (fmt@bold (fmt@dark@blue "$ ")));
+let incomplete_prompt = cwd -> ((len cwd) + (len "(dune) ")) * " " + (fmt@bold (fmt@dark@yellow "> "));
+
+let shrew = _ ~> {
+"
+          _,____ c--.
+        /`  \\   ` _^_\\
+    `~~~\\  _/---'\\\\  ^
+         `~~~     ~~
+    ─────────────────────
+"
 };
 
-let reduce = f -> acc -> list -> {
-    for item in list {
-        let acc = f acc item
-    }
-    acc
+let turnedshrew = _ ~> {
+"
+      .--p_____,_
+     /_^_ `   /  `\\
+     ^  //'---\\_  /~~~
+       ~~     ~~~`
+     ──────────────────
+"
 };
 
-let sum = reduce add 0;
-let product = reduce mul 1;
-let prod = product;
+let shrewsay = text -> {
+    let title = "Wild Dune Shrew";
 
-let join = sep -> list -> {
-    let out = "";
-    let count = 0;
-    let size = len list;
 
-    for item in list {
-        let count = count + 1;
-        let out = out + item;
-        if count < size {
-            let out = out + sep;
+    let cols = 22;
+    let text = fmt@wrap text cols;
+    let text-lines = lines text;
+    if (len text-lines) == 1 {
+        if (len text) < cols {
+            let cols = len text;
         }
     }
+    let rows = len text-lines;
+    let spacing = 25;
 
-    out
+    for line in (lines (widget@create title text cols + 2 rows + 2)) {
+        echo " " * spacing line;
+    }
+
+    for i in 0 to 2 {
+        echo " " * (spacing - i) "╱";
+    }
+
+    echo (shrew ());
 };
 
-let fact = n -> prod (2 to n + 1);
+let turnedshrewsay = text -> {
+    let title = "Wild Dune Shrew";
 
+    let cols = 27;
+    let text = fmt@wrap text cols;
+    let text-lines = lines text;
+    if (len text-lines) == 1 {
+        if (len text) < cols {
+            let cols = len text;
+        }
+    }
+    let rows = len text-lines;
+    let spacing = 20;
 
-let inc = n -> n + 1;
-let dec = n -> n - 1;
+    for line in (lines (widget@create title text cols + 2 rows + 2)) {
+        echo " " * spacing line;
+    }
 
-let double = n -> n * 2;
-let triple = n -> n * 3;
+    for i in 0 to 2 {
+        echo " " * (spacing - i) "╱";
+    }
 
-let half = n -> n // 2;
-let third = n -> n // 3;
-let quarter = n -> n // 4;
-
-let ls = 'lsd;
-let cat = 'bat;
-
-
-# let prompt = cwd -> (fmt@blue "(dune) ") + (fmt@italics (fmt@green cwd)) + (fmt@blue "$ ");
-# let incomplete_prompt = cwd -> ((len cwd) + (len "(dune) ")) * " " + (fmt@yellow "> ");
-
-
-let lib = {
-  fn: fn,
-  fs: fs,
-  os: os,
-  fmt: fmt,
-  time: time,
-  rand: rand,
-  math: math,
-  widget: widget
+    echo (turnedshrew ());
 };
 
 
@@ -366,5 +396,90 @@ let wait = _ -> {
    input (fmt@italics (fmt@blue "(Press enter to continue) "));
 };
 
-clear ();
+
+let intro = _ ~> {
+    clear ();
+    welcomebanner ();
+
+    shrewsay "Hey there! Is this your first time using Dune?";
+    if (yesorno ()) {
+        clear ();
+        welcomebanner ();
+        shrewsay "Then let's get started!";
+        wait ();
+        
+        clear ();
+        welcomebanner ();
+        about ();
+        turnedshrewsay "First off, here's some background information about Dune!";
+        wait ();
+
+
+        clear ();
+        welcomebanner ();
+        shrewsay "To execute a program in Dune, simply call the program the same way you would in bash or Powershell!\n\n\n$ prog arg1 arg2 ...";
+        wait ();
+        
+        clear ();
+        welcomebanner ();
+        turnedshrewsay "You can also define macros for Dune, and call them the same way you would a program! (Macros called without arguments are implicitly passed the current working directory as an argument)\n\n\n$ cd ..";
+        wait ();
+        
+        clear ();
+        welcomebanner ();
+        shrewsay "To define variables (which also act as environment variables), simply use the `let` keyword!\n\n\n$ let x = 5";
+        wait ();
+        
+        clear ();
+        welcomebanner ();
+        turnedshrewsay "That should be enough to get you started! If you have any questions, just call the `help` macro! To ask for general help, run `help me`!\n\n\n$ help me";
+        wait ();
+        
+        clear ();
+        welcomebanner ();
+        turnedshrewsay "Good luck! I really hope you enjoy my shell! 😄❤️";
+        wait ();
+
+    } else {
+        clear ();
+        welcomebanner ();
+        turnedshrewsay "Oh good! I'll assume you know your way around. To write your own startup script, instead of this default script, write a `.dune-prelude` file in your home directory! Bye!";
+        wait ();
+    }
+
+    clear ();
+    welcome ();
+};
+
+let old-report = report;
+let REPORT_COUNT = 0;
+let report = val ~> {
+    old-report val;
+    if REPORT_COUNT == 50 {
+        donate ();
+    }
+    let REPORT_COUNT = REPORT_COUNT + 1;
+};
+
+let old-help = help;
+let help = val ~> {
+    if val == CWD || val == 'me {
+        old-help me;
+        echo "\n";
+        donate ();
+    } else if val == 'builtin {
+        old-help builtin;
+    } else if val == 'lib {
+        old-help lib;
+    } else if val == 'syntax {
+        old-help syntax;
+    } else if val == 'types {
+        old-help types;
+    } else if val == 'scripting {
+        old-help scripting;
+    } else if val == 'prelude {
+        old-help prelude;
+    }
+};
+
 welcome ();

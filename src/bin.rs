@@ -30,7 +30,28 @@ use std::{
 
 
 const DEFAULT_PRELUDE: &'static str = r#"
+console@title "Dune";
 
+let donate = _ ~> {
+        echo "                     ┌──────Wild Dune Shrew──────┐
+                      Hello, how is Dune working  
+                      for you so far? If you like 
+                      it, consider starring our   
+                      GitHub page and donating!";
+        echo "                     " (fmt@italics "(To remove this message,\n                      write your own prelude)\n");
+        echo "                     " (fmt@href "https://github.com/adam-mcdaniel/dune" "Thank You❤️");
+
+        echo "                     └───────────────────────────┘
+                     ╱
+                    ╱
+
+          _,____ c--.
+        /`  \\   ` _^_\\
+    `~~~\\  _/---'\\\\  ^
+         `~~~     ~~
+    ─────────────────────
+"
+};
 
 let CATS = ["
      _
@@ -371,10 +392,8 @@ let wait = _ -> {
 
 
 let intro = _ ~> {
-
     clear ();
     welcomebanner ();
-
 
     shrewsay "Hey there! Is this your first time using Dune?";
     if (yesorno ()) {
@@ -426,8 +445,38 @@ let intro = _ ~> {
     welcome ();
 };
 
-intro ();
+let old-report = report;
+let REPORT_COUNT = 0;
+let report = val ~> {
+    old-report val;
+    if REPORT_COUNT == 50 {
+        donate ();
+    }
+    let REPORT_COUNT = REPORT_COUNT + 1;
+};
 
+let old-help = help;
+let help = val ~> {
+    if val == CWD || val == 'me {
+        old-help me;
+        echo "\n";
+        donate ();
+    } else if val == 'builtin {
+        old-help builtin;
+    } else if val == 'lib {
+        old-help lib;
+    } else if val == 'syntax {
+        old-help syntax;
+    } else if val == 'types {
+        old-help types;
+    } else if val == 'scripting {
+        old-help scripting;
+    } else if val == 'prelude {
+        old-help prelude;
+    }
+};
+
+intro ();
 "#;
 
 
@@ -1542,13 +1591,20 @@ fn main() -> Result<(), Error> {
 	b_tree_map! {
 		String::from("write") => Expression::builtin("write", |args, env| {
 			check_exact_args_len("write", &args, 3)?;
-        	        print!("\x1b[s\x1b[{line};{column}H\x1b[{line};{column}f{content}\x1b[u",
+            print!("\x1b[s\x1b[{line};{column}H\x1b[{line};{column}f{content}\x1b[u",
 				line=args[1].eval(env)?,
 				column=args[0].eval(env)?,
 				content=args[2].eval(env)?
 			);
 			Ok(Expression::None)
-	        }, "write text to a specific position in the console"),
+	    }, "write text to a specific position in the console"),
+		String::from("title") => Expression::builtin("title", |args, env| {
+			check_exact_args_len("title", &args, 1)?;
+            print!("\x1b]2;{}\x1b[0m",
+                args[0].eval(env)?
+			);
+			Ok(Expression::None)
+	    }, "set the title of the console"),
 	}.into()
     );
 
@@ -1562,6 +1618,11 @@ fn main() -> Result<(), Error> {
                     otherwise => Err(Error::CustomError(format!("expected number of columns in wrap, but got {}", otherwise)))
                 }
             }, "wrap text such that it fits in a specific number of columns"),
+
+            String::from("href") => Expression::builtin("href", |args, env| {
+                check_exact_args_len("href", &args, 2)?;
+                Ok(format!("\x1b]8;;{url}\x1b\\{text}\x1b]8;;\x1b\\", url=args[0].eval(env)?, text=args[1].eval(env)?).into())
+            }, "create a hyperlink on the console"),
 
             String::from("bold") => Expression::builtin("bold", |args, env| {
                 Ok(format!("\x1b[1m{}\x1b[m\x1b[0m", args[0].eval(env)?).into())
@@ -1804,6 +1865,7 @@ run `help` with the following arguments!
 4. `types`: to find out about the various types Dune supports
 5. `scripting`: to learn about scripting in Dune
 6. `prelude`: to learn about the prelude
+7. `me`: to see this message
 
 You can also call `help` on any builtin function:
 
@@ -1829,7 +1891,8 @@ Dune has the following types in its typesystem:
 7. `Map`: a table of expressions
 8. `Lambda`: a function
 9. `Macro`: a macro (exactly like a function, but executes within the current scope)
-10. `Builtin`: a builtin function");
+10. `Builtin`: a builtin function
+11. `Symbol`: the type of a variable name like `x`");
                     }
                     Expression::Symbol(name) if name == "scripting" => {
                         println!("Hello, welcome to Dune's help macro!
@@ -1923,6 +1986,7 @@ Dune offers the following builtin libraries:
 6. `fn`: a library with functional programming constructs.
 7. `fmt`: a library with color, formatting, and other text functions.
 8. `widget`: a library for creating widgets on the console.
+9. `console`: a library for manipulating the terminal console.
 
 To see all the different functions and constants for each library,
 simply print the library itself!
