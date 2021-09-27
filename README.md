@@ -95,7 +95,7 @@ Dune offers the following builtin libraries:
 |Name|Description|
 |-|-|
 |`rand`|A library for randomness|
-|`time`|Date and time functions|
+|`time`|A library with date and time functions|
 |`math`|A module for math and trig functionality|
 |`fs`|A module for interacting with the file system|
 |`fn`|A functional programming library|
