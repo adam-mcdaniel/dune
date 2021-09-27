@@ -84,6 +84,11 @@ To write functions that modify your shell's environment and act like commands or
 
 Macros, when called with zero arguments, are passed the current working directory. When invoked, they assume the environment of the callee: if you execute a macro, it will execute as if you executed the contents of the macro itself with the parameter defined as the argument passed.
 
+## Standard Library
+
+Dune offers an extensive standard library, and also provides a pretty interface to see all the functions available in each module! To see the available builtin libraries, use the `help` macro.
+
+<a href="https://asciinema.org/a/7Cr96ndSzsIch7oGVYI3aIaX9"><img src="./assets/math.png" width="48%"/></a>
 
 ## Installation
 
