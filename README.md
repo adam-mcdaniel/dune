@@ -113,7 +113,10 @@ To install, you must download Rust from [here](https://www.rust-lang.org/).
 #### Development Build
 
 ```bash
-# Download the repo and install from source
+# Install directly from git with cargo
+cargo install --git https://github.com/adam-mcdaniel/dune
+
+# Or, alternatively, the repo and install from source
 git clone https://github.com/adam-mcdaniel/dune
 cd dune
 cargo install -f --path .
