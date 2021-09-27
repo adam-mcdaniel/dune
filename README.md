@@ -86,9 +86,25 @@ Macros, when called with zero arguments, are passed the current working director
 
 ## Standard Library
 
-Dune offers an extensive standard library, and also provides a pretty interface to see all the functions available in each module! To see the available builtin libraries, use the `help` macro.
+Dune offers an extensive standard library, and also provides a pretty interface to see all the functions available in each module!
 
 <a href="https://asciinema.org/a/7Cr96ndSzsIch7oGVYI3aIaX9"><img src="./assets/math.png" width="48%"/></a>
+
+Dune offers the following builtin libraries:
+
+|Name|Description|
+|-|-|
+|`rand`|A library for randomness|
+|`time`|Date and time functions|
+|`math`|A module for math and trig functionality|
+|`fs`|A module for interacting with the file system|
+|`fn`|A functional programming library|
+|`fmt`|A library for text formatting on the console (color, styling, hyperlinks, text wrapping, etc.)|
+|`os`|A small module with OS info|
+|`widget`|A library creating text widgets|
+|`console`|A library for manipulating the console|
+
+For more information about each, just run `echo library-name`.
 
 ## Installation
 
