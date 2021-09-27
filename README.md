@@ -11,7 +11,7 @@ A shell by the beach!
 
 ## About the Author
 
-I'm a *bored* sophomore in college working on projects to fill the time. If you enjoy my projects, consider supporting me by buying me a coffee! 
+I'm a *bored* sophomore in college working on projects to fill the time. If you enjoy my work, consider supporting me by buying me a coffee! 
 
 <a href="https://www.buymeacoffee.com/adam.mcdaniel" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-violet.png" height=41px width=174px style="!important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
 
@@ -19,7 +19,7 @@ I'm a *bored* sophomore in college working on projects to fill the time. If you 
 
 I feel that bash is great in a lot of ways, but it doesn't exactly feel *cozy*: it's lacking a sort of personal touch, and it's also missing quick and easy customizability. With my last shell, [Atom](https://github.com/adam-mcdaniel/atom), I had accomplished some of the coziness that bash was missing, but I also introduced a lot of *really* fatal flaws in the syntax and the type system.
 
-Dune, however, is designed ***completely*** differently from Atom. The interpreter itself is standalone, and it holds almost none of the functionality you see in the default distribution of Dune. If you wanted to, you could write a custom frontend and make a unique Dune based shell of your own!
+Dune, however, is designed ***completely*** differently from Atom (although you might notice the similarities in their widget systems). The interpreter itself is standalone, and it holds almost none of the functionality you see in the default distribution of Dune. If you wanted to, you could write a custom frontend and make a unique Dune based shell of your own!
 
 This frontend implementation turns the coziness dial to 11. Just check out the shell's default startup script!
 
