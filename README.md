@@ -1,25 +1,6 @@
+# dune
 
-<div align="center">
-  <h1>dune</h1>
-  <p>
-    <strong>A shell by the beach!</strong>
-  </p>
-
-  <p>
-    <a href="https://www.buymeacoffee.com/adam.mcdaniel" rel="nofollow"><img src="https://camo.githubusercontent.com/6315cdb9b889562e5b4d78fc3ae8c44852b7826c228f0b59b379b53fb57c6eaf/68747470733a2f2f696d672e736869656c64732e696f2f62616467652f242d737570706f72742d6666363962342e7376673f7374796c653d666c6174" alt="Donate" data-canonical-src="https://img.shields.io/badge/$-support-ff69b4.svg?style=flat" style="max-width:100%;"></a>
-    <a href="https://opensource.org/" rel="nofollow"><img src="https://camo.githubusercontent.com/97d4586afa582b2dcec2fa8ed7c84d02977a21c2dd1578ade6d48ed82296eb10/68747470733a2f2f6261646765732e66726170736f66742e636f6d2f6f732f76312f6f70656e2d736f757263652e7376673f763d313033" alt="Open Source" data-canonical-src="https://badges.frapsoft.com/os/v1/open-source.svg?v=103" style="max-width:100%;"></a>
-  </p>
-
-  <h3>
-    <a href="https://asciinema.org/a/7Cr96ndSzsIch7oGVYI3aIaX9">Demo</a>
-    <span> | </span>
-    <a href="https://docs.rs/dune/">Docs</a>
-    <span> | </span>
-    <a href="mailto:adam.mcdaniel17@gmail.com">Contact Me</a>
-  </h3>
-
-  <sub>Written in Rust🦀💖</sub>
-</div>
+A shell by the beach!
 
 <p float="left">
   <a href="https://asciinema.org/a/7Cr96ndSzsIch7oGVYI3aIaX9"><img src="./assets/welcome2.png" width="48%"/></a>
@@ -30,7 +11,7 @@
 
 ## About the Author
 
-I'm a sophomore in college, and I'm bored with my classes. If you enjoy my projects, consider supporting me by buying me a coffee! 
+I'm a *bored* sophomore in college working on projects to fill the time. If you enjoy my projects, consider supporting me by buying me a coffee! 
 
 <a href="https://www.buymeacoffee.com/adam.mcdaniel" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-violet.png" height=41px width=174px style="!important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
 
