@@ -580,6 +580,51 @@ impl Completer for DuneHelper {
     }
 }
 
+fn syntax_highlight(line: impl ToString) -> String {
+    line.to_string()
+        .replace("False", "\x1b[95mFalse\x1b[m\x1b[0m")
+        .replace("True", "\x1b[95mTrue\x1b[m\x1b[0m")
+        
+        .replace("None", "\x1b[91mNone\x1b[m\x1b[0m")
+        .replace("()", "\x1b[91m()\x1b[m\x1b[0m")
+
+        .replace("clear ",   "\x1b[94mclear \x1b[m\x1b[0m")
+        .replace("echo ",   "\x1b[94mecho \x1b[m\x1b[0m")
+        .replace("exit ",   "\x1b[94mexit \x1b[m\x1b[0m")
+        .replace("cd ",   "\x1b[94mcd \x1b[m\x1b[0m")
+        .replace("rm ",   "\x1b[94mrm \x1b[m\x1b[0m")
+
+
+        .replace("else ",   "\x1b[94melse \x1b[m\x1b[0m")
+        .replace("let ", "\x1b[94mlet \x1b[m\x1b[0m")
+        .replace("for ",   "\x1b[94mfor \x1b[m\x1b[0m")
+        .replace("if ",   "\x1b[94mif \x1b[m\x1b[0m")
+        .replace(" in ",   "\x1b[94m in \x1b[m\x1b[0m")
+        .replace(" to ",   "\x1b[94m to \x1b[m\x1b[0m")
+
+        .replace(" == ",   "\x1b[96m == \x1b[m\x1b[0m")
+        .replace(" != ",   "\x1b[96m != \x1b[m\x1b[0m")
+        .replace(" <= ",   "\x1b[96m <= \x1b[m\x1b[0m")
+        .replace(" >= ",   "\x1b[96m >= \x1b[m\x1b[0m")
+        .replace(" && ",   "\x1b[96m && \x1b[m\x1b[0m")
+        .replace(" || ",   "\x1b[96m || \x1b[m\x1b[0m")
+
+        .replace("@",   "\x1b[96m@\x1b[m\x1b[0m")
+        .replace("'",   "\x1b[96m'\x1b[m\x1b[0m")
+
+        .replace("->",   "\x1b[95m->\x1b[m\x1b[0m")
+        .replace("~>",   "\x1b[95m~>\x1b[m\x1b[0m")
+
+
+        .replace(" > ",   "\x1b[96m > \x1b[m\x1b[0m")
+        .replace(" < ",   "\x1b[96m < \x1b[m\x1b[0m")
+
+        .replace(" + ",   "\x1b[96m + \x1b[m\x1b[0m")
+        .replace(" - ",   "\x1b[96m - \x1b[m\x1b[0m")
+        .replace(" * ",   "\x1b[96m * \x1b[m\x1b[0m")
+        .replace(" // ",   "\x1b[96m // \x1b[m\x1b[0m")
+}
+
 impl Hinter for DuneHelper {
     type Hint = String;
 
@@ -643,52 +688,9 @@ impl Highlighter for DuneHelper {
     }
 
     fn highlight<'l>(&self, line: &'l str, pos: usize) -> Cow<'l, str> {
-        let line = line
-            .replace("False", "\x1b[95mFalse\x1b[m\x1b[0m")
-            .replace("True", "\x1b[95mTrue\x1b[m\x1b[0m")
-            
-            .replace("None", "\x1b[91mNone\x1b[m\x1b[0m")
-            .replace("()", "\x1b[91m()\x1b[m\x1b[0m")
-
-            .replace("clear ",   "\x1b[94mclear \x1b[m\x1b[0m")
-            .replace("echo ",   "\x1b[94mecho \x1b[m\x1b[0m")
-            .replace("exit ",   "\x1b[94mexit \x1b[m\x1b[0m")
-            .replace("cd ",   "\x1b[94mcd \x1b[m\x1b[0m")
-            .replace("rm ",   "\x1b[94mrm \x1b[m\x1b[0m")
-
-
-            .replace("else ",   "\x1b[94melse \x1b[m\x1b[0m")
-            .replace("let ", "\x1b[94mlet \x1b[m\x1b[0m")
-            .replace("for ",   "\x1b[94mfor \x1b[m\x1b[0m")
-            .replace("if ",   "\x1b[94mif \x1b[m\x1b[0m")
-            .replace(" in ",   "\x1b[94m in \x1b[m\x1b[0m")
-            .replace(" to ",   "\x1b[94m to \x1b[m\x1b[0m")
-
-            .replace(" == ",   "\x1b[96m == \x1b[m\x1b[0m")
-            .replace(" != ",   "\x1b[96m != \x1b[m\x1b[0m")
-            .replace(" <= ",   "\x1b[96m <= \x1b[m\x1b[0m")
-            .replace(" >= ",   "\x1b[96m >= \x1b[m\x1b[0m")
-            .replace(" && ",   "\x1b[96m && \x1b[m\x1b[0m")
-            .replace(" || ",   "\x1b[96m || \x1b[m\x1b[0m")
-
-            .replace("@",   "\x1b[96m@\x1b[m\x1b[0m")
-            .replace("'",   "\x1b[96m'\x1b[m\x1b[0m")
-
-            .replace("->",   "\x1b[95m->\x1b[m\x1b[0m")
-            .replace("~>",   "\x1b[95m~>\x1b[m\x1b[0m")
-
-
-            .replace(" > ",   "\x1b[96m > \x1b[m\x1b[0m")
-            .replace(" < ",   "\x1b[96m < \x1b[m\x1b[0m")
-
-            .replace(" + ",   "\x1b[96m + \x1b[m\x1b[0m")
-            .replace(" - ",   "\x1b[96m - \x1b[m\x1b[0m")
-            .replace(" * ",   "\x1b[96m * \x1b[m\x1b[0m")
-            .replace(" // ",   "\x1b[96m // \x1b[m\x1b[0m")
-            ;
         match self.highlighter.highlight(&line, pos) {
-            Owned(x) => Owned(x),
-            Borrowed(x) => Owned(x.to_owned())
+            Owned(x) => Owned(syntax_highlight(x)),
+            Borrowed(x) => Owned(syntax_highlight(x.to_owned()))
         }
     }
 
@@ -696,52 +698,7 @@ impl Highlighter for DuneHelper {
         if self.highlighter.highlight_char(line, pos) {
             return true;
         }
-        let old_line = line;
-        let line = line
-            .replace("False", "\x1b[95mFalse\x1b[m\x1b[0m")
-            .replace("True", "\x1b[95mTrue\x1b[m\x1b[0m")
-
-            .replace("None", "\x1b[91mNone\x1b[m\x1b[0m")
-            .replace("()", "\x1b[91m()\x1b[m\x1b[0m")
-
-            .replace("clear ",   "\x1b[94mclear \x1b[m\x1b[0m")
-            .replace("echo ",   "\x1b[94mecho \x1b[m\x1b[0m")
-            .replace("exit ",   "\x1b[94mexit \x1b[m\x1b[0m")
-            .replace("cd ",   "\x1b[94mcd \x1b[m\x1b[0m")
-            .replace("rm ",   "\x1b[94mrm \x1b[m\x1b[0m")
-
-
-            .replace("else ",   "\x1b[94melse\x1b[m\x1b[0m")
-            .replace("let ", "\x1b[94mlet \x1b[m\x1b[0m")
-            .replace("for ",   "\x1b[94mfor \x1b[m\x1b[0m")
-            .replace("if ",   "\x1b[94mif \x1b[m\x1b[0m")
-            .replace(" in ",   "\x1b[94m in \x1b[m\x1b[0m")
-            .replace(" to ",   "\x1b[94m to \x1b[m\x1b[0m")
-
-            .replace(" == ",   "\x1b[96m == \x1b[m\x1b[0m")
-            .replace(" != ",   "\x1b[96m != \x1b[m\x1b[0m")
-            .replace(" <= ",   "\x1b[96m <= \x1b[m\x1b[0m")
-            .replace(" >= ",   "\x1b[96m >= \x1b[m\x1b[0m")
-            .replace(" && ",   "\x1b[96m && \x1b[m\x1b[0m")
-            .replace(" || ",   "\x1b[96m || \x1b[m\x1b[0m")
-
-            .replace("@",   "\x1b[96m + \x1b[m\x1b[0m")
-            .replace("'",   "\x1b[96m'\x1b[m\x1b[0m")
-
-            .replace("->",   "\x1b[95m->\x1b[m\x1b[0m")
-            .replace("~>",   "\x1b[95m~>\x1b[m\x1b[0m")
-
-
-            .replace(" > ",   "\x1b[96m > \x1b[m\x1b[0m")
-            .replace(" < ",   "\x1b[96m < \x1b[m\x1b[0m")
-
-            .replace(" + ",   "\x1b[96m + \x1b[m\x1b[0m")
-            .replace(" - ",   "\x1b[96m - \x1b[m\x1b[0m")
-            .replace(" * ",   "\x1b[96m * \x1b[m\x1b[0m")
-            .replace(" // ",   "\x1b[96m // \x1b[m\x1b[0m")
-            ;
-
-        old_line != line
+        syntax_highlight(line) != line
     }
 }
 
