@@ -763,7 +763,7 @@ fn readline(prompt: impl ToString, rl: &mut Editor<impl Helper>) -> String {
                 return String::new();
             }
             Err(ReadlineError::Eof) => {
-                return String::new();
+                std::process::exit(0)
             }
             Err(err) => {
                 eprintln!("error: {:?}", err);
