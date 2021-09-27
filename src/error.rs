@@ -34,7 +34,30 @@ impl fmt::Display for Error {
                 write!(f, "{}", e)
             }
             Self::SyntaxError(e) => {
-                write!(f, "{:?}", e)
+                match e {
+                    SyntaxError::At(input, err) => {
+                        write!(f, "syntax error:\n | on input `{}`\n | {}", input.trim(), Self::SyntaxError(*err.clone()))
+                    },
+                    SyntaxError::CustomError(e) => {
+                        write!(f, "{}", Self::CustomError(e.to_string()))
+                    }
+                    SyntaxError::Expected {
+                        input,
+                        expected,
+                        found,
+                        hint,
+                    } => {
+                        writeln!(f, "syntax error:\n | on input `{}`\n | expected {}", input, expected)?;
+                        if let Some(found) = found {
+                            writeln!(f, " | found {}", found)?;
+                        }
+                        if let Some(hint) = hint {
+                            writeln!(f, " | hint: {}", hint)?;
+                        }
+                        Ok(())
+                    },
+                    _ => write!(f, "{:?}", e)
+                }
             }
         }
     }
