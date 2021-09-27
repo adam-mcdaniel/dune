@@ -1951,7 +1951,7 @@ Dune offers the following builtin functions:
 9. `sub`: subtracts two numbers.
 10. `div`: divides two numbers.
 11. `mul`: multiplies two numbers, a number and a string, or a number and a list.
-12. `mod`: calculates the remainder of two numbers.
+12. `rem`: calculates the remainder of two numbers.
 13. `input`: reads input from the console with a prompt and returns it as a string.
 14. `range`: returns a list of integers from the given start to the given end.
 15. `len`: returns the length of a list, string, or dictionary.
@@ -2353,7 +2353,7 @@ $ let cat = 'bat
 
             Ok(arr)
         },
-        "insert an item a dictionary or list",
+        "insert an item into a dictionary or list",
     );
 
     env.define_builtin(
