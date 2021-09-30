@@ -337,7 +337,7 @@ let MONTHS = [
 ];
 
 let make-calendar = m -> d -> y -> {
-    let now = {month: m, day: d, year: y};
+    let now = {month=m, day=d, year=y};
     let result = MONTHS@(now@month - 1) + " " + (str now@day) + ", " + (str now@year) + "\n";
 	let result = " " * ((28 - (len result)) // 2 + 1) + result;
     let result = result + " Su  Mo  Tu  We  Th  Fr  Sa\n";

@@ -105,6 +105,8 @@ const ASCII_NONZERO_DIGIT: &'static str = "123456789";
 const ASCII_DIGIT: &'static str = "0123456789";
 const ASCII_HEX_DIGIT: &'static str = "0123456789ABCDEFabcdef";
 
+const ALLOWED_SYMBOL_PUNCTUATION: &'static str = "_+-.~\\/?&<>$%#^:";
+
 pub fn parse_script(input: &str, require_eof: bool) -> IResult<&str, Expression, SyntaxError> {
     let (input, _) = try_parse_ws(input)?;
     let (input, mut exprs) = many0(alt((
@@ -185,11 +187,11 @@ fn parse_symbol(input: &str) -> IResult<&str, String, SyntaxError> {
         Err(_) => {
             let old_input = input;
 
-            let (input, head) = alt((one_of(ASCII_ALPHA), one_of("_+-.~\\/?&<>$%#^=")))(input)?;
+            let (input, head) = alt((one_of(ASCII_ALPHA), one_of(ALLOWED_SYMBOL_PUNCTUATION)))(input)?;
 
             let (input, tail) = many0(alt((
                 one_of(ASCII_ALPHANUMERIC),
-                one_of("_+-.~\\/?&<>$%#^="),
+                one_of(ALLOWED_SYMBOL_PUNCTUATION),
             )))(input)?;
 
             let mut result = String::from(head);
@@ -471,7 +473,7 @@ fn parse_map(input: &str) -> IResult<&str, Expression, SyntaxError> {
         tag(","),
         separated_pair(
             delimited(try_parse_ws, parse_symbol, try_parse_ws),
-            tag(":"),
+            tag("="),
             parse_expression,
         ),
     )(input)?;
