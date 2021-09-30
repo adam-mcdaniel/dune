@@ -1,6 +1,6 @@
 #![allow(clippy::wildcard_in_or_patterns)]
 
-use dune::{parse_script, Environment, Error, Expression, Int, SyntaxError, VERSION};
+use dune::{parse_script, Builtin, Environment, Error, Expression, Int, SyntaxError, VERSION};
 
 use rustyline::completion::{Completer, FilenameCompleter, Pair as PairComplete};
 use rustyline::config::OutputStreamType;
@@ -2033,7 +2033,7 @@ $ let cat = 'bat
 ");
                     }
                     otherwise => {
-                        if let Expression::Builtin(_, _, help) = otherwise.eval(env)? {
+                        if let Expression::Builtin(Builtin { help, .. }) = otherwise.eval(env)? {
                             println!("{}", help)
                         }
                     }
@@ -2480,8 +2480,18 @@ $ let cat = 'bat
         "a fun builtin function for playing chess!",
     );
 
-    parse(r#"let prompt = cwd -> fmt@bold ((fmt@dark@blue "(dune) ") + (fmt@bold (fmt@dark@green cwd)) + (fmt@bold (fmt@dark@blue "$ ")))"#)?.eval(&mut env)?;
-    parse(r#"let incomplete_prompt = cwd -> ((len cwd) + (len "(dune) ")) * " " + (fmt@bold (fmt@dark@yellow "> "));"#)?.eval(&mut env)?;
+    parse(
+        "let prompt = cwd -> \
+            fmt@bold ((fmt@dark@blue \"(dune) \") + \
+            (fmt@bold (fmt@dark@green cwd)) + \
+            (fmt@bold (fmt@dark@blue \"$ \")))",
+    )?
+    .eval(&mut env)?;
+    parse(
+        r#"let incomplete_prompt = cwd -> \
+            ((len cwd) + (len "(dune) ")) * " " + (fmt@bold (fmt@dark@yellow "> "));"#,
+    )?
+    .eval(&mut env)?;
 
     env.define_builtin(
         "report",

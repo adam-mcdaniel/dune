@@ -70,7 +70,7 @@ where
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum Expression {
     Group(Box<Self>),
 
@@ -105,17 +105,37 @@ pub enum Expression {
     Macro(String, Box<Self>),
     Do(Vec<Self>),
     // A builtin function.
-    //
-    // The first argument is the name of the function, the second is the
-    // function pointer for executing the function. The third is the
-    // help string for the function.
-    Builtin(
-        String,
-        fn(Vec<Self>, &mut Environment) -> Result<Self, Error>,
-        String,
-    ),
+    Builtin(Builtin),
 
     Quote(Box<Self>),
+}
+
+#[derive(Clone)]
+pub struct Builtin {
+    /// name of the function
+    pub name: String,
+    /// function pointer for executing the function
+    pub body: fn(Vec<Expression>, &mut Environment) -> Result<Expression, Error>,
+    /// help string
+    pub help: String,
+}
+
+impl fmt::Debug for Builtin {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "builtin@{}", self.name)
+    }
+}
+
+impl fmt::Display for Builtin {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "builtin@{}", self.name)
+    }
+}
+
+impl PartialEq for Builtin {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
 }
 
 impl fmt::Debug for Expression {
@@ -175,7 +195,7 @@ impl fmt::Debug for Expression {
                     .collect::<Vec<String>>()
                     .join(" ")
             ),
-            Self::Builtin(name, _, _) => write!(f, "builtin@{}", name),
+            Self::Builtin(builtin) => fmt::Debug::fmt(builtin, f),
         }
     }
 }
@@ -219,7 +239,7 @@ impl fmt::Display for Expression {
                 fmt.separator(LinePosition::Intern, LineSeparator::new('─', '┼', '├', '┤'));
                 fmt.separator(LinePosition::Bottom, LineSeparator::new('─', '┴', '└', '┘'));
                 for (key, val) in exprs {
-                    if let Self::Builtin(_, _, help) = &val {
+                    if let Self::Builtin(Builtin { help, .. }) = &val {
                         t.add_row(row!(key, format!("{}", val), help));
                     } else {
                         t.add_row(row!(key, format!("{}", val)));
@@ -255,30 +275,7 @@ impl fmt::Display for Expression {
                     .collect::<Vec<String>>()
                     .join(" ")
             ),
-            Self::Builtin(name, _, _) => write!(f, "builtin@{}", name),
-        }
-    }
-}
-
-impl PartialEq for Expression {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Symbol(a), Self::Symbol(b)) => a == b,
-            (Self::Integer(a), Self::Integer(b)) => a == b,
-            (Self::Float(a), Self::Float(b)) => a == b,
-            (Self::String(a), Self::String(b)) => a == b,
-            (Self::Boolean(a), Self::Boolean(b)) => a == b,
-            (Self::List(a), Self::List(b)) => a == b,
-            (Self::Map(a), Self::Map(b)) => a == b,
-            (Self::None, Self::None) => true,
-            (Self::Lambda(name1, expr1, env1), Self::Lambda(name2, expr2, env2)) => {
-                name1 == name2 && expr1 == expr2 && env1 == env2
-            }
-            (Self::Macro(name1, expr1), Self::Macro(name2, expr2)) => {
-                name1 == name2 && expr1 == expr2
-            }
-            (Self::Builtin(a, _, _), Self::Builtin(b, _, _)) => a == b,
-            _ => false,
+            Self::Builtin(builtin) => fmt::Display::fmt(builtin, f),
         }
     }
 }
@@ -302,7 +299,11 @@ impl Expression {
         body: fn(Vec<Self>, &mut Environment) -> Result<Self, Error>,
         help: impl ToString,
     ) -> Self {
-        Self::Builtin(name.to_string(), body, help.to_string())
+        Self::Builtin(Builtin {
+            name: name.to_string(),
+            body,
+            help: help.to_string(),
+        })
     }
 
     pub fn new(x: impl Into<Self>) -> Self {
@@ -319,7 +320,7 @@ impl Expression {
             Self::Map(exprs) => !exprs.is_empty(),
             Self::Lambda(_, _, _) => true,
             Self::Macro(_, _) => true,
-            Self::Builtin(_, _, _) => true,
+            Self::Builtin(_) => true,
             _ => false,
         }
     }
@@ -332,7 +333,7 @@ impl Expression {
             | Self::Float(_)
             | Self::String(_)
             | Self::Boolean(_)
-            | Self::Builtin(_, _, _) => vec![],
+            | Self::Builtin(_) => vec![],
 
             Self::For(_, list, body) => {
                 let mut result = vec![];
@@ -487,8 +488,8 @@ impl Expression {
                         self = Self::Apply(Box::new(body.eval_mut(&mut env)?), args[1..].to_vec());
                     }
 
-                    Self::Builtin(_, g, _) => {
-                        return g(args.clone(), env);
+                    Self::Builtin(Builtin { body, .. }) => {
+                        return body(args.clone(), env);
                     }
 
                     _ => return Err(Error::CannotApply(*f.clone(), args.clone())),
@@ -540,7 +541,7 @@ impl Expression {
                 | Self::Boolean(_)
                 | Self::String(_)
                 | Self::Macro(_, _)
-                | Self::Builtin(_, _, _) => return Ok(self.clone()),
+                | Self::Builtin(_) => return Ok(self.clone()),
             }
         }
     }
