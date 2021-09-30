@@ -1,0 +1,39 @@
+"Hello, welcome to Dune's help macro!
+
+Dune offers the following builtin functions:
+
+1. `echo`: prints the given arguments to the console with a newline
+2. `println`: identical to `echo`
+3. `print`: prints the given arguments to the console without a newline
+4. `help`: prints this message
+5. `exit`: exits the shell
+6. `quit`: identical to `exit`
+7. `neg`: negates a number.
+8. `add`: adds two numbers, strings, lists, etc.
+9. `sub`: subtracts two numbers.
+10. `div`: divides two numbers.
+11. `mul`: multiplies two numbers, a number and a string, or a number and a list.
+12. `rem`: calculates the remainder of two numbers.
+13. `input`: reads input from the console with a prompt and returns it as a string.
+14. `range`: returns a list of integers from the given start to the given end.
+15. `len`: returns the length of a list, string, or dictionary.
+16. `insert`: insert an item into a list or dictionary with a given key or position.
+17. `remove`: remove an item from a list or dictionary with a given key or position.
+18. `index`: returns the item at an index in a list or dictionary.
+19. `chars`: returns a list of characters from a string.
+20. `lines`: returns a list of lines from a string.
+21. `eval`: evaluates a quoted Dune expression.
+22. `cd`: changes the current working directory in the current scope.
+23. `prompt`: returns the prompt as a string given the current working directory.
+24. `incomplete_prompt`: returns the prompt for incomplete expressions as a string given the current working directory.
+25. `report`: prints the result of a user-entered expression to the console.
+26. `and`: returns the logical and of two expressions.
+27. `or`: returns the logical or of two expressions.
+28. `not`: returns the logical not of a boolean expression.
+29. `eq`: returns true if two expressions are equal.
+30. `neq`: returns true if two expressions are not equal.
+31. `lt`: returns true if the first expression is less than the second.
+32. `gt`: returns true if the first expression is greater than the second.
+33. `lte`: returns true if the first expression is less than or equal to the second.
+34. `gte`: returns true if the first expression is greater than or equal to the second.
+35. `str`: returns the string representation of an expression."

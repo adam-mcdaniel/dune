@@ -1,0 +1,15 @@
+Hello, welcome to Dune's help macro!
+
+To find information on various topics,
+run `help` with the following arguments!
+1. `builtin`: to learn about the builtin functions
+2. `lib`: to find out about the various builtin libraries
+3. `syntax`: to find out about the syntax of Dune
+4. `types`: to find out about the various types Dune supports
+5. `scripting`: to learn about scripting in Dune
+6. `prelude`: to learn about the prelude
+7. `me`: to see this message
+
+You can also call `help` on any builtin function:
+
+$ help echo
