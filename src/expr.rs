@@ -8,7 +8,11 @@ use std::{
     process::Command,
 };
 
-use prettytable::{row, cell, Table, format::{LinePosition, LineSeparator}};
+use prettytable::{
+    cell,
+    format::{LinePosition, LineSeparator},
+    row, Table,
+};
 
 impl From<Int> for Expression {
     fn from(x: Int) -> Self {
@@ -267,8 +271,12 @@ impl PartialEq for Expression {
             (Self::List(a), Self::List(b)) => a == b,
             (Self::Map(a), Self::Map(b)) => a == b,
             (Self::None, Self::None) => true,
-            (Self::Lambda(a, b, c), Self::Lambda(x, y, z)) => a == x && b == y && c == z,
-            (Self::Macro(a, b), Self::Macro(c, d)) => a == c && b == d,
+            (Self::Lambda(name1, expr1, env1), Self::Lambda(name2, expr2, env2)) => {
+                name1 == name2 && expr1 == expr2 && env1 == env2
+            }
+            (Self::Macro(name1, expr1), Self::Macro(name2, expr2)) => {
+                name1 == name2 && expr1 == expr2
+            }
             (Self::Builtin(a, _, _), Self::Builtin(b, _, _)) => a == b,
             _ => false,
         }
@@ -342,7 +350,7 @@ impl Expression {
             }
             Self::Map(exprs) => {
                 let mut result = vec![];
-                for (_, expr) in exprs {
+                for expr in exprs.values() {
                     result.extend(expr.get_used_symbols())
                 }
                 result
@@ -389,7 +397,7 @@ impl Expression {
 
                 Self::Assign(name, expr) => {
                     let x = expr.eval_mut(env)?;
-                    env.define(&name, x.clone());
+                    env.define(&name, x);
                     return Ok(Self::None);
                 }
 
@@ -430,7 +438,7 @@ impl Expression {
                             .current_dir(env.get_cwd())
                             .args(
                                 args.iter()
-                                    .filter(|x| x.clone() != &Self::None)
+                                    .filter(|&x| x != &Self::None)
                                     .map(|x| Ok(format!("{}", x.clone().eval_mut(env)?)))
                                     .collect::<Result<Vec<String>, Error>>()?,
                             )
@@ -440,9 +448,10 @@ impl Expression {
                             Ok(_) => return Ok(Self::None),
                             Err(e) => {
                                 return Err(match e.kind() {
-                                    ErrorKind::NotFound => {
-                                        Error::CustomError(format!("program \"{}\" not found", name))
-                                    }
+                                    ErrorKind::NotFound => Error::CustomError(format!(
+                                        "program \"{}\" not found",
+                                        name
+                                    )),
                                     ErrorKind::PermissionDenied => Error::CustomError(format!(
                                         "permission to execute \"{}\" denied",
                                         name
@@ -454,7 +463,7 @@ impl Expression {
                     }
 
                     Self::Lambda(param, body, old_env) if args.len() == 1 => {
-                        let mut new_env = old_env.clone();
+                        let mut new_env = old_env;
                         new_env.define(&param, args[0].clone().eval_mut(env)?);
                         return body.eval_mut(&mut new_env);
                     }
@@ -496,7 +505,7 @@ impl Expression {
                             }
                         }
                     }
-                    return Ok(Self::Lambda(param.clone(), body.clone(), tmp_env));
+                    return Ok(Self::Lambda(param.clone(), body, tmp_env));
                 }
 
                 Self::List(exprs) => {
@@ -511,7 +520,7 @@ impl Expression {
                     return Ok(Self::Map(
                         exprs
                             .into_iter()
-                            .map(|(n, x)| Ok((n.clone(), x.eval_mut(env)?)))
+                            .map(|(n, x)| Ok((n, x.eval_mut(env)?)))
                             .collect::<Result<BTreeMap<String, Self>, Error>>()?,
                     ))
                 }
@@ -639,16 +648,15 @@ where
 
     fn index(&self, idx: T) -> &Self {
         match (self, idx.into()) {
-            (Self::Map(m), Self::Symbol(name))
-                | (Self::Map(m), Self::String(name))=> match m.get(&name) {
-                Some(val) => val,
-                None => &Self::None,
-            },
+            (Self::Map(m), Self::Symbol(name)) | (Self::Map(m), Self::String(name)) => {
+                match m.get(&name) {
+                    Some(val) => val,
+                    None => &Self::None,
+                }
+            }
 
             (Self::List(list), Self::Integer(n)) if list.len() > n as usize => &list[n as usize],
-            _ => {
-                &Self::None
-            },
+            _ => &Self::None,
         }
     }
 }

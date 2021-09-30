@@ -1,12 +1,18 @@
 use super::{Error, Expression};
 use std::collections::BTreeMap;
 
-const CWD_ENV_VAR: &'static str = "CWD";
+const CWD_ENV_VAR: &str = "CWD";
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct Environment {
     pub bindings: BTreeMap<String, Expression>,
     parent: Option<Box<Self>>,
+}
+
+impl Default for Environment {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Environment {
@@ -19,7 +25,7 @@ impl Environment {
 
     pub fn get_cwd(&self) -> String {
         match self.get(CWD_ENV_VAR) {
-            Some(Expression::String(path)) => path.to_string(),
+            Some(Expression::String(path)) => path,
             _ => String::from("/"),
         }
     }
@@ -48,7 +54,7 @@ impl Environment {
     }
 
     pub fn define(&mut self, name: &str, expr: Expression) {
-        self.bindings.insert(name.to_string(), expr.clone());
+        self.bindings.insert(name.to_string(), expr);
     }
 
     pub fn define_builtin(
