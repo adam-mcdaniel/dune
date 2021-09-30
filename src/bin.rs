@@ -1,6 +1,7 @@
-use dune::{parse_script, VERSION, Environment, Error, Expression, Int, SyntaxError};
+#![allow(clippy::wildcard_in_or_patterns)]
 
-use rustyline::{error::ReadlineError, Editor, Helper};
+use dune::{parse_script, Builtin, Environment, Error, Expression, Int, SyntaxError, VERSION};
+
 use rustyline::completion::{Completer, FilenameCompleter, Pair as PairComplete};
 use rustyline::config::OutputStreamType;
 use rustyline::highlight::{Highlighter, MatchingBracketHighlighter};
@@ -8,479 +9,27 @@ use rustyline::hint::{Hinter, HistoryHinter};
 use rustyline::validate::{
     MatchingBracketValidator, ValidationContext, ValidationResult, Validator,
 };
+use rustyline::{error::ReadlineError, Editor, Helper};
 use rustyline::{CompletionType, Config, Context, EditMode};
 use rustyline_derive::Helper;
 
-
+use chrono::{Datelike, Local, Timelike};
 use common_macros::b_tree_map;
 use os_info::Type;
-use chrono::{Local, Timelike, Datelike};
 
 use rand::{distributions::Uniform, seq::SliceRandom, thread_rng, Rng};
 
 use std::{
     borrow::Cow::{self, Borrowed, Owned},
-    path::PathBuf,
     env::current_exe,
+    path::PathBuf,
     sync::{Arc, Mutex},
     thread::sleep,
     time::Duration,
 };
 
-
-
-const DEFAULT_PRELUDE: &'static str = r#"
-console@title "Dune";
-
-let donate = _ ~> {
-        echo "                     ┌──────Wild Dune Shrew──────┐
-                      Hello, how is Dune working  
-                      for you so far? If you like 
-                      it, consider starring our   
-                      GitHub page and donating!";
-        echo "                     " (fmt@italics "(To remove this message,\n                      write your own prelude)\n");
-        echo "                     " (fmt@href "https://github.com/adam-mcdaniel/dune" "Thank You❤️");
-
-        echo "                     └───────────────────────────┘
-                     ╱
-                    ╱
-
-          _,____ c--.
-        /`  \\   ` _^_\\
-    `~~~\\  _/---'\\\\  ^
-         `~~~     ~~
-    ─────────────────────
-"
-};
-
-let CATS = ["
-     _
-   |\\'/-..--.
-  / _ _   ,  ;
- `~=`Y'~_<._./
-  <`-....__.'",
-"
-
- |\\__/,|   (`\\
- |_ _  |.--.) )
- ( T   )     /
-(((^_(((/(((_/",
-"
-
-    \\    /\\
-     )  ( ')
-    (  /  )
-     \\(__)|",
-"
-
-      ^~^  ,
-     ('Y') )
-     /   \\/ 
-    (\\|||/)",
-"   .       .
-   \\`-\"'\"-'/
-    } 6 6 {
-   =.  Y  ,=
-     /^^^\\  .
-    /     \\  )
-   (  )-(  )/
-    \"\"   \"\"",
-"
-
-         /\\_/\\
-    ____/ o o \\
-  /~____  =Y= /
- (______)__m_m)"
-];
-
-let prompt = cwd -> fmt@bold ((fmt@dark@blue "(dune) ") + (fmt@bold (fmt@dark@green cwd)) + (fmt@bold (fmt@dark@blue "$ ")));
-let incomplete_prompt = cwd -> ((len cwd) + (len "(dune) ")) * " " + (fmt@bold (fmt@dark@yellow "> "));
-
-let shrew = _ ~> {
-"
-          _,____ c--.
-        /`  \\   ` _^_\\
-    `~~~\\  _/---'\\\\  ^
-         `~~~     ~~
-    ─────────────────────
-"
-};
-
-let turnedshrew = _ ~> {
-"
-      .--p_____,_
-     /_^_ `   /  `\\
-     ^  //'---\\_  /~~~
-       ~~     ~~~`
-     ──────────────────
-"
-};
-
-let shrewsay = text -> {
-    let title = "Wild Dune Shrew";
-
-
-    let cols = 22;
-    let text = fmt@wrap text cols;
-    let text-lines = lines text;
-    if (len text-lines) == 1 {
-        if (len text) < cols {
-            let cols = len text;
-        }
-    }
-    let rows = len text-lines;
-    let spacing = 25;
-
-    for line in (lines (widget@create title text cols + 2 rows + 2)) {
-        echo " " * spacing line;
-    }
-
-    for i in 0 to 2 {
-        echo " " * (spacing - i) "╱";
-    }
-
-    echo (shrew ());
-};
-
-let turnedshrewsay = text -> {
-    let title = "Wild Dune Shrew";
-
-    let cols = 27;
-    let text = fmt@wrap text cols;
-    let text-lines = lines text;
-    if (len text-lines) == 1 {
-        if (len text) < cols {
-            let cols = len text;
-        }
-    }
-    let rows = len text-lines;
-    let spacing = 20;
-
-    for line in (lines (widget@create title text cols + 2 rows + 2)) {
-        echo " " * spacing line;
-    }
-
-    for i in 0 to 2 {
-        echo " " * (spacing - i) "╱";
-    }
-
-    echo (turnedshrew ());
-};
-
-
-let about = _ ~> {
-    echo (
-      widget@joiny
-        (widget@create "About"
-  "          Hello, welcome to " + (fmt@yellow "Dune Shell!") + "
-      Written by: " + (fmt@magenta "http://adam-mcdaniel.net") + "
-I wrote Dune to be a nice environment for devs while they work! It's a very cozy shell with high customizability, so you can make it how you'd like."
-  50 10)
-  
-        (widget@joinx
-          (widget@create "Features"
-"Dune has a wide set of
-features, it's basically a
-full blown language!
-
-It supports several uncommon
-features in a shell, such as:
-operator overloading,
-lambdas, macros, quoted
-expressions like Lisp, and
-more!
-
-Dune's libraries are very
-extensive. There are
-libraries for:
-
-☞ A simple widget system🪟
-☞ OS information        💽
-☞ Randomness            🔀
-☞ Basic math, trig, etc.🧮
-☞ File system operations📂
-☞ Text color and styling📝
-☞ Functional programming🔗
-☞ Date and time         🕒
-
-And more!"
-  30 28)
-  
-          (widget@joiny
-            (widget@create "About the Author" "I'm a sophomore at\nthe University of\nTennessee🏴󠁵󠁳󠁴󠁮󠁿\nstudying Computer💻\nScience🧪.\n\nI'm extremely \ninterested in\nlanguage design\n& compiler design.\nCheck out my other\nprojects on GitHub:\n\nadam-mcdaniel" 20 18)
-            (widget@create "Cat" (rand@choose CATS) 20 10)
-  )))
-};
-
-
-let welcomebanner = _ ~> {
-
-
-    let logo = "
-        ██████╗ ██╗   ██╗███╗   ██╗███████╗
-        ██╔══██╗██║   ██║████╗  ██║██╔════╝
-        ██║  ██║██║   ██║██╔██╗ ██║█████╗  
-        ██║  ██║██║   ██║██║╚██╗██║██╔══╝  
-        ██████╔╝╚██████╔╝██║ ╚████║███████╗
-        ╚═════╝  ╚═════╝ ╚═╝  ╚═══╝╚══════╝
-                                     ";
-
-    let logo = "
-
-        ██████╗░██╗░░░██╗███╗░░██╗███████╗
-        ██╔══██╗██║░░░██║████╗░██║██╔════╝
-        ██║░░██║██║░░░██║██╔██╗██║█████╗░░
-        ██║░░██║██║░░░██║██║╚████║██╔══╝░░
-        ██████╔╝╚██████╔╝██║░╚███║███████╗
-        ╚═════╝░░╚═════╝░╚═╝░░╚══╝╚══════╝
-";
-
-    (_ -> {
-        let now = time@now ();
-        let time-emoji = if now@hour <= 6 "🌃"
-            else if now@hour <= 10 "🌅"
-            else if now@hour <= 18 "🌤️ "
-            else "🌃";
-        let date-emoji = if now@month == 1 "⛄"
-            else if now@month == 2 "💖"
-            else if now@month == 3 "🍀"
-            else if now@month == 4 "🌂"
-            else if now@month == 5 "🌻"
-            else if now@month == 6 "🌞"
-            else if now@month == 7 "🌊"
-            else if now@month == 8 "📝"
-            else if now@month == 9 "🍎"
-            else if now@month == 10 "🎃"
-            else if now@month == 11 "🍂"
-            else if now@month == 12 "🌨️"
-            else "📅";
-        let zodiac-emoji = if now@month == 1 (if now@day < 20 "🐐" else "🏺")
-            else if now@month == 2 (if now@day < 19 "🏺" else "🐟")
-            else if now@month == 3 (if now@day < 21 "🐟" else "🐏")
-            else if now@month == 4 (if now@day < 20 "🐏" else "🐂")
-            else if now@month == 5 (if now@day < 21 "🐂" else "👬")
-            else if now@month == 6 (if now@day < 21 "👬" else "🦀")
-            else if now@month == 7 (if now@day < 23 "🦀" else "🦁")
-            else if now@month == 8 (if now@day < 23 "🦁" else "👩")
-            else if now@month == 9 (if now@day < 23 "👩" else "⚖️")
-            else if now@month == 10 (if now@day < 23 "⚖️" else "🦂")
-            else if now@month == 11 (if now@day < 22 "🦂" else "🏹")
-            else if now@month == 12 (if now@day < 22 "🏹" else "🐐")
-            else "⭐";
-        echo "┌─────────────────Welcome to ...─────────────────┐";
-        for ch in (chars logo) {
-            print (fmt@bold (if ch == "█" {
-               fmt@faint (fmt@red ch)
-            } else {
-               fmt@faint (fmt@dark@blue ch)
-            }));
-        }
-        echo "";
-        echo "        The time is " + (fmt@magenta now@time@str) + " " + time-emoji + " on " + (fmt@cyan now@date@str);
-        echo "└────────────────────────────────────────────────┘";
-    }) ();
-
-};
-
-
-let is-leapyear = year -> {
-    if year % 4 == 0 && year % 100 != 0 {
-        True
-    } else if year % 100 == 0 && year % 400 == 0 {
-        True
-    } else {
-        False
-    }
-};
-
-let days-in-month = month -> year -> {
-    if month == 2 {
-        28 + (if (is-leapyear year) 1 else 0)
-    } else {
-        31 - (((month - 1) % 7) % 2)
-    }
-};
-
-let day-of-week = m -> d -> y -> {
-    let t = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4];
-
-    if m < 3 {
-        let y = y - 1
-    }
-
-    (((y + (int(y // 4.0))) - (int(y // 100.0))) + (int(y // 400.0)) + t@(m - 1) + d) % 7
-};
-
-let WEEKDAYS = [
-	"Sunday",
-	"Monday",
-	"Tuesday",
-	"Wednesday",
-	"Thursday",
-	"Friday",
-	"Saturday"
-];
-
-let MONTHS = [
-	"January",
-	"February",
-	"March",
-	"April",
-	"May",
-	"June",
-	"July",
-	"August",
-	"September",
-	"October",
-	"November",
-	"December"
-];
-
-let make-calendar = m -> d -> y -> {
-    let now = {month: m, day: d, year: y};
-    let result = MONTHS@(now@month - 1) + " " + (str now@day) + ", " + (str now@year) + "\n";
-	let result = " " * ((28 - (len result)) // 2 + 1) + result;
-    let result = result + " Su  Mo  Tu  We  Th  Fr  Sa\n";
-
-    let dof = day-of-week now@month 1 now@year;
-    let dim = days-in-month now@month now@year;
-
-    for i in 0 to dof {
-        let result = result + "    ";
-    }
-
-    for i in 1 to dim + 1 {
-        let num = str i;
-        if (len num) < 2 {
-            let num = (if now@day == i " *" else "  ") + num
-        } else {
-            let num = (if now@day == i "*" else " ") + num
-        }
-
-        let result = result + num + (if (i + dof) % 7 == 0 "\n" else " ")
-    }
-    widget@create "Calendar" result 30 10
-};
-
-let cal = _ ~> {
-    (_ -> {
-        let now = time@now ();
-        make-calendar now@month now@day now@year
-    }) ();
-};
-
-
-
-let welcome = _ ~> {
-    welcomebanner ();
-    (_ -> {
-        let now = time@now ();
-        echo (widget@joinx
-            (make-calendar now@month now@day now@year)
-            (widget@create "Cat" (rand@choose CATS) 20 10));
-    }) ();
-};
-
-
-let yesorno = _ -> {
-    (input (fmt@blue "(y/n) ")) != "n"
-};
-
-let wait = _ -> {
-   input (fmt@italics (fmt@blue "(Press enter to continue) "));
-};
-
-
-let intro = _ ~> {
-    clear ();
-    welcomebanner ();
-
-    shrewsay "Hey there! Is this your first time using Dune?";
-    if (yesorno ()) {
-        clear ();
-        welcomebanner ();
-        shrewsay "Then let's get started!";
-        wait ();
-        
-        clear ();
-        welcomebanner ();
-        about ();
-        turnedshrewsay "First off, here's some background information about Dune!";
-        wait ();
-
-
-        clear ();
-        welcomebanner ();
-        shrewsay "To execute a program in Dune, simply call the program the same way you would in bash or Powershell!\n\n\n$ prog arg1 arg2 ...";
-        wait ();
-        
-        clear ();
-        welcomebanner ();
-        turnedshrewsay "You can also define macros for Dune, and call them the same way you would a program! (Macros called without arguments are implicitly passed the current working directory as an argument)\n\n\n$ cd ..";
-        wait ();
-        
-        clear ();
-        welcomebanner ();
-        shrewsay "To define variables (which also act as environment variables), simply use the `let` keyword!\n\n\n$ let x = 5";
-        wait ();
-        
-        clear ();
-        welcomebanner ();
-        turnedshrewsay "That should be enough to get you started! If you have any questions, just call the `help` macro! To ask for general help, run `help me`!\n\n\n$ help me";
-        wait ();
-        
-        clear ();
-        welcomebanner ();
-        turnedshrewsay "Good luck! I really hope you enjoy my shell! 😄❤️";
-        wait ();
-
-    } else {
-        clear ();
-        welcomebanner ();
-        turnedshrewsay "Oh good! I'll assume you know your way around. To write your own startup script, instead of this default script, write a `.dune-prelude` file in your home directory! Bye!";
-        wait ();
-    }
-
-    clear ();
-    welcome ();
-};
-
-let old-report = report;
-let REPORT_COUNT = 0;
-let report = val ~> {
-    old-report val;
-    if REPORT_COUNT == 50 {
-        donate ();
-    }
-    let REPORT_COUNT = REPORT_COUNT + 1;
-};
-
-let old-help = help;
-let help = val ~> {
-    if val == CWD || val == 'me {
-        old-help me;
-        echo "\n";
-        donate ();
-    } else if val == 'builtin {
-        old-help builtin;
-    } else if val == 'lib {
-        old-help lib;
-    } else if val == 'syntax {
-        old-help syntax;
-    } else if val == 'types {
-        old-help types;
-    } else if val == 'scripting {
-        old-help scripting;
-    } else if val == 'prelude {
-        old-help prelude;
-    } else {
-        old-help val;
-    }
-};
-
-intro ();
-"#;
-
+#[rustfmt::skip]
+const DEFAULT_PRELUDE: &str = include_str!(".dune-prelude");
 
 fn new_editor(env: &Environment) -> Editor<DuneHelper> {
     let config = Config::builder()
@@ -506,7 +55,6 @@ fn new_editor(env: &Environment) -> Editor<DuneHelper> {
     rl
 }
 
-
 #[derive(Helper)]
 struct DuneHelper {
     completer: FilenameCompleter,
@@ -516,7 +64,6 @@ struct DuneHelper {
     colored_prompt: String,
     env: Environment,
 }
-
 
 impl DuneHelper {
     fn set_prompt(&mut self, prompt: impl ToString) {
@@ -580,49 +127,50 @@ impl Completer for DuneHelper {
     }
 }
 
+#[rustfmt::skip]
 fn syntax_highlight(line: impl ToString) -> String {
     line.to_string()
         .replace("False", "\x1b[95mFalse\x1b[m\x1b[0m")
         .replace("True", "\x1b[95mTrue\x1b[m\x1b[0m")
-        
+
         .replace("None", "\x1b[91mNone\x1b[m\x1b[0m")
         .replace("()", "\x1b[91m()\x1b[m\x1b[0m")
 
-        .replace("clear ",   "\x1b[94mclear \x1b[m\x1b[0m")
-        .replace("echo ",   "\x1b[94mecho \x1b[m\x1b[0m")
-        .replace("exit ",   "\x1b[94mexit \x1b[m\x1b[0m")
-        .replace("cd ",   "\x1b[94mcd \x1b[m\x1b[0m")
-        .replace("rm ",   "\x1b[94mrm \x1b[m\x1b[0m")
+        .replace("clear ", "\x1b[94mclear \x1b[m\x1b[0m")
+        .replace("echo ", "\x1b[94mecho \x1b[m\x1b[0m")
+        .replace("exit ", "\x1b[94mexit \x1b[m\x1b[0m")
+        .replace("cd ", "\x1b[94mcd \x1b[m\x1b[0m")
+        .replace("rm ", "\x1b[94mrm \x1b[m\x1b[0m")
 
 
-        .replace("else ",   "\x1b[94melse \x1b[m\x1b[0m")
+        .replace("else ", "\x1b[94melse \x1b[m\x1b[0m")
         .replace("let ", "\x1b[94mlet \x1b[m\x1b[0m")
-        .replace("for ",   "\x1b[94mfor \x1b[m\x1b[0m")
-        .replace("if ",   "\x1b[94mif \x1b[m\x1b[0m")
-        .replace(" in ",   "\x1b[94m in \x1b[m\x1b[0m")
-        .replace(" to ",   "\x1b[94m to \x1b[m\x1b[0m")
+        .replace("for ", "\x1b[94mfor \x1b[m\x1b[0m")
+        .replace("if ", "\x1b[94mif \x1b[m\x1b[0m")
+        .replace(" in ", "\x1b[94m in \x1b[m\x1b[0m")
+        .replace(" to ", "\x1b[94m to \x1b[m\x1b[0m")
 
-        .replace(" == ",   "\x1b[96m == \x1b[m\x1b[0m")
-        .replace(" != ",   "\x1b[96m != \x1b[m\x1b[0m")
-        .replace(" <= ",   "\x1b[96m <= \x1b[m\x1b[0m")
-        .replace(" >= ",   "\x1b[96m >= \x1b[m\x1b[0m")
-        .replace(" && ",   "\x1b[96m && \x1b[m\x1b[0m")
-        .replace(" || ",   "\x1b[96m || \x1b[m\x1b[0m")
+        .replace(" == ", "\x1b[96m == \x1b[m\x1b[0m")
+        .replace(" != ", "\x1b[96m != \x1b[m\x1b[0m")
+        .replace(" <= ", "\x1b[96m <= \x1b[m\x1b[0m")
+        .replace(" >= ", "\x1b[96m >= \x1b[m\x1b[0m")
+        .replace(" && ", "\x1b[96m && \x1b[m\x1b[0m")
+        .replace(" || ", "\x1b[96m || \x1b[m\x1b[0m")
 
-        .replace("@",   "\x1b[96m@\x1b[m\x1b[0m")
-        .replace("'",   "\x1b[96m'\x1b[m\x1b[0m")
+        .replace("@", "\x1b[96m@\x1b[m\x1b[0m")
+        .replace("'", "\x1b[96m'\x1b[m\x1b[0m")
 
-        .replace("->",   "\x1b[95m->\x1b[m\x1b[0m")
-        .replace("~>",   "\x1b[95m~>\x1b[m\x1b[0m")
+        .replace("->", "\x1b[95m->\x1b[m\x1b[0m")
+        .replace("~>", "\x1b[95m~>\x1b[m\x1b[0m")
 
 
-        .replace(" > ",   "\x1b[96m > \x1b[m\x1b[0m")
-        .replace(" < ",   "\x1b[96m < \x1b[m\x1b[0m")
+        .replace(" > ", "\x1b[96m > \x1b[m\x1b[0m")
+        .replace(" < ", "\x1b[96m < \x1b[m\x1b[0m")
 
-        .replace(" + ",   "\x1b[96m + \x1b[m\x1b[0m")
-        .replace(" - ",   "\x1b[96m - \x1b[m\x1b[0m")
-        .replace(" * ",   "\x1b[96m * \x1b[m\x1b[0m")
-        .replace(" // ",   "\x1b[96m // \x1b[m\x1b[0m")
+        .replace(" + ", "\x1b[96m + \x1b[m\x1b[0m")
+        .replace(" - ", "\x1b[96m - \x1b[m\x1b[0m")
+        .replace(" * ", "\x1b[96m * \x1b[m\x1b[0m")
+        .replace(" // ", "\x1b[96m // \x1b[m\x1b[0m")
 }
 
 impl Hinter for DuneHelper {
@@ -688,9 +236,9 @@ impl Highlighter for DuneHelper {
     }
 
     fn highlight<'l>(&self, line: &'l str, pos: usize) -> Cow<'l, str> {
-        match self.highlighter.highlight(&line, pos) {
+        match self.highlighter.highlight(line, pos) {
             Owned(x) => Owned(syntax_highlight(x)),
-            Borrowed(x) => Owned(syntax_highlight(x.to_owned()))
+            Borrowed(x) => Owned(syntax_highlight(x.to_owned())),
         }
     }
 
@@ -719,9 +267,7 @@ fn readline(prompt: impl ToString, rl: &mut Editor<impl Helper>) -> String {
             Err(ReadlineError::Interrupted) => {
                 return String::new();
             }
-            Err(ReadlineError::Eof) => {
-                std::process::exit(0)
-            }
+            Err(ReadlineError::Eof) => std::process::exit(0),
             Err(err) => {
                 eprintln!("error: {:?}", err);
             }
@@ -787,8 +333,6 @@ fn get_os_family(t: &Type) -> String {
     .to_string()
 }
 
-
-
 fn parse(input: impl ToString) -> Result<Expression, Error> {
     if let Ok(input) = comment::python::strip(input) {
         match parse_script(input.as_str(), true) {
@@ -803,13 +347,15 @@ fn parse(input: impl ToString) -> Result<Expression, Error> {
             Err(nom::Err::Incomplete(_)) => Err(Error::SyntaxError(SyntaxError::InternalError)),
         }
     } else {
-        Err(Error::CustomError("could not strip comments from command".to_string()))
+        Err(Error::CustomError(
+            "could not strip comments from command".to_string(),
+        ))
     }
 }
 
 fn check_args_len(
     name: impl ToString,
-    args: &Vec<Expression>,
+    args: &[Expression],
     expected_len: std::ops::RangeFrom<usize>,
 ) -> Result<(), Error> {
     if expected_len.contains(&args.len()) {
@@ -824,7 +370,7 @@ fn check_args_len(
 
 fn check_exact_args_len(
     name: impl ToString,
-    args: &Vec<Expression>,
+    args: &[Expression],
     expected_len: usize,
 ) -> Result<(), Error> {
     if args.len() == expected_len {
@@ -861,11 +407,11 @@ fn repl(
             vec![cwd.clone().into()],
         )
         .eval(&mut env)
-        .unwrap_or(format!("{}$", cwd).into())
+        .unwrap_or_else(|_| format!("{}$", cwd).into())
         .to_string();
         rl.helper_mut()
             .expect("No helper")
-            .set_prompt(format!("{}", prompt));
+            .set_prompt(prompt.clone());
         rl.helper_mut().expect("No helper").update_env(&env);
         let line = readline(prompt, &mut rl);
         lines.push(line.clone());
@@ -889,15 +435,12 @@ fn repl(
                     Ok(Expression::Macro(_, _)) => {
                         let _ = Expression::Apply(
                             Box::new(Expression::Symbol("report".to_string())),
-                            vec![
-                                Expression::Apply(
-                                    Box::new(val.unwrap().clone()),
-                                    vec![
-                                        env.get_cwd().into()
-                                    ]
-                                )
-                            ],
-                        ).eval(&mut env);
+                            vec![Expression::Apply(
+                                Box::new(val.unwrap().clone()),
+                                vec![env.get_cwd().into()],
+                            )],
+                        )
+                        .eval(&mut env);
                     }
                     Ok(val) => {
                         let _ = Expression::Apply(
@@ -1129,7 +672,6 @@ fn main() -> Result<(), Error> {
     let os = os_info::get();
     let os_type = os.os_type();
 
-
     env.define(
         "shell",
         b_tree_map! {
@@ -1162,7 +704,7 @@ fn main() -> Result<(), Error> {
             String::from("create") => Expression::builtin("create", |args, env| {
                 check_exact_args_len("create", &args, 4)?;
                 let title = args[0].eval(env)?.to_string();
-                let title_len = title.chars().collect::<Vec<char>>().len();
+                let title_len = title.chars().count();
 
                 let text_width = match args[2].eval(env)? {
                     Expression::Integer(n) if n > 4 => n,
@@ -1170,7 +712,7 @@ fn main() -> Result<(), Error> {
                 } as usize - 2;
 
                 let text = textwrap::fill(&args[1].eval(env)?.to_string(), text_width);
-                
+
                 let widget_height = match args[3].eval(env)? {
                     Expression::Integer(n) if n >= 3 => n,
                     otherwise => return Err(Error::CustomError(format!("expected height argument to be an integer greater than 2, but got {}", otherwise)))
@@ -1181,13 +723,13 @@ fn main() -> Result<(), Error> {
                 } else {
                     let mut left_border_half = "─".repeat(((text_width - title_len) as f64 / 2.0).round() as usize);
                     let right_border_half = left_border_half.clone();
-                    let left_len = left_border_half.chars().collect::<Vec<char>>().len();
+                    let left_len = left_border_half.chars().count();
                     if (left_len * 2 + title_len + 2) > text_width + 2 {
                         left_border_half.pop();
                     }
 
                     let mut result = format!("┌{left_side}{}{right_side}┐\n", title, left_side=left_border_half, right_side=right_border_half);
-                    let width = result.chars().collect::<Vec<char>>().len() - 1;
+                    let width = result.chars().count() - 1;
 
                     let mut lines = 1;
                     let mut i = 0;
@@ -1220,8 +762,9 @@ fn main() -> Result<(), Error> {
 
                     result += &" ".repeat(width-i);
 
-                    while result.lines().collect::<Vec<&str>>().len() < widget_height - 1 {
-                        result += &(String::from("\n") + &" ".repeat(width));
+                    while result.lines().count() < widget_height - 1 {
+                        result += "\n";
+                        result += &" ".repeat(width);
                     }
 
                     result += &format!("\n└{left_side}{}{right_side}┘", "─".repeat(title_len), left_side=left_border_half, right_side=right_border_half);
@@ -1272,8 +815,8 @@ fn main() -> Result<(), Error> {
                         Expression::String(s) => {
                             string_args.push(s.trim().to_string());
 
-                            let width = string_args[0].lines().next().unwrap().chars().collect::<Vec<char>>().len();
-                            let this_width = string_args[i].lines().next().unwrap().chars().collect::<Vec<char>>().len();
+                            let width = string_args[0].lines().next().unwrap().chars().count();
+                            let this_width = string_args[i].lines().next().unwrap().chars().count();
                             if width != this_width {
                                 return Err(Error::CustomError(format!("Widths of vertically added widgets must be equal, first widget height={}, {}th widget height={}", width, i, this_width)))
                             }
@@ -1311,10 +854,10 @@ fn main() -> Result<(), Error> {
                     String::from("hour") => Expression::Integer(now.hour() as i64),
                     String::from("time") => Expression::Map(b_tree_map! {
                         String::from("str") => Expression::String(now.time().format("%-I:%M %p").to_string()),
-                    }.into()),
+                    }),
                     String::from("date") => Expression::Map(b_tree_map! {
                         String::from("str") => Expression::String(now.format("%D").to_string()),
-                    }.into()),
+                    }),
                 }))
             }, "get information about the current time")
         }.into()
@@ -1374,30 +917,20 @@ fn main() -> Result<(), Error> {
     if let Some(desk_dir) = dirs::desktop_dir() {
         let desk_dir = desk_dir.into_os_string().into_string().unwrap();
         dir_tree.insert("desk".to_string(), desk_dir.clone().into());
-        env.define(
-            "DESK",
-            Expression::String(desk_dir),
-        );
+        env.define("DESK", Expression::String(desk_dir));
     }
 
     if let Some(docs_dir) = dirs::document_dir() {
         let docs_dir = docs_dir.into_os_string().into_string().unwrap();
         dir_tree.insert("docs".to_string(), docs_dir.clone().into());
-        env.define(
-            "DOCS",
-            Expression::String(docs_dir),
-        );
+        env.define("DOCS", Expression::String(docs_dir));
     }
 
     if let Some(down_dir) = dirs::download_dir() {
         let down_dir = down_dir.into_os_string().into_string().unwrap();
         dir_tree.insert("down".to_string(), down_dir.clone().into());
-        env.define(
-            "DOWN",
-            Expression::String(down_dir),
-        );
+        env.define("DOWN", Expression::String(down_dir));
     }
-
 
     env.define(
         "fs",
@@ -1449,7 +982,6 @@ fn main() -> Result<(), Error> {
         }
         .into(),
     );
-
 
     env.define(
         "fn",
@@ -1547,25 +1079,26 @@ fn main() -> Result<(), Error> {
     );
 
     env.define(
-	"console",
-	b_tree_map! {
-		String::from("write") => Expression::builtin("write", |args, env| {
-			check_exact_args_len("write", &args, 3)?;
-            print!("\x1b[s\x1b[{line};{column}H\x1b[{line};{column}f{content}\x1b[u",
-				line=args[1].eval(env)?,
-				column=args[0].eval(env)?,
-				content=args[2].eval(env)?
-			);
-			Ok(Expression::None)
-	    }, "write text to a specific position in the console"),
-		String::from("title") => Expression::builtin("title", |args, env| {
-			check_exact_args_len("title", &args, 1)?;
-            print!("\x1b]2;{}\x1b[0m",
-                args[0].eval(env)?
-			);
-			Ok(Expression::None)
-	    }, "set the title of the console"),
-	}.into()
+        "console",
+        b_tree_map! {
+            String::from("write") => Expression::builtin("write", |args, env| {
+                check_exact_args_len("write", &args, 3)?;
+                print!("\x1b[s\x1b[{line};{column}H\x1b[{line};{column}f{content}\x1b[u",
+                    line=args[1].eval(env)?,
+                    column=args[0].eval(env)?,
+                    content=args[2].eval(env)?
+                );
+                Ok(Expression::None)
+            }, "write text to a specific position in the console"),
+            String::from("title") => Expression::builtin("title", |args, env| {
+                check_exact_args_len("title", &args, 1)?;
+                print!("\x1b]2;{}\x1b[0m",
+                    args[0].eval(env)?
+                );
+                Ok(Expression::None)
+            }, "set the title of the console"),
+        }
+        .into(),
     );
 
     env.define(
@@ -2050,7 +1583,7 @@ $ let cat = 'bat
 ");
                     }
                     otherwise => {
-                        if let Expression::Builtin(_, _, help) = otherwise.eval(env)? {
+                        if let Expression::Builtin(Builtin { help, .. }) = otherwise.eval(env)? {
                             println!("{}", help)
                         }
                     }
@@ -2122,14 +1655,14 @@ $ let cat = 'bat
                     (Expression::Integer(m), Expression::Integer(n)) => Ok(Expression::List(
                         (m..n).map(Expression::Integer).collect::<Vec<Expression>>(),
                     )),
-                    _ => Err(Error::CustomError(format!(
-                        "Arguments to range must be integers"
-                    ))),
+                    _ => Err(Error::CustomError(
+                        "Arguments to range must be integers".to_string(),
+                    )),
                 }
             } else {
-                Err(Error::CustomError(format!(
-                    "Must supply 2 arguments to range"
-                )))
+                Err(Error::CustomError(
+                    "Must supply 2 arguments to range".to_string(),
+                ))
             }
         },
         "get a list of integers from (inclusive) one to another (exclusive)",
@@ -2243,13 +1776,10 @@ $ let cat = 'bat
             let mut val = args[0].eval(env)?;
             for arg in &args[1..] {
                 val = match arg {
-                    Expression::Integer(_) | Expression::Symbol(_) => {
-                        &val[arg.clone()]
-                    }
-                    otherwise => {
-                        &val[otherwise.eval(env)?]
-                    }
-                }.clone()
+                    Expression::Integer(_) | Expression::Symbol(_) => &val[arg.clone()],
+                    otherwise => &val[otherwise.eval(env)?],
+                }
+                .clone()
             }
             Ok(val)
         },
@@ -2258,25 +1788,29 @@ $ let cat = 'bat
 
     env.define_builtin(
         "str",
-        |args, env| {
-            Ok(Expression::String(args[0].eval(env)?.to_string()))
-        },
+        |args, env| Ok(Expression::String(args[0].eval(env)?.to_string())),
         "format an expression to a string",
     );
 
     env.define_builtin(
         "int",
-        |args, env| {
-            match args[0].eval(env)? {
-                Expression::Integer(x) => Ok(Expression::Integer(x)),
-                Expression::Float(x) => Ok(Expression::Integer(x as Int)),
-                Expression::String(x) => if let Ok(n) = x.parse::<Int>() {
+        |args, env| match args[0].eval(env)? {
+            Expression::Integer(x) => Ok(Expression::Integer(x)),
+            Expression::Float(x) => Ok(Expression::Integer(x as Int)),
+            Expression::String(x) => {
+                if let Ok(n) = x.parse::<Int>() {
                     Ok(Expression::Integer(n))
                 } else {
-                    Err(Error::CustomError(format!("could not convert {:?} to an integer", x)))
-                },
-                otherwise => Err(Error::CustomError(format!("could not convert {:?} to an integer", otherwise)))
+                    Err(Error::CustomError(format!(
+                        "could not convert {:?} to an integer",
+                        x
+                    )))
+                }
             }
+            otherwise => Err(Error::CustomError(format!(
+                "could not convert {:?} to an integer",
+                otherwise
+            ))),
         },
         "format an expression to a string",
     );
@@ -2296,17 +1830,28 @@ $ let cat = 'bat
                     if *i as usize <= exprs.len() {
                         exprs.insert(*i as usize, val);
                     } else {
-                        return Err(Error::CustomError(format!("index {} out of bounds for {:?}", idx, arr)))
+                        return Err(Error::CustomError(format!(
+                            "index {} out of bounds for {:?}",
+                            idx, arr
+                        )));
                     }
                 }
                 (Expression::String(s), Expression::Integer(i)) => {
                     if *i as usize <= s.len() {
                         s.insert_str(*i as usize, &val.to_string());
                     } else {
-                        return Err(Error::CustomError(format!("index {} out of bounds for {:?}", idx, arr)))
+                        return Err(Error::CustomError(format!(
+                            "index {} out of bounds for {:?}",
+                            idx, arr
+                        )));
                     }
                 }
-                _ => return Err(Error::CustomError(format!("cannot insert {:?} into {:?} with index {:?}", val, arr, idx)))
+                _ => {
+                    return Err(Error::CustomError(format!(
+                        "cannot insert {:?} into {:?} with index {:?}",
+                        val, arr, idx
+                    )))
+                }
             }
 
             Ok(arr)
@@ -2319,9 +1864,9 @@ $ let cat = 'bat
         |args, env| match args[0].eval(env)? {
             Expression::Map(m) => Ok(Expression::Integer(m.len() as Int)),
             Expression::List(list) => Ok(Expression::Integer(list.len() as Int)),
-            Expression::Symbol(x) | Expression::String(x) => Ok(Expression::Integer(
-                x.chars().collect::<Vec<char>>().len() as Int,
-            )),
+            Expression::Symbol(x) | Expression::String(x) => {
+                Ok(Expression::Integer(x.chars().count() as Int))
+            }
             otherwise => Err(Error::CustomError(format!(
                 "cannot get length of {}",
                 otherwise
@@ -2390,7 +1935,7 @@ $ let cat = 'bat
     //     |_, env| Ok(Expression::String(format!("{}$ ", env.get_cwd()))),
     //     "default prompt",
     // );
-    
+
     // env.define_builtin(
     //     "incomplete_prompt",
     //     |_, env| {
@@ -2403,21 +1948,23 @@ $ let cat = 'bat
     // );
     // let prompt = cwd -> fmt@bold ((fmt@dark@blue "(dune) ") + (fmt@bold (fmt@dark@green cwd)) + (fmt@bold (fmt@dark@blue "$ ")));
     // let incomplete_prompt = cwd -> ((len cwd) + (len "(dune) ")) * " " + (fmt@bold (fmt@dark@yellow "> "));
-    
+
     env.define_builtin(
         "chess",
         |args, env| {
             let mut won = false;
-            
+
             let player_color = match &args[0] {
                 Expression::String(color) | Expression::Symbol(color) if color == "white" => {
                     chess_engine::WHITE
-                },
+                }
                 Expression::String(color) | Expression::Symbol(color) if color == "black" => {
                     chess_engine::BLACK
-                },
+                }
                 _ => {
-                    return Err(Error::CustomError("call chess with a color, like \"black\" or \"white\"".to_string()))
+                    return Err(Error::CustomError(
+                        "call chess with a color, like \"black\" or \"white\"".to_string(),
+                    ))
                 }
             };
 
@@ -2483,8 +2030,18 @@ $ let cat = 'bat
         "a fun builtin function for playing chess!",
     );
 
-    parse(r#"let prompt = cwd -> fmt@bold ((fmt@dark@blue "(dune) ") + (fmt@bold (fmt@dark@green cwd)) + (fmt@bold (fmt@dark@blue "$ ")))"#)?.eval(&mut env)?;
-    parse(r#"let incomplete_prompt = cwd -> ((len cwd) + (len "(dune) ")) * " " + (fmt@bold (fmt@dark@yellow "> "));"#)?.eval(&mut env)?;
+    parse(
+        "let prompt = cwd -> \
+            fmt@bold ((fmt@dark@blue \"(dune) \") + \
+            (fmt@bold (fmt@dark@green cwd)) + \
+            (fmt@bold (fmt@dark@blue \"$ \")))",
+    )?
+    .eval(&mut env)?;
+    parse(
+        r#"let incomplete_prompt = cwd -> \
+            ((len cwd) + (len "(dune) ")) * " " + (fmt@bold (fmt@dark@yellow "> "));"#,
+    )?
+    .eval(&mut env)?;
 
     env.define_builtin(
         "report",
@@ -2493,16 +2050,14 @@ $ let cat = 'bat
             match val {
                 Expression::Map(_) => println!("{}", val),
                 Expression::String(s) => println!("{}", s),
-                Expression::None => {},
-                otherwise => println!("{:?}", otherwise)
+                Expression::None => {}
+                otherwise => println!("{:?}", otherwise),
             }
 
             Ok(Expression::None)
         },
         "default function for reporting values",
     );
-
-
 
     if let Some(home_dir) = dirs::home_dir() {
         let prelude_path = home_dir.join(".dune-prelude");
@@ -2516,19 +2071,17 @@ $ let cat = 'bat
                 Err(e) => {
                     eprintln!("error while running {:?}: {}", prelude_path, e)
                 }
-            }
-            Err(_) => {
-                match parse(DEFAULT_PRELUDE) {
-                    Ok(expr) => {
-                        if let Err(e) = expr.eval(&mut env) {
-                            eprintln!("error while running default prelude: {}", e)
-                        }
-                    }
-                    Err(e) => {
+            },
+            Err(_) => match parse(DEFAULT_PRELUDE) {
+                Ok(expr) => {
+                    if let Err(e) = expr.eval(&mut env) {
                         eprintln!("error while running default prelude: {}", e)
                     }
                 }
-            }
+                Err(e) => {
+                    eprintln!("error while running default prelude: {}", e)
+                }
+            },
         }
     }
 

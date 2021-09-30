@@ -8,7 +8,11 @@ use std::{
     process::Command,
 };
 
-use prettytable::{row, cell, Table, format::{LinePosition, LineSeparator}};
+use prettytable::{
+    cell,
+    format::{LinePosition, LineSeparator},
+    row, Table,
+};
 
 impl From<Int> for Expression {
     fn from(x: Int) -> Self {
@@ -66,7 +70,7 @@ where
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum Expression {
     Group(Box<Self>),
 
@@ -101,17 +105,37 @@ pub enum Expression {
     Macro(String, Box<Self>),
     Do(Vec<Self>),
     // A builtin function.
-    //
-    // The first argument is the name of the function, the second is the
-    // function pointer for executing the function. The third is the
-    // help string for the function.
-    Builtin(
-        String,
-        fn(Vec<Self>, &mut Environment) -> Result<Self, Error>,
-        String,
-    ),
+    Builtin(Builtin),
 
     Quote(Box<Self>),
+}
+
+#[derive(Clone)]
+pub struct Builtin {
+    /// name of the function
+    pub name: String,
+    /// function pointer for executing the function
+    pub body: fn(Vec<Expression>, &mut Environment) -> Result<Expression, Error>,
+    /// help string
+    pub help: String,
+}
+
+impl fmt::Debug for Builtin {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "builtin@{}", self.name)
+    }
+}
+
+impl fmt::Display for Builtin {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "builtin@{}", self.name)
+    }
+}
+
+impl PartialEq for Builtin {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
 }
 
 impl fmt::Debug for Expression {
@@ -171,7 +195,7 @@ impl fmt::Debug for Expression {
                     .collect::<Vec<String>>()
                     .join(" ")
             ),
-            Self::Builtin(name, _, _) => write!(f, "builtin@{}", name),
+            Self::Builtin(builtin) => fmt::Debug::fmt(builtin, f),
         }
     }
 }
@@ -215,7 +239,7 @@ impl fmt::Display for Expression {
                 fmt.separator(LinePosition::Intern, LineSeparator::new('─', '┼', '├', '┤'));
                 fmt.separator(LinePosition::Bottom, LineSeparator::new('─', '┴', '└', '┘'));
                 for (key, val) in exprs {
-                    if let Self::Builtin(_, _, help) = &val {
+                    if let Self::Builtin(Builtin { help, .. }) = &val {
                         t.add_row(row!(key, format!("{}", val), help));
                     } else {
                         t.add_row(row!(key, format!("{}", val)));
@@ -251,26 +275,7 @@ impl fmt::Display for Expression {
                     .collect::<Vec<String>>()
                     .join(" ")
             ),
-            Self::Builtin(name, _, _) => write!(f, "builtin@{}", name),
-        }
-    }
-}
-
-impl PartialEq for Expression {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Symbol(a), Self::Symbol(b)) => a == b,
-            (Self::Integer(a), Self::Integer(b)) => a == b,
-            (Self::Float(a), Self::Float(b)) => a == b,
-            (Self::String(a), Self::String(b)) => a == b,
-            (Self::Boolean(a), Self::Boolean(b)) => a == b,
-            (Self::List(a), Self::List(b)) => a == b,
-            (Self::Map(a), Self::Map(b)) => a == b,
-            (Self::None, Self::None) => true,
-            (Self::Lambda(a, b, c), Self::Lambda(x, y, z)) => a == x && b == y && c == z,
-            (Self::Macro(a, b), Self::Macro(c, d)) => a == c && b == d,
-            (Self::Builtin(a, _, _), Self::Builtin(b, _, _)) => a == b,
-            _ => false,
+            Self::Builtin(builtin) => fmt::Display::fmt(builtin, f),
         }
     }
 }
@@ -294,7 +299,11 @@ impl Expression {
         body: fn(Vec<Self>, &mut Environment) -> Result<Self, Error>,
         help: impl ToString,
     ) -> Self {
-        Self::Builtin(name.to_string(), body, help.to_string())
+        Self::Builtin(Builtin {
+            name: name.to_string(),
+            body,
+            help: help.to_string(),
+        })
     }
 
     pub fn new(x: impl Into<Self>) -> Self {
@@ -311,7 +320,7 @@ impl Expression {
             Self::Map(exprs) => !exprs.is_empty(),
             Self::Lambda(_, _, _) => true,
             Self::Macro(_, _) => true,
-            Self::Builtin(_, _, _) => true,
+            Self::Builtin(_) => true,
             _ => false,
         }
     }
@@ -324,7 +333,7 @@ impl Expression {
             | Self::Float(_)
             | Self::String(_)
             | Self::Boolean(_)
-            | Self::Builtin(_, _, _) => vec![],
+            | Self::Builtin(_) => vec![],
 
             Self::For(_, list, body) => {
                 let mut result = vec![];
@@ -342,7 +351,7 @@ impl Expression {
             }
             Self::Map(exprs) => {
                 let mut result = vec![];
-                for (_, expr) in exprs {
+                for expr in exprs.values() {
                     result.extend(expr.get_used_symbols())
                 }
                 result
@@ -389,7 +398,7 @@ impl Expression {
 
                 Self::Assign(name, expr) => {
                     let x = expr.eval_mut(env)?;
-                    env.define(&name, x.clone());
+                    env.define(&name, x);
                     return Ok(Self::None);
                 }
 
@@ -430,7 +439,7 @@ impl Expression {
                             .current_dir(env.get_cwd())
                             .args(
                                 args.iter()
-                                    .filter(|x| x.clone() != &Self::None)
+                                    .filter(|&x| x != &Self::None)
                                     .map(|x| Ok(format!("{}", x.clone().eval_mut(env)?)))
                                     .collect::<Result<Vec<String>, Error>>()?,
                             )
@@ -440,9 +449,10 @@ impl Expression {
                             Ok(_) => return Ok(Self::None),
                             Err(e) => {
                                 return Err(match e.kind() {
-                                    ErrorKind::NotFound => {
-                                        Error::CustomError(format!("program \"{}\" not found", name))
-                                    }
+                                    ErrorKind::NotFound => Error::CustomError(format!(
+                                        "program \"{}\" not found",
+                                        name
+                                    )),
                                     ErrorKind::PermissionDenied => Error::CustomError(format!(
                                         "permission to execute \"{}\" denied",
                                         name
@@ -454,7 +464,7 @@ impl Expression {
                     }
 
                     Self::Lambda(param, body, old_env) if args.len() == 1 => {
-                        let mut new_env = old_env.clone();
+                        let mut new_env = old_env;
                         new_env.define(&param, args[0].clone().eval_mut(env)?);
                         return body.eval_mut(&mut new_env);
                     }
@@ -478,8 +488,8 @@ impl Expression {
                         self = Self::Apply(Box::new(body.eval_mut(&mut env)?), args[1..].to_vec());
                     }
 
-                    Self::Builtin(_, g, _) => {
-                        return g(args.clone(), env);
+                    Self::Builtin(Builtin { body, .. }) => {
+                        return body(args.clone(), env);
                     }
 
                     _ => return Err(Error::CannotApply(*f.clone(), args.clone())),
@@ -496,7 +506,7 @@ impl Expression {
                             }
                         }
                     }
-                    return Ok(Self::Lambda(param.clone(), body.clone(), tmp_env));
+                    return Ok(Self::Lambda(param.clone(), body, tmp_env));
                 }
 
                 Self::List(exprs) => {
@@ -511,7 +521,7 @@ impl Expression {
                     return Ok(Self::Map(
                         exprs
                             .into_iter()
-                            .map(|(n, x)| Ok((n.clone(), x.eval_mut(env)?)))
+                            .map(|(n, x)| Ok((n, x.eval_mut(env)?)))
                             .collect::<Result<BTreeMap<String, Self>, Error>>()?,
                     ))
                 }
@@ -531,7 +541,7 @@ impl Expression {
                 | Self::Boolean(_)
                 | Self::String(_)
                 | Self::Macro(_, _)
-                | Self::Builtin(_, _, _) => return Ok(self.clone()),
+                | Self::Builtin(_) => return Ok(self.clone()),
             }
         }
     }
@@ -639,16 +649,15 @@ where
 
     fn index(&self, idx: T) -> &Self {
         match (self, idx.into()) {
-            (Self::Map(m), Self::Symbol(name))
-                | (Self::Map(m), Self::String(name))=> match m.get(&name) {
-                Some(val) => val,
-                None => &Self::None,
-            },
+            (Self::Map(m), Self::Symbol(name)) | (Self::Map(m), Self::String(name)) => {
+                match m.get(&name) {
+                    Some(val) => val,
+                    None => &Self::None,
+                }
+            }
 
             (Self::List(list), Self::Integer(n)) if list.len() > n as usize => &list[n as usize],
-            _ => {
-                &Self::None
-            },
+            _ => &Self::None,
         }
     }
 }

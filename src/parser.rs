@@ -1,6 +1,6 @@
 use nom::{
     branch::alt,
-    bytes::complete::{tag},
+    bytes::complete::tag,
     character::complete::one_of,
     combinator::{eof, map, opt},
     error::{ErrorKind, ParseError},
@@ -93,17 +93,18 @@ where
     fn or(self, other: Self) -> Self {
         match self {
             Self::InternalError => other,
-            _ => self.clone(),
+            _ => self,
         }
     }
 }
 
-const ASCII_ALPHA: &'static str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const ASCII_ALPHANUMERIC: &'static str =
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-const ASCII_NONZERO_DIGIT: &'static str = "123456789";
-const ASCII_DIGIT: &'static str = "0123456789";
-const ASCII_HEX_DIGIT: &'static str = "0123456789ABCDEFabcdef";
+const ASCII_ALPHA: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const ASCII_ALPHANUMERIC: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+const ASCII_NONZERO_DIGIT: &str = "123456789";
+const ASCII_DIGIT: &str = "0123456789";
+const ASCII_HEX_DIGIT: &str = "0123456789ABCDEFabcdef";
+
+const ALLOWED_SYMBOL_PUNCTUATION: &'static str = "_+-.~\\/?&<>$%#^:";
 
 pub fn parse_script(input: &str, require_eof: bool) -> IResult<&str, Expression, SyntaxError> {
     let (input, _) = try_parse_ws(input)?;
@@ -185,11 +186,11 @@ fn parse_symbol(input: &str) -> IResult<&str, String, SyntaxError> {
         Err(_) => {
             let old_input = input;
 
-            let (input, head) = alt((one_of(ASCII_ALPHA), one_of("_+-.~\\/?&<>$%#^=")))(input)?;
+            let (input, head) = alt((one_of(ASCII_ALPHA), one_of(ALLOWED_SYMBOL_PUNCTUATION)))(input)?;
 
             let (input, tail) = many0(alt((
                 one_of(ASCII_ALPHANUMERIC),
-                one_of("_+-.~\\/?&<>$%#^="),
+                one_of(ALLOWED_SYMBOL_PUNCTUATION),
             )))(input)?;
 
             let mut result = String::from(head);
@@ -231,16 +232,13 @@ fn parse_digits(input: &str) -> IResult<&str, String, SyntaxError> {
 }
 
 fn parse_any_digits(input: &str) -> IResult<&str, String, SyntaxError> {
-    map(
-        many1(one_of(ASCII_DIGIT)),
-        |digits| {
-            let mut result = String::new();
-            for ch in digits {
-                result.push(ch)
-            }
-            result
-        },
-    )(input)
+    map(many1(one_of(ASCII_DIGIT)), |digits| {
+        let mut result = String::new();
+        for ch in digits {
+            result.push(ch)
+        }
+        result
+    })(input)
 }
 
 fn parse_integer(input: &str) -> IResult<&str, Int, SyntaxError> {
@@ -471,7 +469,7 @@ fn parse_map(input: &str) -> IResult<&str, Expression, SyntaxError> {
         tag(","),
         separated_pair(
             delimited(try_parse_ws, parse_symbol, try_parse_ws),
-            tag(":"),
+            tag("="),
             parse_expression,
         ),
     )(input)?;
@@ -599,7 +597,6 @@ fn parse_if(input: &str) -> IResult<&str, Expression, SyntaxError> {
     );
 
     Ok((input, result))
-
 }
 
 fn parse_callable(input: &str) -> IResult<&str, Expression, SyntaxError> {
@@ -607,7 +604,7 @@ fn parse_callable(input: &str) -> IResult<&str, Expression, SyntaxError> {
     let (input, arg) = match parse_symbol(input) {
         Ok((input, symbol)) => (input, symbol),
         Err(nom::Err::Failure(e)) => return Err(nom::Err::Error(e)),
-        Err(e) => return Err(e)
+        Err(e) => return Err(e),
     };
     let (input, _) = try_parse_ws(input)?;
     let (input, fn_type) = alt((tag("->"), tag("~>")))(input)?;
@@ -718,7 +715,7 @@ fn parse_expression_prec_six(input: &str) -> IResult<&str, Expression, SyntaxErr
 
     Ok((
         input,
-        Expression::Apply(Box::new(op_fun.clone()), vec![head, result]),
+        Expression::Apply(Box::new(op_fun), vec![head, result]),
     ))
 }
 
@@ -821,7 +818,7 @@ fn parse_expression_prec_five(input: &str) -> IResult<&str, Expression, SyntaxEr
 
     Ok((
         input,
-        Expression::Apply(Box::new(op_fun.clone()), vec![head, result]),
+        Expression::Apply(Box::new(op_fun), vec![head, result]),
     ))
 }
 
@@ -872,7 +869,7 @@ fn parse_expression_prec_four(input: &str) -> IResult<&str, Expression, SyntaxEr
     Ok((
         input,
         Expression::Group(Box::new(Expression::Apply(
-            Box::new(op_fun.clone()),
+            Box::new(op_fun),
             vec![head, result],
         ))),
     ))
@@ -927,7 +924,7 @@ fn parse_expression_prec_three(input: &str) -> IResult<&str, Expression, SyntaxE
     Ok((
         input,
         Expression::Group(Box::new(Expression::Apply(
-            Box::new(op_fun.clone()),
+            Box::new(op_fun),
             vec![head, result],
         ))),
     ))
@@ -935,9 +932,7 @@ fn parse_expression_prec_three(input: &str) -> IResult<&str, Expression, SyntaxE
 
 fn parse_expression_prec_two(input: &str) -> IResult<&str, Expression, SyntaxError> {
     let (input, head) = parse_expression_prec_one(input)?;
-    let (input, args) = many0(preceded(
-        tag("@"), parse_expression_prec_one,
-    ))(input)?;
+    let (input, args) = many0(preceded(tag("@"), parse_expression_prec_one))(input)?;
 
     if args.is_empty() {
         return Ok((input, head));
@@ -960,11 +955,11 @@ fn parse_expression_prec_one(input: &str) -> IResult<&str, Expression, SyntaxErr
         parse_map,
         parse_block,
         parse_list,
-        map(parse_boolean, |b| Expression::Boolean(b)),
+        map(parse_boolean, Expression::Boolean),
         map(parse_none, |_| Expression::None),
-        map(parse_float, |n| Expression::Float(n)),
-        map(parse_integer, |n| Expression::Integer(n)),
-        map(parse_string, |x| Expression::String(x)),
-        map(parse_symbol, |x| Expression::Symbol(x)),
+        map(parse_float, Expression::Float),
+        map(parse_integer, Expression::Integer),
+        map(parse_string, Expression::String),
+        map(parse_symbol, Expression::Symbol),
     ))(input)
 }
