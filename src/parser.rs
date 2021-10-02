@@ -104,7 +104,7 @@ const ASCII_NONZERO_DIGIT: &str = "123456789";
 const ASCII_DIGIT: &str = "0123456789";
 const ASCII_HEX_DIGIT: &str = "0123456789ABCDEFabcdef";
 
-const ALLOWED_SYMBOL_PUNCTUATION: &'static str = "_+-.~\\/?&<>$%#^:";
+const ALLOWED_SYMBOL_PUNCTUATION: &str = "_+-.~\\/?&<>$%#^:";
 
 pub fn parse_script(input: &str, require_eof: bool) -> IResult<&str, Expression, SyntaxError> {
     let (input, _) = try_parse_ws(input)?;
@@ -165,6 +165,8 @@ fn parse_keyword(input: &str) -> IResult<&str, &str, SyntaxError> {
             tag("&&"),
             tag("||"),
             tag("//"),
+            tag(">>"),
+            tag("|"),
             tag("<"),
             tag(">"),
             tag("+"),
@@ -186,7 +188,8 @@ fn parse_symbol(input: &str) -> IResult<&str, String, SyntaxError> {
         Err(_) => {
             let old_input = input;
 
-            let (input, head) = alt((one_of(ASCII_ALPHA), one_of(ALLOWED_SYMBOL_PUNCTUATION)))(input)?;
+            let (input, head) =
+                alt((one_of(ASCII_ALPHA), one_of(ALLOWED_SYMBOL_PUNCTUATION)))(input)?;
 
             let (input, tail) = many0(alt((
                 one_of(ASCII_ALPHANUMERIC),
@@ -659,6 +662,41 @@ fn parse_apply(input: &str) -> IResult<&str, Expression, SyntaxError> {
 }
 
 fn parse_expression(input: &str) -> IResult<&str, Expression, SyntaxError> {
+    let expr_parser = parse_expression_prec_seven;
+
+    let (input, head) = expr_parser(input)?;
+
+    let (input, list) = many0(pair(
+        delimited(parse_ws, alt((tag("|"), tag(">>"))), parse_ws),
+        expr_parser,
+    ))(input)?;
+
+    if list.is_empty() {
+        return Ok((input, head));
+    }
+
+    let mut args = vec![head];
+    for (op, item) in list {
+        args.push(match op {
+            "|" => item,
+            ">>" => Expression::Apply(
+                Box::new(Expression::Symbol("redirect-out".to_string())),
+                vec![item],
+            ),
+            _ => unreachable!(),
+        })
+    }
+
+    Ok((
+        input,
+        Expression::Group(Box::new(Expression::Apply(
+            Box::new(Expression::Symbol("pipe".to_string())),
+            args,
+        ))),
+    ))
+}
+
+fn parse_expression_prec_seven(input: &str) -> IResult<&str, Expression, SyntaxError> {
     alt((
         parse_for_loop,
         parse_if,

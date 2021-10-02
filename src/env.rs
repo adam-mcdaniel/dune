@@ -53,6 +53,10 @@ impl Environment {
             }
     }
 
+    pub fn undefine(&mut self, name: &str) {
+        self.bindings.remove(name);
+    }
+
     pub fn define(&mut self, name: &str, expr: Expression) {
         self.bindings.insert(name.to_string(), expr);
     }
