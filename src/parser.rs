@@ -28,7 +28,7 @@ pub enum SyntaxError {
 }
 
 impl SyntaxError {
-    fn unrecoverable<A, B, T>(
+    pub(crate) fn unrecoverable<A, B, T>(
         input: T,
         expected: T,
         found: Option<T>,
@@ -45,7 +45,7 @@ impl SyntaxError {
         }))
     }
 
-    fn expected<A, B, T>(
+    pub(crate) fn expected<A, B, T>(
         input: T,
         expected: T,
         found: Option<T>,

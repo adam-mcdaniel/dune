@@ -1,5 +1,6 @@
 #![allow(clippy::wildcard_in_or_patterns)]
 
+use dune::Token;
 use dune::{parse_script, Builtin, Environment, Error, Expression, Int, SyntaxError, VERSION};
 
 use rustyline::completion::{Completer, FilenameCompleter, Pair as PairComplete};
@@ -144,50 +145,78 @@ impl Completer for DuneHelper {
     }
 }
 
-#[rustfmt::skip]
-fn syntax_highlight(line: impl ToString) -> String {
-    line.to_string()
-        .replace("False", "\x1b[95mFalse\x1b[m\x1b[0m")
-        .replace("True", "\x1b[95mTrue\x1b[m\x1b[0m")
+fn syntax_highlight(line: &str) -> String {
+    let tokens = match dune::parse_tokens(line) {
+        Ok((_, t)) => t,
+        Err(_) => return line.to_string(),
+    };
 
-        .replace("None", "\x1b[91mNone\x1b[m\x1b[0m")
-        .replace("()", "\x1b[91m()\x1b[m\x1b[0m")
+    let mut result = String::new();
+    let mut is_colored = false;
 
-        .replace("clear ", "\x1b[94mclear \x1b[m\x1b[0m")
-        .replace("echo ", "\x1b[94mecho \x1b[m\x1b[0m")
-        .replace("exit ", "\x1b[94mexit \x1b[m\x1b[0m")
-        .replace("cd ", "\x1b[94mcd \x1b[m\x1b[0m")
-        .replace("rm ", "\x1b[94mrm \x1b[m\x1b[0m")
+    for token in tokens {
+        match token {
+            Token::BooleanLiteral(b) => {
+                result.push_str("\x1b[95m");
+                is_colored = true;
+                result.push_str(b);
+            }
+            Token::Punctuation(o) => {
+                if matches!(o, "@" | "\'" | "=" | "|" | ">>" | "->" | "~>") {
+                    result.push_str("\x1b[96m");
+                    is_colored = true;
+                } else if is_colored {
+                    result.push_str("\x1b[m\x1b[0m");
+                    is_colored = false;
+                }
+                result.push_str(o);
+            }
+            Token::Keyword(k) => {
+                result.push_str("\x1b[95m");
+                is_colored = true;
+                result.push_str(k);
+            }
+            Token::Operator(k) => {
+                result.push_str("\x1b[38;5;220m");
+                is_colored = true;
+                result.push_str(k);
+            }
+            Token::StringLiteral(s) => {
+                result.push_str("\x1b[38;5;208m");
+                is_colored = true;
+                result.push_str(&s);
+            }
+            Token::IntegerLiteral(l) | Token::FloatLiteral(l) => {
+                if is_colored {
+                    result.push_str("\x1b[m\x1b[0m");
+                    is_colored = false;
+                }
+                result.push_str(&l);
+            }
+            Token::Symbol(l) => {
+                if l == "None" {
+                    result.push_str("\x1b[91m");
+                    is_colored = true;
+                } else if matches!(l.as_str(), "echo" | "exit" | "clear" | "cd" | "rm") {
+                    result.push_str("\x1b[94m");
+                    is_colored = true;
+                } else if is_colored {
+                    result.push_str("\x1b[m\x1b[0m");
+                    is_colored = false;
+                }
+                result.push_str(&l);
+            }
+            Token::Whitespace(w) => {
+                result.push_str(&w);
+            }
+            Token::Eof => {}
+        }
+    }
+    if is_colored {
+        result.push_str("\x1b[m\x1b[0m");
+    }
 
-
-        .replace("else ", "\x1b[94melse \x1b[m\x1b[0m")
-        .replace("let ", "\x1b[94mlet \x1b[m\x1b[0m")
-        .replace("for ", "\x1b[94mfor \x1b[m\x1b[0m")
-        .replace("if ", "\x1b[94mif \x1b[m\x1b[0m")
-        .replace(" in ", "\x1b[94m in \x1b[m\x1b[0m")
-        .replace(" to ", "\x1b[94m to \x1b[m\x1b[0m")
-
-        .replace(" == ", "\x1b[96m == \x1b[m\x1b[0m")
-        .replace(" != ", "\x1b[96m != \x1b[m\x1b[0m")
-        .replace(" <= ", "\x1b[96m <= \x1b[m\x1b[0m")
-        .replace(" >= ", "\x1b[96m >= \x1b[m\x1b[0m")
-        .replace(" && ", "\x1b[96m && \x1b[m\x1b[0m")
-        .replace(" || ", "\x1b[96m || \x1b[m\x1b[0m")
-
-        .replace("@", "\x1b[96m@\x1b[m\x1b[0m")
-        .replace("'", "\x1b[96m'\x1b[m\x1b[0m")
-
-        .replace("->", "\x1b[95m->\x1b[m\x1b[0m")
-        .replace("~>", "\x1b[95m~>\x1b[m\x1b[0m")
-
-
-        .replace(" > ", "\x1b[96m > \x1b[m\x1b[0m")
-        .replace(" < ", "\x1b[96m < \x1b[m\x1b[0m")
-
-        .replace(" + ", "\x1b[96m + \x1b[m\x1b[0m")
-        .replace(" - ", "\x1b[96m - \x1b[m\x1b[0m")
-        .replace(" * ", "\x1b[96m * \x1b[m\x1b[0m")
-        .replace(" // ", "\x1b[96m // \x1b[m\x1b[0m")
+    result
 }
 
 impl Hinter for DuneHelper {
@@ -254,8 +283,8 @@ impl Highlighter for DuneHelper {
 
     fn highlight<'l>(&self, line: &'l str, pos: usize) -> Cow<'l, str> {
         match self.highlighter.highlight(line, pos) {
-            Owned(x) => Owned(syntax_highlight(x)),
-            Borrowed(x) => Owned(syntax_highlight(x.to_owned())),
+            Owned(x) => Owned(syntax_highlight(&x)),
+            Borrowed(x) => Owned(syntax_highlight(x)),
         }
     }
 
