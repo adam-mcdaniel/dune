@@ -387,7 +387,7 @@ impl Expression {
         self.clone().eval_mut(env)
     }
 
-    fn eval_mut(mut self, mut env: &mut Environment) -> Result<Self, Error> {
+    fn eval_mut(mut self, env: &mut Environment) -> Result<Self, Error> {
         loop {
             match self {
                 Self::Quote(inner) => return Ok(*inner),
