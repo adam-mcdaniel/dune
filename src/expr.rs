@@ -497,7 +497,7 @@ impl Expression {
                     Self::Macro(param, body) if args.len() > 1 => {
                         let x = args[0].clone().eval_mut(env)?;
                         env.define(&param, x);
-                        self = Self::Apply(Box::new(body.eval_mut(&mut env)?), args[1..].to_vec());
+                        self = Self::Apply(Box::new(body.eval_mut(env)?), args[1..].to_vec());
                     }
 
                     Self::Builtin(Builtin { body, .. }) => {
