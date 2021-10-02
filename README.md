@@ -84,6 +84,14 @@ To write functions that modify your shell's environment and act like commands or
 
 Macros, when called with zero arguments, are passed the current working directory. When invoked, they assume the environment of the callee: if you execute a macro, it will execute as if you executed the contents of the macro itself with the parameter defined as the argument passed.
 
+### Piping and Redirection
+
+Piping and redirection are done with the `|` and `>>` operators. Here's some example uses!
+
+![Piping and Redirection](./assets/piping.png)
+
+If a value is piped into a callable object, like a function or macro, it is performed as an application; otherwise, the expression is treated like a regular call to a program.
+
 ## Standard Library
 
 Dune offers an extensive standard library, and also provides a pretty interface to see all the functions available in each module!
