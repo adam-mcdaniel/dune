@@ -710,7 +710,7 @@ fn parse_expression_prec_seven(input: &str) -> IResult<&str, Expression, SyntaxE
 fn parse_expression_prec_six(input: &str) -> IResult<&str, Expression, SyntaxError> {
     let expr_parser = parse_expression_prec_five;
 
-    let (input, head) = expr_parser(input)?;
+    let (input, mut head) = expr_parser(input)?;
 
     let (input, mut list) = many0(pair(
         delimited(parse_ws, alt((tag("&&"), tag("||"))), parse_ws),
@@ -721,9 +721,10 @@ fn parse_expression_prec_six(input: &str) -> IResult<&str, Expression, SyntaxErr
         return Ok((input, head));
     }
 
-    let (mut op, mut result) = list.pop().unwrap();
+    list.reverse();
+
     while !list.is_empty() {
-        if let Some((next_op, item)) = list.pop() {
+        if let Some((op, item)) = list.pop() {
             let op_fun = Expression::Symbol(
                 match op {
                     "&&" => "and",
@@ -733,28 +734,14 @@ fn parse_expression_prec_six(input: &str) -> IResult<&str, Expression, SyntaxErr
                 .to_string(),
             );
 
-            result = Expression::Group(Box::new(Expression::Apply(
+            head = Expression::Group(Box::new(Expression::Apply(
                 Box::new(op_fun.clone()),
-                vec![item, result],
+                vec![head, item],
             )));
-
-            op = next_op;
         }
     }
 
-    let op_fun = Expression::Symbol(
-        match op {
-            "&&" => "and",
-            "||" => "or",
-            _ => unreachable!(),
-        }
-        .to_string(),
-    );
-
-    Ok((
-        input,
-        Expression::Apply(Box::new(op_fun), vec![head, result]),
-    ))
+    Ok((input, head))
 }
 
 fn parse_range(input: &str) -> IResult<&str, Expression, SyntaxError> {
@@ -790,7 +777,7 @@ fn parse_expression_prec_five(input: &str) -> IResult<&str, Expression, SyntaxEr
         return Ok(result);
     }
 
-    let (input, head) = expr_parser(input)?;
+    let (input, mut head) = expr_parser(input)?;
 
     let (input, mut list) = many0(pair(
         delimited(
@@ -816,9 +803,10 @@ fn parse_expression_prec_five(input: &str) -> IResult<&str, Expression, SyntaxEr
         return Ok((input, head));
     }
 
-    let (mut op, mut result) = list.pop().unwrap();
+    list.reverse();
+
     while !list.is_empty() {
-        if let Some((next_op, item)) = list.pop() {
+        if let Some((op, item)) = list.pop() {
             let op_fun = Expression::Symbol(
                 match op {
                     "==" => "eq",
@@ -832,38 +820,20 @@ fn parse_expression_prec_five(input: &str) -> IResult<&str, Expression, SyntaxEr
                 .to_string(),
             );
 
-            result = Expression::Group(Box::new(Expression::Apply(
+            head = Expression::Group(Box::new(Expression::Apply(
                 Box::new(op_fun.clone()),
-                vec![item, result],
+                vec![head, item],
             )));
-
-            op = next_op;
         }
     }
 
-    let op_fun = Expression::Symbol(
-        match op {
-            "==" => "eq",
-            "!=" => "neq",
-            ">=" => "gte",
-            "<=" => "lte",
-            ">" => "gt",
-            "<" => "lt",
-            _ => unreachable!(),
-        }
-        .to_string(),
-    );
-
-    Ok((
-        input,
-        Expression::Apply(Box::new(op_fun), vec![head, result]),
-    ))
+    Ok((input, head))
 }
 
 fn parse_expression_prec_four(input: &str) -> IResult<&str, Expression, SyntaxError> {
     let expr_parser = parse_expression_prec_three;
 
-    let (input, head) = expr_parser(input)?;
+    let (input, mut head) = expr_parser(input)?;
 
     let (input, mut list) = many0(pair(
         delimited(parse_ws, alt((tag("+"), tag("-"))), parse_ws),
@@ -874,9 +844,10 @@ fn parse_expression_prec_four(input: &str) -> IResult<&str, Expression, SyntaxEr
         return Ok((input, head));
     }
 
-    let (mut op, mut result) = list.pop().unwrap();
+    list.reverse();
+
     while !list.is_empty() {
-        if let Some((next_op, item)) = list.pop() {
+        if let Some((op, item)) = list.pop() {
             let op_fun = Expression::Symbol(
                 match op {
                     "+" => "add",
@@ -886,37 +857,20 @@ fn parse_expression_prec_four(input: &str) -> IResult<&str, Expression, SyntaxEr
                 .to_string(),
             );
 
-            result = Expression::Group(Box::new(Expression::Apply(
+            head = Expression::Group(Box::new(Expression::Apply(
                 Box::new(op_fun.clone()),
-                vec![item, result],
+                vec![head, item],
             )));
-
-            op = next_op;
         }
     }
 
-    let op_fun = Expression::Symbol(
-        match op {
-            "+" => "add",
-            "-" => "sub",
-            _ => unreachable!(),
-        }
-        .to_string(),
-    );
-
-    Ok((
-        input,
-        Expression::Group(Box::new(Expression::Apply(
-            Box::new(op_fun),
-            vec![head, result],
-        ))),
-    ))
+    Ok((input, head))
 }
 
 fn parse_expression_prec_three(input: &str) -> IResult<&str, Expression, SyntaxError> {
     let expr_parser = parse_expression_prec_two;
 
-    let (input, head) = expr_parser(input)?;
+    let (input, mut head) = expr_parser(input)?;
 
     let (input, mut list) = many0(pair(
         delimited(parse_ws, alt((tag("*"), tag("//"), tag("%"))), parse_ws),
@@ -927,9 +881,10 @@ fn parse_expression_prec_three(input: &str) -> IResult<&str, Expression, SyntaxE
         return Ok((input, head));
     }
 
-    let (mut op, mut result) = list.pop().unwrap();
+    list.reverse();
+
     while !list.is_empty() {
-        if let Some((next_op, item)) = list.pop() {
+        if let Some((op, item)) = list.pop() {
             let op_fun = Expression::Symbol(
                 match op {
                     "*" => "mul",
@@ -940,32 +895,14 @@ fn parse_expression_prec_three(input: &str) -> IResult<&str, Expression, SyntaxE
                 .to_string(),
             );
 
-            result = Expression::Group(Box::new(Expression::Apply(
+            head = Expression::Group(Box::new(Expression::Apply(
                 Box::new(op_fun.clone()),
-                vec![item, result],
+                vec![head, item],
             )));
-
-            op = next_op;
         }
     }
 
-    let op_fun = Expression::Symbol(
-        match op {
-            "*" => "mul",
-            "//" => "div",
-            "%" => "rem",
-            _ => unreachable!(),
-        }
-        .to_string(),
-    );
-
-    Ok((
-        input,
-        Expression::Group(Box::new(Expression::Apply(
-            Box::new(op_fun),
-            vec![head, result],
-        ))),
-    ))
+    Ok((input, head))
 }
 
 fn parse_expression_prec_two(input: &str) -> IResult<&str, Expression, SyntaxError> {
