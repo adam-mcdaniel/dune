@@ -723,22 +723,20 @@ fn parse_expression_prec_six(input: &str) -> IResult<&str, Expression, SyntaxErr
 
     list.reverse();
 
-    while !list.is_empty() {
-        if let Some((op, item)) = list.pop() {
-            let op_fun = Expression::Symbol(
-                match op {
-                    "&&" => "and",
-                    "||" => "or",
-                    _ => unreachable!(),
-                }
-                .to_string(),
-            );
+    while let Some((op, item)) = list.pop() {
+        let op_fun = Expression::Symbol(
+            match op {
+                "&&" => "and",
+                "||" => "or",
+                _ => unreachable!(),
+            }
+            .to_string(),
+        );
 
-            head = Expression::Group(Box::new(Expression::Apply(
-                Box::new(op_fun.clone()),
-                vec![head, item],
-            )));
-        }
+        head = Expression::Group(Box::new(Expression::Apply(
+            Box::new(op_fun.clone()),
+            vec![head, item],
+        )));
     }
 
     Ok((input, head))
@@ -805,26 +803,24 @@ fn parse_expression_prec_five(input: &str) -> IResult<&str, Expression, SyntaxEr
 
     list.reverse();
 
-    while !list.is_empty() {
-        if let Some((op, item)) = list.pop() {
-            let op_fun = Expression::Symbol(
-                match op {
-                    "==" => "eq",
-                    "!=" => "neq",
-                    ">=" => "gte",
-                    "<=" => "lte",
-                    ">" => "gt",
-                    "<" => "lt",
-                    _ => unreachable!(),
-                }
-                .to_string(),
-            );
+    while let Some((op, item)) = list.pop() {
+        let op_fun = Expression::Symbol(
+            match op {
+                "==" => "eq",
+                "!=" => "neq",
+                ">=" => "gte",
+                "<=" => "lte",
+                ">" => "gt",
+                "<" => "lt",
+                _ => unreachable!(),
+            }
+            .to_string(),
+        );
 
-            head = Expression::Group(Box::new(Expression::Apply(
-                Box::new(op_fun.clone()),
-                vec![head, item],
-            )));
-        }
+        head = Expression::Group(Box::new(Expression::Apply(
+            Box::new(op_fun.clone()),
+            vec![head, item],
+        )));
     }
 
     Ok((input, head))
@@ -846,22 +842,20 @@ fn parse_expression_prec_four(input: &str) -> IResult<&str, Expression, SyntaxEr
 
     list.reverse();
 
-    while !list.is_empty() {
-        if let Some((op, item)) = list.pop() {
-            let op_fun = Expression::Symbol(
-                match op {
-                    "+" => "add",
-                    "-" => "sub",
-                    _ => unreachable!(),
-                }
-                .to_string(),
-            );
+    while let Some((op, item)) = list.pop() {
+        let op_fun = Expression::Symbol(
+            match op {
+                "+" => "add",
+                "-" => "sub",
+                _ => unreachable!(),
+            }
+            .to_string(),
+        );
 
-            head = Expression::Group(Box::new(Expression::Apply(
-                Box::new(op_fun.clone()),
-                vec![head, item],
-            )));
-        }
+        head = Expression::Group(Box::new(Expression::Apply(
+            Box::new(op_fun.clone()),
+            vec![head, item],
+        )));
     }
 
     Ok((input, head))
@@ -883,23 +877,21 @@ fn parse_expression_prec_three(input: &str) -> IResult<&str, Expression, SyntaxE
 
     list.reverse();
 
-    while !list.is_empty() {
-        if let Some((op, item)) = list.pop() {
-            let op_fun = Expression::Symbol(
-                match op {
-                    "*" => "mul",
-                    "//" => "div",
-                    "%" => "rem",
-                    _ => unreachable!(),
-                }
-                .to_string(),
-            );
+    while let Some((op, item)) = list.pop() {
+        let op_fun = Expression::Symbol(
+            match op {
+                "*" => "mul",
+                "//" => "div",
+                "%" => "rem",
+                _ => unreachable!(),
+            }
+            .to_string(),
+        );
 
-            head = Expression::Group(Box::new(Expression::Apply(
-                Box::new(op_fun.clone()),
-                vec![head, item],
-            )));
-        }
+        head = Expression::Group(Box::new(Expression::Apply(
+            Box::new(op_fun.clone()),
+            vec![head, item],
+        )));
     }
 
     Ok((input, head))
