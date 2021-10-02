@@ -133,6 +133,22 @@ pub fn parse_script(input: &str, require_eof: bool) -> IResult<&str, Expression,
     }
 }
 
+/// Parses a word that contains characters which can also appear in a symbol.
+///
+/// This parser ensures that the word is *not* immediately followed by symbol characters.
+fn keyword_tag<'a>(keyword: &'a str) -> impl Fn(&str) -> IResult<&str, &'a str, SyntaxError> {
+    move |input: &str| match input.strip_prefix(keyword) {
+        Some(rest)
+            if !rest.starts_with(|c: char| {
+                c.is_ascii_alphanumeric() || ALLOWED_SYMBOL_PUNCTUATION.contains(c)
+            }) =>
+        {
+            Ok((rest, keyword))
+        }
+        _ => Err(nom::Err::Error(SyntaxError::InternalError)),
+    }
+}
+
 fn try_parse_ws(input: &str) -> IResult<&str, (), SyntaxError> {
     let (i, _) = many0(one_of(" \r\t\n"))(input)?;
     Ok((i, ()))
@@ -145,32 +161,32 @@ fn parse_ws(input: &str) -> IResult<&str, (), SyntaxError> {
 
 fn parse_keyword(input: &str) -> IResult<&str, &str, SyntaxError> {
     alt((
-        tag("False"),
-        tag("True"),
-        tag("None"),
-        tag("then"),
-        tag("else"),
-        tag("let"),
-        tag("for"),
-        tag("if"),
-        tag("in"),
-        tag("to"),
-        tag("->"),
-        tag("~>"),
+        keyword_tag("False"),
+        keyword_tag("True"),
+        keyword_tag("None"),
+        keyword_tag("then"),
+        keyword_tag("else"),
+        keyword_tag("let"),
+        keyword_tag("for"),
+        keyword_tag("if"),
+        keyword_tag("in"),
+        keyword_tag("to"),
+        keyword_tag("->"),
+        keyword_tag("~>"),
         alt((
-            tag("=="),
-            tag("!="),
-            tag(">="),
-            tag("<="),
-            tag("&&"),
-            tag("||"),
-            tag("//"),
-            tag(">>"),
-            tag("|"),
-            tag("<"),
-            tag(">"),
-            tag("+"),
-            tag("-"),
+            keyword_tag("=="),
+            keyword_tag("!="),
+            keyword_tag(">="),
+            keyword_tag("<="),
+            keyword_tag("&&"),
+            keyword_tag("||"),
+            keyword_tag("//"),
+            keyword_tag(">>"),
+            keyword_tag("|"),
+            keyword_tag("<"),
+            keyword_tag(">"),
+            keyword_tag("+"),
+            keyword_tag("-"),
             tag("'"),
             tag("@"),
         )),
@@ -178,7 +194,7 @@ fn parse_keyword(input: &str) -> IResult<&str, &str, SyntaxError> {
 }
 
 fn parse_symbol(input: &str) -> IResult<&str, String, SyntaxError> {
-    match tuple((parse_keyword, parse_ws))(input) {
+    match parse_keyword(input) {
         Ok(_) => SyntaxError::expected(
             input,
             "symbol",
@@ -298,9 +314,9 @@ fn parse_float(input: &str) -> IResult<&str, f64, SyntaxError> {
 }
 
 fn parse_boolean(input: &str) -> IResult<&str, bool, SyntaxError> {
-    match tag::<&str, &str, SyntaxError>("True")(input) {
+    match keyword_tag("True")(input) {
         Ok((input, _)) => Ok((input, true)),
-        Err(_) => match tag::<&str, &str, SyntaxError>("False")(input) {
+        Err(_) => match keyword_tag("False")(input) {
             Ok((input, _)) => Ok((input, false)),
             Err(_) => SyntaxError::expected(input, "bool", None, None),
         },
@@ -308,7 +324,7 @@ fn parse_boolean(input: &str) -> IResult<&str, bool, SyntaxError> {
 }
 
 fn parse_none(input: &str) -> IResult<&str, (), SyntaxError> {
-    match tag::<&str, &str, SyntaxError>("None")(input) {
+    match keyword_tag("None")(input) {
         Ok((input, _)) => Ok((input, ())),
         Err(_) => match tag::<&str, &str, SyntaxError>("()")(input) {
             Ok((input, _)) => Ok((input, ())),
@@ -396,7 +412,7 @@ fn parse_escape(input: &str) -> IResult<&str, (), SyntaxError> {
 
 fn parse_assign(input: &str) -> IResult<&str, Expression, SyntaxError> {
     let (input, _) = try_parse_ws(input)?;
-    let (input, _) = tag("let")(input)?;
+    let (input, _) = keyword_tag("let")(input)?;
     let (input, _) = try_parse_ws(input)?;
     let (input, symbol) = match parse_symbol(input) {
         Ok(result) => result,
@@ -509,7 +525,7 @@ fn parse_map(input: &str) -> IResult<&str, Expression, SyntaxError> {
 
 fn parse_for_loop(input: &str) -> IResult<&str, Expression, SyntaxError> {
     let (input, _) = try_parse_ws(input)?;
-    let (input, _) = tag("for")(input)?;
+    let (input, _) = keyword_tag("for")(input)?;
     let (input, _) = try_parse_ws(input)?;
     let (input, symbol) = parse_symbol(input)?;
     let (input, _) = try_parse_ws(input)?;
@@ -559,7 +575,7 @@ fn parse_for_loop(input: &str) -> IResult<&str, Expression, SyntaxError> {
 
 fn parse_if(input: &str) -> IResult<&str, Expression, SyntaxError> {
     let (input, _) = try_parse_ws(input)?;
-    let (input, _) = tag("if")(input)?;
+    let (input, _) = keyword_tag("if")(input)?;
 
     let (input, cond) = match parse_expression_prec_six(input) {
         Ok(result) => result,
@@ -586,7 +602,7 @@ fn parse_if(input: &str) -> IResult<&str, Expression, SyntaxError> {
     };
 
     let (input, maybe_e) = opt(preceded(
-        pair(try_parse_ws, tag("else")),
+        pair(try_parse_ws, keyword_tag("else")),
         alt((parse_block, parse_expression_prec_four, parse_if)),
     ))(input)?;
 
@@ -745,7 +761,7 @@ fn parse_expression_prec_six(input: &str) -> IResult<&str, Expression, SyntaxErr
 fn parse_range(input: &str) -> IResult<&str, Expression, SyntaxError> {
     let (input, from) = parse_expression_prec_four(input)?;
     let (input, _) = try_parse_ws(input)?;
-    let (input, _) = tag("to")(input)?;
+    let (input, _) = keyword_tag("to")(input)?;
 
     let (input, to) = match parse_expression_prec_four(input) {
         Ok(result) => result,
