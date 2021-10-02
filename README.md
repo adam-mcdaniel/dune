@@ -110,6 +110,7 @@ Dune offers the following builtin libraries:
 |`fmt`|A library for text formatting on the console (color, styling, hyperlinks, text wrapping, etc.)|
 |`os`|A small module with the host's OS info|
 |`widget`|A module for creating text widgets|
+|`shell`|A small module for information about the Dune shell|
 |`console`|A library for manipulating the console|
 
 For more information about each, just run `echo library-name`.
