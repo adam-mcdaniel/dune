@@ -38,6 +38,12 @@ impl From<String> for Expression {
     }
 }
 
+impl From<Vec<u8>> for Expression {
+    fn from(x: Vec<u8>) -> Self {
+        Self::Bytes(x)
+    }
+}
+
 impl From<bool> for Expression {
     fn from(x: bool) -> Self {
         Self::Boolean(x)
@@ -79,6 +85,8 @@ pub enum Expression {
     Integer(Int),
     // A floating point number literal
     Float(f64),
+    // A list of bytes
+    Bytes(Vec<u8>),
     // A string literal
     String(String),
     // A boolean literal
@@ -146,6 +154,7 @@ impl fmt::Debug for Expression {
             Self::Symbol(name) => write!(f, "{}", name),
             Self::Integer(i) => write!(f, "{}", *i),
             Self::Float(n) => write!(f, "{}", *n),
+            Self::Bytes(b) => write!(f, "b{:?}", b),
             Self::String(s) => write!(f, "{:?}", s),
             Self::Boolean(b) => write!(f, "{}", if *b { "True" } else { "False" }),
             Self::List(exprs) => write!(
@@ -208,6 +217,7 @@ impl fmt::Display for Expression {
             Self::Symbol(name) => write!(f, "{}", name),
             Self::Integer(i) => write!(f, "{}", *i),
             Self::Float(n) => write!(f, "{}", *n),
+            Self::Bytes(b) => write!(f, "b{:?}", b),
             Self::String(s) => write!(f, "{}", s),
             Self::Boolean(b) => write!(f, "{}", if *b { "True" } else { "False" }),
             Self::List(exprs) => write!(
@@ -219,15 +229,6 @@ impl fmt::Display for Expression {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
-            // Self::Map(exprs) => write!(
-            //     f,
-            //     "{{{}}}",
-            //     exprs
-            //         .iter()
-            //         .map(|(k, e)| format!("{}: {:?}", k, e))
-            //         .collect::<Vec<String>>()
-            //         .join(", ")
-            // ),
             Self::Map(exprs) => {
                 let mut t = Table::new();
                 let fmt = t.get_format();
@@ -286,6 +287,7 @@ impl PartialOrd for Expression {
             (Self::Integer(a), Self::Integer(b)) => a.partial_cmp(b),
             (Self::Float(a), Self::Float(b)) => a.partial_cmp(b),
             (Self::String(a), Self::String(b)) => a.partial_cmp(b),
+            (Self::Bytes(a), Self::Bytes(b)) => a.partial_cmp(b),
             (Self::List(a), Self::List(b)) => a.partial_cmp(b),
             (Self::Map(a), Self::Map(b)) => a.partial_cmp(b),
             _ => None,
@@ -315,6 +317,7 @@ impl Expression {
             Self::Integer(i) => *i != 0,
             Self::Float(f) => *f != 0.0,
             Self::String(s) => !s.is_empty(),
+            Self::Bytes(b) => !b.is_empty(),
             Self::Boolean(b) => *b,
             Self::List(exprs) => !exprs.is_empty(),
             Self::Map(exprs) => !exprs.is_empty(),
@@ -331,6 +334,7 @@ impl Expression {
             Self::None
             | Self::Integer(_)
             | Self::Float(_)
+            | Self::Bytes(_)
             | Self::String(_)
             | Self::Boolean(_)
             | Self::Builtin(_) => vec![],
@@ -431,8 +435,14 @@ impl Expression {
                     Self::Symbol(name) | Self::String(name) => {
                         let bindings = env
                             .bindings
-                            .iter()
-                            .map(|(k, v)| (k.clone(), format!("{}", v)))
+                            .clone()
+                            .into_iter()
+                            .map(|(k, v)| (k, v.to_string()))
+                            // This is to prevent environment variables from getting too large.
+                            // This causes some strange bugs on Linux: mainly it becomes
+                            // impossible to execute any program because `the argument
+                            // list is too long`.
+                            .filter(|(_, s)| s.len() <= 1024)
                             .collect::<BTreeMap<String, String>>();
 
                         match Command::new(&name)
@@ -465,12 +475,14 @@ impl Expression {
 
                     Self::Lambda(param, body, old_env) if args.len() == 1 => {
                         let mut new_env = old_env;
+                        new_env.set_cwd(env.get_cwd());
                         new_env.define(&param, args[0].clone().eval_mut(env)?);
                         return body.eval_mut(&mut new_env);
                     }
 
                     Self::Lambda(param, body, old_env) if args.len() > 1 => {
                         let mut new_env = old_env.clone();
+                        new_env.set_cwd(env.get_cwd());
                         new_env.define(&param, args[0].clone().eval_mut(env)?);
                         self =
                             Self::Apply(Box::new(body.eval_mut(&mut new_env)?), args[1..].to_vec());
@@ -499,6 +511,7 @@ impl Expression {
                 Self::Lambda(param, body, captured) => {
                     let mut tmp_env = captured.clone();
                     tmp_env.define(&param, Expression::None);
+                    tmp_env.set_cwd(env.get_cwd());
                     for symbol in body.get_used_symbols() {
                         if symbol != param && !captured.is_defined(&symbol) {
                             if let Some(val) = env.get(&symbol) {
@@ -539,6 +552,7 @@ impl Expression {
                 | Self::Integer(_)
                 | Self::Float(_)
                 | Self::Boolean(_)
+                | Self::Bytes(_)
                 | Self::String(_)
                 | Self::Macro(_, _)
                 | Self::Builtin(_) => return Ok(self.clone()),
@@ -559,6 +573,10 @@ impl Add for Expression {
             (Self::Float(m), Self::Integer(n)) => Self::Float(m + n as f64),
             (Self::Float(m), Self::Float(n)) => Self::Float(m + n),
             (Self::String(m), Self::String(n)) => Self::String(m + &n),
+            (Self::Bytes(mut a), Self::Bytes(b)) => {
+                a.extend(b);
+                Self::Bytes(a)
+            }
             (Self::List(mut a), Self::List(b)) => {
                 a.extend(b);
                 Self::List(a)
