@@ -492,7 +492,7 @@ fn expr_to_command<'a>(
 
     Ok(match expr {
         // If the command is quoted or in parentheses, try to get the inner command.
-        Expression::Group(expr) | Expression::Quote(expr) => expr_to_command(cmd, &expr, env)?,
+        Expression::Group(expr) | Expression::Quote(expr) => expr_to_command(cmd, expr, env)?,
         // If the command is an undefined symbol with some arguments.
         Expression::Apply(f, args) => match **f {
             Expression::Symbol(ref name) if !env.is_defined(name) => {
@@ -593,7 +593,7 @@ fn main() -> Result<(), Error> {
                                 if let Some(stdin) = child_handler.stdin.as_mut() {
                                     // Write the contents of the previous command's STDOUT
                                     // to the process's STDIN.
-                                    if let Err(_) = stdin.write_all(&buf) {
+                                    if stdin.write_all(&buf).is_err() {
                                         return Err(Error::CustomError(format!(
                                             "error when piping into process `{}`",
                                             expr
@@ -617,7 +617,7 @@ fn main() -> Result<(), Error> {
                             if is_last {
                                 // If this is the last command in the pipe, then simply
                                 // wait for it to finish without piping in any input.
-                                if let Err(_) = child_handler.wait() {
+                                if child_handler.wait().is_err() {
                                     return Err(Error::CustomError(format!(
                                         "error when waiting for process `{}`",
                                         expr
@@ -671,7 +671,7 @@ fn main() -> Result<(), Error> {
                             // If this is any other command, pipe in the result of the last command (via application).
                             Expression::Apply(
                                 Box::new(expr.clone()),
-                                vec![result_of_last_cmd.into()],
+                                vec![result_of_last_cmd],
                             )
                         }
                         .eval(env)?;

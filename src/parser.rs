@@ -104,7 +104,7 @@ const ASCII_NONZERO_DIGIT: &str = "123456789";
 const ASCII_DIGIT: &str = "0123456789";
 const ASCII_HEX_DIGIT: &str = "0123456789ABCDEFabcdef";
 
-const ALLOWED_SYMBOL_PUNCTUATION: &'static str = "_+-.~\\/?&<>$%#^:";
+const ALLOWED_SYMBOL_PUNCTUATION: &str = "_+-.~\\/?&<>$%#^:";
 
 pub fn parse_script(input: &str, require_eof: bool) -> IResult<&str, Expression, SyntaxError> {
     let (input, _) = try_parse_ws(input)?;
