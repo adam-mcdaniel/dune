@@ -472,7 +472,7 @@ fn repl(
 /// If the expression can be executed as a program, then it will
 /// be stored in the `cmd` parameter, and the function will return
 /// `Ok(Some(cmd))`.
-/// 
+///
 /// Otherwise, the program will return `Ok(None)`.
 fn expr_to_command<'a>(
     cmd: &'a mut Command,
@@ -627,7 +627,7 @@ fn main() -> Result<(), Error> {
                                 // If it is not the last command, then we need
                                 // collect its standard output for the next process
                                 // in the pipe.
-                                
+
                                 // Attempt to grab the STDOUT of the process from the handler.
                                 if let Ok(output) = child_handler.wait_with_output() {
                                     // Store the contents of the STDOUT into the buffer
@@ -669,10 +669,7 @@ fn main() -> Result<(), Error> {
                             expr.clone()
                         } else {
                             // If this is any other command, pipe in the result of the last command (via application).
-                            Expression::Apply(
-                                Box::new(expr.clone()),
-                                vec![result_of_last_cmd],
-                            )
+                            Expression::Apply(Box::new(expr.clone()), vec![result_of_last_cmd])
                         }
                         .eval(env)?;
 
