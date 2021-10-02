@@ -8,20 +8,20 @@ use nom::{
 use crate::SyntaxError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Token {
-    Punctuation(&'static str),
-    Operator(&'static str),
-    Keyword(&'static str),
-    StringLiteral(String),
-    IntegerLiteral(String),
-    FloatLiteral(String),
-    BooleanLiteral(&'static str),
-    Symbol(String),
-    Whitespace(String),
+pub enum Token<'a> {
+    Punctuation(&'a str),
+    Operator(&'a str),
+    Keyword(&'a str),
+    StringLiteral(&'a str),
+    IntegerLiteral(&'a str),
+    FloatLiteral(&'a str),
+    BooleanLiteral(&'a str),
+    Symbol(&'a str),
+    Whitespace(&'a str),
     Eof,
 }
 
-fn parse_token(input: &str) -> IResult<&str, Token, SyntaxError> {
+fn parse_token(input: &str) -> IResult<&str, Token<'_>, SyntaxError> {
     if input.is_empty() {
         Ok((input, Token::Eof))
     } else if let Ok((input, op)) = any_punctuation(input) {
@@ -34,10 +34,10 @@ fn parse_token(input: &str) -> IResult<&str, Token, SyntaxError> {
         Ok((input, Token::BooleanLiteral(lit)))
     } else {
         alt((
-            map(string_literal, |s| Token::StringLiteral(s.to_string())),
+            map(string_literal, |s| Token::StringLiteral(s)),
             number_literal,
-            map(symbol, |s| Token::Symbol(s.to_string())),
-            map(whitespace, |s| Token::Whitespace(s.to_string())),
+            map(symbol, |s| Token::Symbol(s)),
+            map(whitespace, |s| Token::Whitespace(s)),
         ))(input)
     }
 }
@@ -100,7 +100,7 @@ fn string_literal(input: &str) -> IResult<&str, &str, SyntaxError> {
     Ok((input, &old_input[0..old_input.len() - input.len()]))
 }
 
-fn number_literal(input: &str) -> IResult<&str, Token, SyntaxError> {
+fn number_literal(input: &str) -> IResult<&str, Token<'_>, SyntaxError> {
     // skip sign
     let rest = input.strip_prefix('-').unwrap_or(input);
 
@@ -122,7 +122,7 @@ fn number_literal(input: &str) -> IResult<&str, Token, SyntaxError> {
         None => {
             let number_len = input.len() - rest.len();
             let (number, rest) = input.split_at(number_len);
-            return Ok((rest, Token::IntegerLiteral(number.to_string())));
+            return Ok((rest, Token::IntegerLiteral(number)));
         }
     };
 
@@ -140,7 +140,7 @@ fn number_literal(input: &str) -> IResult<&str, Token, SyntaxError> {
 
     let number_len = input.len() - rest.len();
     let (number, rest) = input.split_at(number_len);
-    Ok((rest, Token::FloatLiteral(number.to_string())))
+    Ok((rest, Token::FloatLiteral(number)))
 }
 
 fn bool_literal(input: &str) -> IResult<&str, &'static str, ()> {

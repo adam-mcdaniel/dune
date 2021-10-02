@@ -184,30 +184,30 @@ fn syntax_highlight(line: &str) -> String {
             Token::StringLiteral(s) => {
                 result.push_str("\x1b[38;5;208m");
                 is_colored = true;
-                result.push_str(&s);
+                result.push_str(s);
             }
             Token::IntegerLiteral(l) | Token::FloatLiteral(l) => {
                 if is_colored {
                     result.push_str("\x1b[m\x1b[0m");
                     is_colored = false;
                 }
-                result.push_str(&l);
+                result.push_str(l);
             }
             Token::Symbol(l) => {
                 if l == "None" {
                     result.push_str("\x1b[91m");
                     is_colored = true;
-                } else if matches!(l.as_str(), "echo" | "exit" | "clear" | "cd" | "rm") {
+                } else if matches!(l, "echo" | "exit" | "clear" | "cd" | "rm") {
                     result.push_str("\x1b[94m");
                     is_colored = true;
                 } else if is_colored {
                     result.push_str("\x1b[m\x1b[0m");
                     is_colored = false;
                 }
-                result.push_str(&l);
+                result.push_str(l);
             }
             Token::Whitespace(w) => {
-                result.push_str(&w);
+                result.push_str(w);
             }
             Token::Eof => {}
         }
