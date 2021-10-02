@@ -495,8 +495,18 @@ fn expr_to_command<'a>(
         Expression::Group(expr) | Expression::Quote(expr) => expr_to_command(cmd, expr, env)?,
         // If the command is an undefined symbol with some arguments.
         Expression::Apply(f, args) => match **f {
-            Expression::Symbol(ref name) if !env.is_defined(name) => {
-                *cmd = Command::new(name);
+            Expression::Symbol(ref name) => {
+                let cmd_name = match env.get(name) {
+                    // If the symbol is an alias, then execute the alias.
+                    Some(Expression::Symbol(alias)) => {
+                        alias.clone()
+                    }
+                    // If the symbol is bound to something like `5`, this isn't a command.
+                    Some(_) => { return Ok(None) },
+                    // If the symbol is not bound, then it is a command.
+                    None => name.clone(),
+                };
+                *cmd = Command::new(cmd_name);
                 Some(
                     cmd.current_dir(env.get_cwd()).envs(bindings).args(
                         args.iter()
