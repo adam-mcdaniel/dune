@@ -498,11 +498,9 @@ fn expr_to_command<'a>(
             Expression::Symbol(ref name) => {
                 let cmd_name = match env.get(name) {
                     // If the symbol is an alias, then execute the alias.
-                    Some(Expression::Symbol(alias)) => {
-                        alias.clone()
-                    }
+                    Some(Expression::Symbol(alias)) => alias,
                     // If the symbol is bound to something like `5`, this isn't a command.
-                    Some(_) => { return Ok(None) },
+                    Some(_) => return Ok(None),
                     // If the symbol is not bound, then it is a command.
                     None => name.clone(),
                 };
