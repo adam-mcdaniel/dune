@@ -5,40 +5,32 @@ use nom::{
     IResult,
 };
 
+use crate::tokens::{Token, TokenKind};
 use crate::SyntaxError;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Token<'a> {
-    Punctuation(&'a str),
-    Operator(&'a str),
-    Keyword(&'a str),
-    StringLiteral(&'a str),
-    IntegerLiteral(&'a str),
-    FloatLiteral(&'a str),
-    BooleanLiteral(&'a str),
-    Symbol(&'a str),
-    Whitespace(&'a str),
-    Eof,
-}
-
-fn parse_token(input: &str) -> IResult<&str, Token<'_>, SyntaxError> {
+fn parse_token(input: &str) -> IResult<&str, Option<Token<'_>>, SyntaxError> {
     if input.is_empty() {
-        Ok((input, Token::Eof))
+        Ok((input, None))
     } else if let Ok((input, op)) = any_punctuation(input) {
-        Ok((input, Token::Punctuation(op)))
+        Ok((input, Some(Token::new(TokenKind::Punctuation, op))))
     } else if let Ok((input, kwd)) = any_keyword(input) {
-        Ok((input, Token::Keyword(kwd)))
-    } else if let Ok((input, kwd)) = any_operator(input) {
-        Ok((input, Token::Operator(kwd)))
+        Ok((input, Some(Token::new(TokenKind::Keyword, kwd))))
+    } else if let Ok((input, op)) = any_operator(input) {
+        Ok((input, Some(Token::new(TokenKind::Operator, op))))
     } else if let Ok((input, lit)) = bool_literal(input) {
-        Ok((input, Token::BooleanLiteral(lit)))
+        Ok((input, Some(Token::new(TokenKind::BooleanLiteral, lit))))
     } else {
-        alt((
-            map(string_literal, |s| Token::StringLiteral(s)),
-            number_literal,
-            map(symbol, |s| Token::Symbol(s)),
-            map(whitespace, |s| Token::Whitespace(s)),
-        ))(input)
+        map(
+            alt((
+                map(comment, |s| Token::new(TokenKind::Comment, s)),
+                map(string_literal, |s| Token::new(TokenKind::StringLiteral, s)),
+                number_literal,
+                map(symbol, |s| Token::new(TokenKind::Symbol, s)),
+                map(whitespace, |s| Token::new(TokenKind::Whitespace, s)),
+                map(other, |s| Token::new(TokenKind::Other, s)),
+            )),
+            Some,
+        )(input)
     }
 }
 
@@ -53,7 +45,8 @@ fn any_punctuation(input: &str) -> IResult<&str, &'static str, ()> {
         punctuation_tag("@"),
         punctuation_tag("\'"),
         punctuation_tag(","),
-        keyword_tag("="),  // must be surrounded by whitespace
+        punctuation_tag(";"),
+        punctuation_tag("="),
         keyword_tag("|"),  // must be surrounded by whitespace
         keyword_tag(">>"), // `>>foo` is also a valid symbol
         keyword_tag("->"), // `->foo` is also a valid symbol
@@ -122,7 +115,7 @@ fn number_literal(input: &str) -> IResult<&str, Token<'_>, SyntaxError> {
         None => {
             let number_len = input.len() - rest.len();
             let (number, rest) = input.split_at(number_len);
-            return Ok((rest, Token::IntegerLiteral(number)));
+            return Ok((rest, Token::new(TokenKind::IntegerLiteral, number)));
         }
     };
 
@@ -132,7 +125,7 @@ fn number_literal(input: &str) -> IResult<&str, Token<'_>, SyntaxError> {
         return SyntaxError::expected(
             input,
             "float",
-            None,
+            None::<&str>,
             Some("valid floats can be written like 1.0 or 5.23"),
         );
     }
@@ -140,7 +133,7 @@ fn number_literal(input: &str) -> IResult<&str, Token<'_>, SyntaxError> {
 
     let number_len = input.len() - rest.len();
     let (number, rest) = input.split_at(number_len);
-    Ok((rest, Token::FloatLiteral(number)))
+    Ok((rest, Token::new(TokenKind::FloatLiteral, number)))
 }
 
 fn bool_literal(input: &str) -> IResult<&str, &'static str, ()> {
@@ -170,6 +163,32 @@ fn whitespace(input: &str) -> IResult<&str, &str, SyntaxError> {
 
     let (ws, rest) = input.split_at(ws_chars);
     Ok((rest, ws))
+}
+
+fn other(input: &str) -> IResult<&str, &str, SyntaxError> {
+    let mut chars = input.chars();
+    match chars.next() {
+        Some(_) => {
+            let rest = chars.as_str();
+            Ok((rest, &input[..input.len() - rest.len()]))
+        }
+        None => Err(nom::Err::Error(SyntaxError::InternalError)),
+    }
+}
+
+fn comment(input: &str) -> IResult<&str, &str, SyntaxError> {
+    if input.starts_with('#') {
+        let index = input
+            .chars()
+            .take_while(|&c| !matches!(c, '\r' | '\n'))
+            .map(|c| c.len_utf8())
+            .sum::<usize>();
+
+        let (comment, rest) = input.split_at(index);
+        Ok((rest, comment))
+    } else {
+        Err(nom::Err::Error(SyntaxError::InternalError))
+    }
 }
 
 fn ignore_string_inner(mut input: &str) -> IResult<&str, (), SyntaxError> {
@@ -243,7 +262,7 @@ fn is_symbol_char(c: char) -> bool {
     macro_rules! special_char_pattern {
         () => {
             '_' | '+' | '-' | '.' | '~' | '\\' | '/' | '?' |
-            '&' | '<' | '>' | '$' | '%' | '#' | '^' | ':' | '='
+            '&' | '<' | '>' | '$' | '%' | '#' | '^' | ':'
         };
     }
 
@@ -274,14 +293,11 @@ pub fn parse_tokens(mut input: &str) -> IResult<&str, Vec<Token>, SyntaxError> {
     let mut result = Vec::new();
     loop {
         match parse_token(input) {
-            Ok((new_input, token)) => {
+            Ok((new_input, Some(token))) => {
                 input = new_input;
-                let is_eof = token == Token::Eof;
                 result.push(token);
-                if is_eof {
-                    break;
-                }
             }
+            Ok((_, None)) => break,
             Err(e) => return Err(e),
         }
     }

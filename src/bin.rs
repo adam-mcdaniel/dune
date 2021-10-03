@@ -1,6 +1,6 @@
 #![allow(clippy::wildcard_in_or_patterns)]
 
-use dune::Token;
+use dune::TokenKind;
 use dune::{parse_script, Builtin, Environment, Error, Expression, Int, SyntaxError, VERSION};
 
 use rustyline::completion::{Completer, FilenameCompleter, Pair as PairComplete};
@@ -155,45 +155,47 @@ fn syntax_highlight(line: &str) -> String {
     let mut is_colored = false;
 
     for token in tokens {
-        match token {
-            Token::BooleanLiteral(b) => {
+        match (token.kind, token.text) {
+            (TokenKind::BooleanLiteral, b) => {
                 result.push_str("\x1b[95m");
                 is_colored = true;
                 result.push_str(b);
             }
-            Token::Punctuation(o) => {
-                if matches!(o, "@" | "\'" | "=" | "|" | ">>" | "->" | "~>") {
-                    result.push_str("\x1b[96m");
-                    is_colored = true;
-                } else if is_colored {
+            (TokenKind::Punctuation, o @ ("@" | "\'" | "=" | "|" | ">>" | "->" | "~>")) => {
+                result.push_str("\x1b[96m");
+                is_colored = true;
+                result.push_str(o);
+            }
+            (TokenKind::Punctuation, o) => {
+                if is_colored {
                     result.push_str("\x1b[m\x1b[0m");
                     is_colored = false;
                 }
                 result.push_str(o);
             }
-            Token::Keyword(k) => {
+            (TokenKind::Keyword, k) => {
                 result.push_str("\x1b[95m");
                 is_colored = true;
                 result.push_str(k);
             }
-            Token::Operator(k) => {
+            (TokenKind::Operator, k) => {
                 result.push_str("\x1b[38;5;220m");
                 is_colored = true;
                 result.push_str(k);
             }
-            Token::StringLiteral(s) => {
+            (TokenKind::StringLiteral, s) => {
                 result.push_str("\x1b[38;5;208m");
                 is_colored = true;
                 result.push_str(s);
             }
-            Token::IntegerLiteral(l) | Token::FloatLiteral(l) => {
+            (TokenKind::IntegerLiteral | TokenKind::FloatLiteral, l) => {
                 if is_colored {
                     result.push_str("\x1b[m\x1b[0m");
                     is_colored = false;
                 }
                 result.push_str(l);
             }
-            Token::Symbol(l) => {
+            (TokenKind::Symbol, l) => {
                 if l == "None" {
                     result.push_str("\x1b[91m");
                     is_colored = true;
@@ -206,10 +208,19 @@ fn syntax_highlight(line: &str) -> String {
                 }
                 result.push_str(l);
             }
-            Token::Whitespace(w) => {
+            (TokenKind::Whitespace, w) => {
                 result.push_str(w);
             }
-            Token::Eof => {}
+            (TokenKind::Comment, w) => {
+                result.push_str("\x1b[38;5;247m");
+                is_colored = true;
+                result.push_str(w);
+            }
+            (TokenKind::Other, o) => {
+                result.push_str("\x1b[38;5;9m");
+                is_colored = true;
+                result.push_str(o);
+            }
         }
     }
     if is_colored {
@@ -364,23 +375,11 @@ fn get_os_family(t: &Type) -> String {
     .to_string()
 }
 
-fn parse(input: impl ToString) -> Result<Expression, Error> {
-    if let Ok(input) = comment::python::strip(input) {
-        match parse_script(input.as_str(), true) {
-            Ok((unparsed, result)) => {
-                if !unparsed.is_empty() {
-                    eprintln!("UNPARSED: `{}`", unparsed);
-                    return Err(Error::CustomError("incomplete input".to_string()));
-                }
-                Ok(result)
-            }
-            Err(nom::Err::Error(e)) | Err(nom::Err::Failure(e)) => Err(Error::SyntaxError(e)),
-            Err(nom::Err::Incomplete(_)) => Err(Error::SyntaxError(SyntaxError::InternalError)),
-        }
-    } else {
-        Err(Error::CustomError(
-            "could not strip comments from command".to_string(),
-        ))
+fn parse(input: impl AsRef<str>) -> Result<Expression, Error> {
+    match parse_script(input.as_ref()) {
+        Ok(result) => Ok(result),
+        Err(nom::Err::Error(e)) | Err(nom::Err::Failure(e)) => Err(Error::SyntaxError(e)),
+        Err(nom::Err::Incomplete(_)) => Err(Error::SyntaxError(SyntaxError::InternalError)),
     }
 }
 
