@@ -11,11 +11,13 @@ use crate::SyntaxError;
 fn parse_token(input: &str) -> IResult<&str, Option<Token<'_>>, SyntaxError> {
     if input.is_empty() {
         Ok((input, None))
+    } else if let Ok((input, op)) = long_operator(input) {
+        Ok((input, Some(Token::new(TokenKind::Operator, op))))
     } else if let Ok((input, op)) = any_punctuation(input) {
         Ok((input, Some(Token::new(TokenKind::Punctuation, op))))
     } else if let Ok((input, kwd)) = any_keyword(input) {
         Ok((input, Some(Token::new(TokenKind::Keyword, kwd))))
-    } else if let Ok((input, op)) = any_operator(input) {
+    } else if let Ok((input, op)) = short_operator(input) {
         Ok((input, Some(Token::new(TokenKind::Operator, op))))
     } else if let Ok((input, lit)) = bool_literal(input) {
         Ok((input, Some(Token::new(TokenKind::BooleanLiteral, lit))))
@@ -54,7 +56,7 @@ fn any_punctuation(input: &str) -> IResult<&str, &'static str, ()> {
     ))(input)
 }
 
-fn any_operator(input: &str) -> IResult<&str, &'static str, ()> {
+fn long_operator(input: &str) -> IResult<&str, &'static str, ()> {
     alt((
         keyword_tag("to"),
         keyword_tag("=="),
@@ -63,12 +65,17 @@ fn any_operator(input: &str) -> IResult<&str, &'static str, ()> {
         keyword_tag("<="),
         keyword_tag("&&"),
         keyword_tag("||"),
+        keyword_tag("//"),
+    ))(input)
+}
+
+fn short_operator(input: &str) -> IResult<&str, &'static str, ()> {
+    alt((
         keyword_tag("<"),
         keyword_tag(">"),
         keyword_tag("+"),
         keyword_tag("-"),
         keyword_tag("*"),
-        keyword_tag("//"),
     ))(input)
 }
 
@@ -305,5 +312,58 @@ pub fn parse_tokens(mut input: &str) -> IResult<&str, Vec<Token>, SyntaxError> {
         Ok((input, result))
     } else {
         Err(nom::Err::Failure(SyntaxError::InternalError))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{parse_tokens, SyntaxError};
+
+    fn test(input: &str, expected: &str) -> Result<(), nom::Err<SyntaxError>> {
+        let (rest, tokens) = parse_tokens(input)?;
+        assert!(
+            rest.is_empty(),
+            "Not all input was tokenized. Rest: {:?}",
+            rest
+        );
+        let got = format!("{:#?}", tokens);
+        assert_eq!(expected, got.as_str());
+        Ok(())
+    }
+
+    #[test]
+    fn test1() -> Result<(), nom::Err<SyntaxError>> {
+        test(
+            r#"let a = foo -> bar -> {
+    foo == bar
+}"#,
+            r#"[
+    Keyword(let),
+    Whitespace( ),
+    Symbol(a),
+    Whitespace( ),
+    Punctuation(=),
+    Whitespace( ),
+    Symbol(foo),
+    Whitespace( ),
+    Punctuation(->),
+    Whitespace( ),
+    Symbol(bar),
+    Whitespace( ),
+    Punctuation(->),
+    Whitespace( ),
+    Punctuation({),
+    Whitespace(
+        ),
+    Symbol(foo),
+    Whitespace( ),
+    Operator(==),
+    Whitespace( ),
+    Symbol(bar),
+    Whitespace(
+    ),
+    Punctuation(}),
+]"#,
+        )
     }
 }
