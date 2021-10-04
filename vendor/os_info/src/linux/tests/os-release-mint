@@ -1,0 +1,12 @@
+NAME="Linux Mint"
+VERSION="20 (Ulyana)"
+ID=linuxmint
+ID_LIKE=ubuntu
+PRETTY_NAME="Linux Mint 20"
+VERSION_ID="20"
+HOME_URL="https://www.linuxmint.com/"
+SUPPORT_URL="https://forums.linuxmint.com/"
+BUG_REPORT_URL="http://linuxmint-troubleshooting-guide.readthedocs.io/en/latest/"
+PRIVACY_POLICY_URL="https://www.linuxmint.com/"
+VERSION_CODENAME=ulyana
+UBUNTU_CODENAME=focal

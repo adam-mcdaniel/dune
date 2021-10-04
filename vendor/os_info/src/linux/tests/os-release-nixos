@@ -1,0 +1,11 @@
+NAME=NixOS
+ID=nixos
+VERSION="21.05pre275822.916ee862e87 (Okapi)"
+VERSION_CODENAME=okapi
+VERSION_ID="21.05pre275822.916ee862e87"
+PRETTY_NAME="NixOS 21.05 (Okapi)"
+LOGO="nix-snowflake"
+HOME_URL="https://nixos.org/"
+DOCUMENTATION_URL="https://nixos.org/learn.html"
+SUPPORT_URL="https://nixos.org/community.html"
+BUG_REPORT_URL="https://github.com/NixOS/nixpkgs/issues"

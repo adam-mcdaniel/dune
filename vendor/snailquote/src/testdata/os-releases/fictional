@@ -1,0 +1,6 @@
+NAME='Fictional os-release to use lots of escapes'
+VERSION="420"
+ID=1
+VERSION_ID=1
+PRETTY_NAME="Fictional \$ OS: \` edition"
+KEY='$'
