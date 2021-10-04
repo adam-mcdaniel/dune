@@ -299,11 +299,6 @@ impl Highlighter for DuneHelper {
         _prompt: &'p str,
         _default: bool,
     ) -> Cow<'b, str> {
-        // if default {
-        //     Borrowed(&self.colored_prompt)
-        // } else {
-        //     Borrowed(prompt)
-        // }
         Borrowed(&self.colored_prompt)
     }
 

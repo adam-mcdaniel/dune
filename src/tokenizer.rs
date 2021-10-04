@@ -34,10 +34,10 @@ fn parse_token(input: &str) -> IResult<&str, Token<'_>, SyntaxError> {
         Ok((input, Token::BooleanLiteral(lit)))
     } else {
         alt((
-            map(string_literal, |s| Token::StringLiteral(s)),
+            map(string_literal, Token::StringLiteral),
             number_literal,
-            map(symbol, |s| Token::Symbol(s)),
-            map(whitespace, |s| Token::Whitespace(s)),
+            map(symbol, Token::Symbol),
+            map(whitespace, Token::Whitespace),
         ))(input)
     }
 }
