@@ -5,7 +5,7 @@ use dune::{parse_script, Builtin, Environment, Error, Expression, Int, SyntaxErr
 
 use rustyline::completion::{Completer, FilenameCompleter, Pair as PairComplete};
 use rustyline::config::OutputStreamType;
-use rustyline::highlight::{Highlighter, MatchingBracketHighlighter};
+use rustyline::highlight::{Highlighter};
 use rustyline::hint::{Hinter, HistoryHinter};
 use rustyline::validate::{
     MatchingBracketValidator, ValidationContext, ValidationResult, Validator,
@@ -48,10 +48,9 @@ fn new_editor(env: &Environment) -> Editor<DuneHelper> {
     let mut rl = Editor::with_config(config);
     let h = DuneHelper {
         completer: FilenameCompleter::new(),
-        highlighter: MatchingBracketHighlighter::new(),
         hinter: HistoryHinter {},
-        colored_prompt: "".to_string(),
         validator: MatchingBracketValidator::new(),
+        colored_prompt: "".to_string(),
         env: env.clone(),
     };
     rl.set_helper(Some(h));
@@ -103,10 +102,9 @@ fn readline(prompt: impl ToString, rl: &mut Editor<DuneHelper>) -> String {
 #[derive(Helper)]
 struct DuneHelper {
     completer: FilenameCompleter,
-    highlighter: MatchingBracketHighlighter,
-    validator: MatchingBracketValidator,
     hinter: HistoryHinter,
     colored_prompt: String,
+    validator: MatchingBracketValidator,
     env: Environment,
 }
 
@@ -306,17 +304,11 @@ impl Highlighter for DuneHelper {
         Owned("\x1b[1m".to_owned() + hint + "\x1b[m")
     }
 
-    fn highlight<'l>(&self, line: &'l str, pos: usize) -> Cow<'l, str> {
-        match self.highlighter.highlight(line, pos) {
-            Owned(x) => Owned(syntax_highlight(&x)),
-            Borrowed(x) => Owned(syntax_highlight(x)),
-        }
+    fn highlight<'l>(&self, line: &'l str, _pos: usize) -> Cow<'l, str> {
+        Owned(syntax_highlight(line))
     }
 
-    fn highlight_char(&self, line: &str, pos: usize) -> bool {
-        if self.highlighter.highlight_char(line, pos) {
-            return true;
-        }
+    fn highlight_char(&self, line: &str, _pos: usize) -> bool {
         syntax_highlight(line) != line
     }
 }
