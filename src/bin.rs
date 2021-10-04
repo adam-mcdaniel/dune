@@ -5,7 +5,7 @@ use dune::{parse_script, Builtin, Environment, Error, Expression, Int, SyntaxErr
 
 use rustyline::completion::{Completer, FilenameCompleter, Pair as PairComplete};
 use rustyline::config::OutputStreamType;
-use rustyline::highlight::{Highlighter};
+use rustyline::highlight::Highlighter;
 use rustyline::hint::{Hinter, HistoryHinter};
 use rustyline::validate::{
     MatchingBracketValidator, ValidationContext, ValidationResult, Validator,
