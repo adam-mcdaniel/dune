@@ -10,7 +10,7 @@ use rustyline::hint::{Hinter, HistoryHinter};
 use rustyline::validate::{
     MatchingBracketValidator, ValidationContext, ValidationResult, Validator,
 };
-use rustyline::{error::ReadlineError, Editor, Helper};
+use rustyline::{error::ReadlineError, Editor};
 use rustyline::{CompletionType, Config, Context, EditMode};
 use rustyline_derive::Helper;
 
@@ -58,9 +58,36 @@ fn new_editor(env: &Environment) -> Editor<DuneHelper> {
     rl
 }
 
-fn readline(prompt: impl ToString, rl: &mut Editor<impl Helper>) -> String {
+fn strip_ansi_escapes(text: impl ToString) -> String {
+    let text = text.to_string();
+
+    let mut result = String::new();
+    let mut is_in_escape = false;
+    for ch in text.chars() {
+        // If this is the start of a new escape
+        if ch == '\x1b' {
+            is_in_escape = true;
+        // If this is the end of an escape
+        } else if is_in_escape && ch == 'm' {
+            is_in_escape = false;
+        // If this is any other sort of text
+        } else if !is_in_escape {
+            result.push(ch);
+        }
+    }
+
+    result
+}
+
+fn readline(prompt: impl ToString, rl: &mut Editor<DuneHelper>) -> String {
+    let prompt = prompt.to_string();
     loop {
-        match rl.readline(&prompt.to_string()) {
+        // This MUST be called to update the prompt.
+        if let Some(helper) = rl.helper_mut() {
+            helper.set_prompt(&prompt);
+        }
+
+        match rl.readline(&strip_ansi_escapes(&prompt)) {
             Ok(line) => return line,
             Err(ReadlineError::Interrupted) => {
                 return String::new();
@@ -84,6 +111,9 @@ struct DuneHelper {
 }
 
 impl DuneHelper {
+    /// This method MUST be called to update the prompt.
+    /// If this method is not called, the prompt will not
+    /// update.
     fn set_prompt(&mut self, prompt: impl ToString) {
         self.colored_prompt = prompt.to_string();
     }
@@ -266,15 +296,10 @@ impl Hinter for DuneHelper {
 impl Highlighter for DuneHelper {
     fn highlight_prompt<'b, 's: 'b, 'p: 'b>(
         &'s self,
-        prompt: &'p str,
+        _prompt: &'p str,
         _default: bool,
     ) -> Cow<'b, str> {
-        // if default {
-        //     Borrowed(&self.colored_prompt)
-        // } else {
-        //     Borrowed(prompt)
-        // }
-        Borrowed(prompt)
+        Borrowed(&self.colored_prompt)
     }
 
     fn highlight_hint<'h>(&self, hint: &'h str) -> Cow<'h, str> {
@@ -1381,6 +1406,11 @@ fn main() -> Result<(), Error> {
     env.define(
         "fmt",
         b_tree_map! {
+            String::from("strip") => Expression::builtin("strip", |args, env| {
+                check_exact_args_len("strip", &args, 1)?;
+                Ok(strip_ansi_escapes(args[0].eval(env)?).into())
+            }, "strips all colors and styling from a string"),
+
             String::from("wrap") => Expression::builtin("wrap", |args, env| {
                 check_exact_args_len("wrap", &args, 2)?;
                 match args[1].eval(env)? {
