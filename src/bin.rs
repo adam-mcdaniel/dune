@@ -590,6 +590,7 @@ fn copy_path(src: &Path, dst: &Path) -> Result<(), Error> {
         return Ok(());
     }
 
+    // If the destination exists, simply throw an error.
     if dst.exists() {
         return Err(Error::CustomError(format!(
             "destination {} already exists",
@@ -597,7 +598,9 @@ fn copy_path(src: &Path, dst: &Path) -> Result<(), Error> {
         )));
     }
 
+    // If the source is a directory, recursively copy the directory.
     if src.is_dir() {
+        // Create the destination directory and all of its parents.
         if std::fs::create_dir_all(dst).is_err() {
             return Err(Error::CustomError(format!(
                 "could not create directory {}",
@@ -605,13 +608,18 @@ fn copy_path(src: &Path, dst: &Path) -> Result<(), Error> {
             )));
         }
 
+        // Get the entries of the source directory
         if let Ok(entries) = std::fs::read_dir(src) {
             for entry in entries {
+                // For every valid entry, copy it to the destination recursively.
                 if let Ok(entry) = entry {
+                    // Get the source file's new path relative to the destination
                     let path = entry.path();
                     let dst_path = dst.join(entry.file_name());
+                    // Copy the path to its destination.
                     copy_path(&path, &dst_path)?;
                 } else {
+                    // If an entry is not valid, throw an error.
                     return Err(Error::CustomError(format!(
                         "could not read directory {}",
                         src.display()
@@ -619,12 +627,15 @@ fn copy_path(src: &Path, dst: &Path) -> Result<(), Error> {
                 }
             }
         } else {
+            // If we cannot read the entries of the source directory, throw an error.
             return Err(Error::CustomError(format!(
                 "could not create directory {}",
                 dst.display()
             )));
         }
+    // If the directory is a file, try to copy it.
     } else if std::fs::copy(src, dst).is_err() {
+        // If copying the file fails, throw an error.
         return Err(Error::CustomError(format!(
             "could not copy file {} to {}",
             src.display(),
