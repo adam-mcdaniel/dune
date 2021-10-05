@@ -138,6 +138,7 @@ To get the current release build, install from [crates.io](https://crates.io/cra
 # Also works for updating dune
 cargo install -f dune
 ```
+_Currently, since Dune is in its early stages of development, I would recommend against using releases at the moment. There are a lot of bug fixes and new features added inbetween releases._
 
 #### After Install
 
