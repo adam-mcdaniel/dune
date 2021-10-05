@@ -690,7 +690,7 @@ fn remove_path(path: &Path) -> Result<(), Error> {
     Ok(())
 }
 
-/// Removes a file or directory from the file system.
+/// Returns the paths of entries in a directory as a list of strings.
 fn list_directory(dir: &Path) -> Result<Expression, Error> {
     if dir.is_dir() {
         // The list of paths (as strings) in the directory we will return.
