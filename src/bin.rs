@@ -1359,6 +1359,17 @@ fn main() -> Result<(), Error> {
         "fs",
         b_tree_map! {
             String::from("dirs") => dir_tree.into(),
+            String::from("canon") => Expression::builtin("canon", |args, env| {
+                check_exact_args_len("canon", &args, 1)?;
+                let cwd = PathBuf::from(env.get_cwd());
+                let path = cwd.join(args[0].eval(env)?.to_string());
+
+                if let Ok(canon_path) = dunce::canonicalize(&path) {
+                    Ok(canon_path.into_os_string().into_string().unwrap().into())
+                } else {
+                    Err(Error::CustomError(format!("could not canonicalize path {}", path.display())))
+                }
+            }, "resolve, normalize, and absolutize a relative path"),
             String::from("mkdir") => Expression::builtin("mkdir", |args, env| {
                 check_exact_args_len("mkdir", &args, 1)?;
                 let cwd = PathBuf::from(env.get_cwd());
