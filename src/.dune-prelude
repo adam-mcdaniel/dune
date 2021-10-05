@@ -17,7 +17,7 @@
 #
 
 if os@name == "windows" {
-    let ls = dir ~> fs@ls dir | join "," | echo;
+    let ls = dir ~> fs@ls dir | join "\n" | echo;
     let rm = fs@rm;
     let cp = fs@cp;
     let mv = fs@mv;
