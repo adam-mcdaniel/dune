@@ -16,6 +16,17 @@
 # |_|   |_|  \___|_|\__,_|\__,_|\___|
 #
 
+if os@name == "windows" {
+    let ls = dir ~> fs@ls dir | join "," | echo;
+    let rm = fs@rm;
+    let cp = fs@cp;
+    let mv = fs@mv;
+    let mkdir = fs@mkdir;
+    let rmdir = fs@rmdir;
+
+    let cat = fs@read;
+}
+
 console@title "Dune";
 
 let donate = _ ~> {
