@@ -586,6 +586,10 @@ fn expr_to_command<'a>(
 
 /// Copy one path to another path.
 fn copy_path(src: &Path, dst: &Path) -> Result<(), Error> {
+    if src == dst {
+        return Ok(());
+    }
+    
     if dst.exists() {
         return Err(Error::CustomError(format!(
             "destination {} already exists",
@@ -632,6 +636,10 @@ fn copy_path(src: &Path, dst: &Path) -> Result<(), Error> {
 
 /// Moves one path to another path.
 fn move_path(src: &Path, dst: &Path) -> Result<(), Error> {
+    if src == dst {
+        return Ok(());
+    }
+
     // If the destination exists, simply throw an error.
     if dst.exists() {
         return Err(Error::CustomError(format!(
