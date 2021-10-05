@@ -1616,6 +1616,11 @@ fn main() -> Result<(), Error> {
                 );
                 Ok(Expression::None)
             }, "set the title of the console"),
+            String::from("clear") => Expression::builtin("clear", |args, _| {
+                check_exact_args_len("clear", &args, 1)?;
+                print!("\x1b[2J\x1b[H");
+                Ok(Expression::None)
+            }, "clear the console"),
         }
         .into(),
     );
@@ -2588,6 +2593,7 @@ $ let cat = 'bat
         "a fun builtin function for playing chess!",
     );
 
+    parse("let clear = _ ~> console@clear ()")?.eval(&mut env)?;
     parse("let pwd = _ ~> echo CWD")?.eval(&mut env)?;
     parse("let join = sep -> list -> { let sep = str sep; fn@reduce (x -> y -> x + sep + (str y)) (str list@0) (tail list) }")?.eval(&mut env)?;
 
