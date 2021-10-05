@@ -589,7 +589,7 @@ fn copy_path(src: &Path, dst: &Path) -> Result<(), Error> {
     if src == dst {
         return Ok(());
     }
-    
+
     if dst.exists() {
         return Err(Error::CustomError(format!(
             "destination {} already exists",
