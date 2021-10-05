@@ -24,7 +24,7 @@ use std::{
     borrow::Cow::{self, Borrowed, Owned},
     env::current_exe,
     io::Write,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{exit, Command, Stdio},
     sync::{Arc, Mutex},
     thread::sleep,
@@ -582,6 +582,119 @@ fn expr_to_command<'a>(
         // Other types of expressions cannot be commands.
         _ => None,
     })
+}
+
+
+/// Copy one path to another path.
+fn copy_path(src: &Path, dst: &Path) -> Result<(), Error> {
+    if dst.exists() {
+        return Err(Error::CustomError(format!("destination {} already exists", dst.display())));
+    }
+    
+    if src.is_dir() {
+        if std::fs::create_dir_all(dst).is_err() {
+            return Err(Error::CustomError(format!("could not create directory {}", dst.display())));
+        }
+
+        if let Ok(entries) = std::fs::read_dir(src) {
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    let path = entry.path();
+                    let dst_path = dst.join(entry.file_name());
+                    copy_path(&path, &dst_path)?;
+                } else {
+                    return Err(Error::CustomError(format!("could not read directory {}", src.display())));
+                }
+            }
+        } else {
+            return Err(Error::CustomError(format!("could not create directory {}", dst.display())));
+        }
+    } else {
+        if std::fs::copy(src, dst).is_err() {
+            return Err(Error::CustomError(format!("could not copy file {} to {}", src.display(), dst.display())));
+        }
+    }
+    Ok(())
+}
+
+/// Moves one path to another path.
+fn move_path(src: &Path, dst: &Path) -> Result<(), Error> {
+    if dst.exists() {
+        return Err(Error::CustomError(format!("destination {} already exists", dst.display())));
+    }
+
+    if src.is_dir() {
+        if std::fs::create_dir_all(dst).is_err() {
+            return Err(Error::CustomError(format!("could not create directory {}", dst.display())));
+        }
+
+        if let Ok(entries) = std::fs::read_dir(src) {
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    let path = entry.path();
+                    let dst_path = dst.join(entry.file_name());
+                    move_path(&path, &dst_path)?;
+                } else {
+                    return Err(Error::CustomError(format!("could not read directory {}", src.display())));
+                }
+            }
+        } else {
+            return Err(Error::CustomError(format!("could not create directory {}", dst.display())));
+        }
+        if std::fs::remove_dir(src).is_err() {
+            return Err(Error::CustomError(format!("could not remove directory {}", src.display())));
+        }
+    } else {
+        if std::fs::rename(src, dst).is_err() {
+            return Err(Error::CustomError(format!("could not move file {} to {}", src.display(), dst.display())));
+        }
+    }
+
+    Ok(())
+}
+
+/// Removes a file or directory from the file system.
+fn remove_path(path: &Path) -> Result<(), Error> {
+    if path.is_dir() {
+        if std::fs::remove_dir_all(path).is_err() {
+            return Err(Error::CustomError(format!("could not remove directory {}", path.display())));
+        }
+    } else {
+        if std::fs::remove_file(path).is_err() {
+            return Err(Error::CustomError(format!("could not remove file {}", path.display())));
+        }
+    }
+
+    Ok(())
+}
+
+/// Removes a file or directory from the file system.
+fn list_directory(dir: &Path) -> Result<Expression, Error> {
+    if dir.is_dir() {
+        let mut result = vec![];
+
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    let file_name_osstring = entry.file_name();
+                    result.push(match file_name_osstring.into_string() {
+                        Ok(file_name) => file_name,
+                        Err(file_name) => file_name.to_string_lossy().to_string()
+                    });
+                } else {
+                    return Err(Error::CustomError(format!("could not read entries in {}", dir.display())));
+                }
+            }
+        } else {
+            return Err(Error::CustomError(format!("could not read directory {}", dir.display())));
+        }
+
+        Ok(result.into())
+    } else if dir.is_file(){
+        return Ok(Expression::List(vec![format!("{}", dir.display()).into()]))
+    } else {
+        return Err(Error::CustomError(format!("{} does not exist", dir.display())))
+    }
 }
 
 fn main() -> Result<(), Error> {
@@ -1214,6 +1327,64 @@ fn main() -> Result<(), Error> {
         "fs",
         b_tree_map! {
             String::from("dirs") => dir_tree.into(),
+            String::from("mkdir") => Expression::builtin("mkdir", |args, env| {
+                check_exact_args_len("mkdir", &args, 1)?;
+                let cwd = PathBuf::from(env.get_cwd());
+                let dir = cwd.join(args[0].eval(env)?.to_string());
+
+                if std::fs::create_dir_all(&dir).is_err() {
+                    return Err(Error::CustomError(format!("could not create directory {}", dir.display())));
+                }
+
+                Ok(Expression::None)
+            }, "create a directory and all its required parent directories"),
+            String::from("rmdir") => Expression::builtin("rmdir", |args, env| {
+                check_exact_args_len("rmdir", &args, 1)?;
+                let cwd = PathBuf::from(env.get_cwd());
+                let dir = cwd.join(args[0].eval(env)?.to_string());
+
+                if std::fs::remove_dir(&dir).is_err() {
+                    return Err(Error::CustomError(format!("could not remove directory {}, is it empty?", dir.display())));
+                }
+
+                Ok(Expression::None)
+            }, "remove an empty directory"),
+            String::from("mv") => Expression::builtin("mv", |args, env| {
+                check_exact_args_len("mv", &args, 2)?;
+                let cwd = PathBuf::from(env.get_cwd());
+                let src = cwd.join(args[0].eval(env)?.to_string());
+                let dst = cwd.join(args[1].eval(env)?.to_string());
+
+                move_path(&src, &dst)?;
+
+                Ok(Expression::None)
+            }, "move a source path to a destination path"),
+            String::from("cp") => Expression::builtin("cp", |args, env| {
+                check_exact_args_len("cp", &args, 2)?;
+                let cwd = PathBuf::from(env.get_cwd());
+                let src = cwd.join(args[0].eval(env)?.to_string());
+                let dst = cwd.join(args[1].eval(env)?.to_string());
+
+                copy_path(&src, &dst)?;
+
+                Ok(Expression::None)
+            }, "copy a source path to a destination path"),
+            String::from("rm") => Expression::builtin("rm", |args, env| {
+                check_exact_args_len("rm", &args, 1)?;
+                let cwd = PathBuf::from(env.get_cwd());
+                let path = cwd.join(args[0].eval(env)?.to_string());
+
+                remove_path(&path)?;
+
+                Ok(Expression::None)
+            }, "remove a file or directory from the filesystem"),
+            String::from("ls") => Expression::builtin("ls", |args, env| {
+                check_exact_args_len("ls", &args, 1)?;
+                let cwd = PathBuf::from(env.get_cwd());
+                let dir = cwd.join(args[0].eval(env)?.to_string());
+
+                list_directory(&dir)
+            }, "retrieve the entries of a given directory as a list of strings"),
             String::from("exists") => Expression::builtin("exists", |args, env| {
                 check_exact_args_len("exists", &args, 1)?;
                 let path = PathBuf::from(env.get_cwd());
@@ -2193,6 +2364,38 @@ $ let cat = 'bat
     );
 
     env.define_builtin(
+        "head",
+        |args, env| match args[0].eval(env)? {
+            Expression::List(x) => Ok(if x.is_empty() {
+                Expression::None
+            } else {
+                x[0].clone()
+            }.into()),
+            otherwise => Err(Error::CustomError(format!(
+                "cannot get the head of a non-list {}",
+                otherwise
+            ))),
+        },
+        "get the first item in a list",
+    );
+
+    env.define_builtin(
+        "tail",
+        |args, env| match args[0].eval(env)? {
+            Expression::List(x) => Ok(if x.is_empty() {
+                vec![]
+            } else {
+                x[1..].to_vec()
+            }.into()),
+            otherwise => Err(Error::CustomError(format!(
+                "cannot get the tail of a non-list {}",
+                otherwise
+            ))),
+        },
+        "get the last items in a list",
+    );
+
+    env.define_builtin(
         "lines",
         |args, env| match args[0].eval(env)? {
             Expression::String(x) => Ok(Expression::List(
@@ -2329,6 +2532,9 @@ $ let cat = 'bat
         },
         "a fun builtin function for playing chess!",
     );
+
+    parse("let pwd = _ ~> echo CWD")?.eval(&mut env)?;
+    parse("let join = sep -> list -> { let sep = str sep; fn@reduce (x -> y -> x + sep + (str y)) (str list@0) (tail list) }")?.eval(&mut env)?;
 
     parse("let redirect-out = file -> contents -> fs@write file contents")?.eval(&mut env)?;
 
