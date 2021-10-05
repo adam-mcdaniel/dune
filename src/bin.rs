@@ -584,16 +584,21 @@ fn expr_to_command<'a>(
     })
 }
 
-
 /// Copy one path to another path.
 fn copy_path(src: &Path, dst: &Path) -> Result<(), Error> {
     if dst.exists() {
-        return Err(Error::CustomError(format!("destination {} already exists", dst.display())));
+        return Err(Error::CustomError(format!(
+            "destination {} already exists",
+            dst.display()
+        )));
     }
-    
+
     if src.is_dir() {
         if std::fs::create_dir_all(dst).is_err() {
-            return Err(Error::CustomError(format!("could not create directory {}", dst.display())));
+            return Err(Error::CustomError(format!(
+                "could not create directory {}",
+                dst.display()
+            )));
         }
 
         if let Ok(entries) = std::fs::read_dir(src) {
@@ -603,16 +608,24 @@ fn copy_path(src: &Path, dst: &Path) -> Result<(), Error> {
                     let dst_path = dst.join(entry.file_name());
                     copy_path(&path, &dst_path)?;
                 } else {
-                    return Err(Error::CustomError(format!("could not read directory {}", src.display())));
+                    return Err(Error::CustomError(format!(
+                        "could not read directory {}",
+                        src.display()
+                    )));
                 }
             }
         } else {
-            return Err(Error::CustomError(format!("could not create directory {}", dst.display())));
+            return Err(Error::CustomError(format!(
+                "could not create directory {}",
+                dst.display()
+            )));
         }
-    } else {
-        if std::fs::copy(src, dst).is_err() {
-            return Err(Error::CustomError(format!("could not copy file {} to {}", src.display(), dst.display())));
-        }
+    } else if std::fs::copy(src, dst).is_err() {
+        return Err(Error::CustomError(format!(
+            "could not copy file {} to {}",
+            src.display(),
+            dst.display()
+        )));
     }
     Ok(())
 }
@@ -620,12 +633,18 @@ fn copy_path(src: &Path, dst: &Path) -> Result<(), Error> {
 /// Moves one path to another path.
 fn move_path(src: &Path, dst: &Path) -> Result<(), Error> {
     if dst.exists() {
-        return Err(Error::CustomError(format!("destination {} already exists", dst.display())));
+        return Err(Error::CustomError(format!(
+            "destination {} already exists",
+            dst.display()
+        )));
     }
 
     if src.is_dir() {
         if std::fs::create_dir_all(dst).is_err() {
-            return Err(Error::CustomError(format!("could not create directory {}", dst.display())));
+            return Err(Error::CustomError(format!(
+                "could not create directory {}",
+                dst.display()
+            )));
         }
 
         if let Ok(entries) = std::fs::read_dir(src) {
@@ -635,19 +654,30 @@ fn move_path(src: &Path, dst: &Path) -> Result<(), Error> {
                     let dst_path = dst.join(entry.file_name());
                     move_path(&path, &dst_path)?;
                 } else {
-                    return Err(Error::CustomError(format!("could not read directory {}", src.display())));
+                    return Err(Error::CustomError(format!(
+                        "could not read directory {}",
+                        src.display()
+                    )));
                 }
             }
         } else {
-            return Err(Error::CustomError(format!("could not create directory {}", dst.display())));
+            return Err(Error::CustomError(format!(
+                "could not create directory {}",
+                dst.display()
+            )));
         }
         if std::fs::remove_dir(src).is_err() {
-            return Err(Error::CustomError(format!("could not remove directory {}", src.display())));
+            return Err(Error::CustomError(format!(
+                "could not remove directory {}",
+                src.display()
+            )));
         }
-    } else {
-        if std::fs::rename(src, dst).is_err() {
-            return Err(Error::CustomError(format!("could not move file {} to {}", src.display(), dst.display())));
-        }
+    } else if std::fs::rename(src, dst).is_err() {
+        return Err(Error::CustomError(format!(
+            "could not move file {} to {}",
+            src.display(),
+            dst.display()
+        )));
     }
 
     Ok(())
@@ -657,12 +687,16 @@ fn move_path(src: &Path, dst: &Path) -> Result<(), Error> {
 fn remove_path(path: &Path) -> Result<(), Error> {
     if path.is_dir() {
         if std::fs::remove_dir_all(path).is_err() {
-            return Err(Error::CustomError(format!("could not remove directory {}", path.display())));
+            return Err(Error::CustomError(format!(
+                "could not remove directory {}",
+                path.display()
+            )));
         }
-    } else {
-        if std::fs::remove_file(path).is_err() {
-            return Err(Error::CustomError(format!("could not remove file {}", path.display())));
-        }
+    } else if std::fs::remove_file(path).is_err() {
+        return Err(Error::CustomError(format!(
+            "could not remove file {}",
+            path.display()
+        )));
     }
 
     Ok(())
@@ -679,21 +713,30 @@ fn list_directory(dir: &Path) -> Result<Expression, Error> {
                     let file_name_osstring = entry.file_name();
                     result.push(match file_name_osstring.into_string() {
                         Ok(file_name) => file_name,
-                        Err(file_name) => file_name.to_string_lossy().to_string()
+                        Err(file_name) => file_name.to_string_lossy().to_string(),
                     });
                 } else {
-                    return Err(Error::CustomError(format!("could not read entries in {}", dir.display())));
+                    return Err(Error::CustomError(format!(
+                        "could not read entries in {}",
+                        dir.display()
+                    )));
                 }
             }
         } else {
-            return Err(Error::CustomError(format!("could not read directory {}", dir.display())));
+            return Err(Error::CustomError(format!(
+                "could not read directory {}",
+                dir.display()
+            )));
         }
 
         Ok(result.into())
-    } else if dir.is_file(){
-        return Ok(Expression::List(vec![format!("{}", dir.display()).into()]))
+    } else if dir.is_file() {
+        return Ok(Expression::List(vec![format!("{}", dir.display()).into()]));
     } else {
-        return Err(Error::CustomError(format!("{} does not exist", dir.display())))
+        return Err(Error::CustomError(format!(
+            "{} does not exist",
+            dir.display()
+        )));
     }
 }
 
@@ -2370,7 +2413,7 @@ $ let cat = 'bat
                 Expression::None
             } else {
                 x[0].clone()
-            }.into()),
+            }),
             otherwise => Err(Error::CustomError(format!(
                 "cannot get the head of a non-list {}",
                 otherwise
@@ -2386,7 +2429,8 @@ $ let cat = 'bat
                 vec![]
             } else {
                 x[1..].to_vec()
-            }.into()),
+            }
+            .into()),
             otherwise => Err(Error::CustomError(format!(
                 "cannot get the tail of a non-list {}",
                 otherwise
