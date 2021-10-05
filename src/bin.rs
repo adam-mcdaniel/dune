@@ -632,6 +632,7 @@ fn copy_path(src: &Path, dst: &Path) -> Result<(), Error> {
 
 /// Moves one path to another path.
 fn move_path(src: &Path, dst: &Path) -> Result<(), Error> {
+    // If the destination exists, simply throw an error.
     if dst.exists() {
         return Err(Error::CustomError(format!(
             "destination {} already exists",
@@ -639,42 +640,10 @@ fn move_path(src: &Path, dst: &Path) -> Result<(), Error> {
         )));
     }
 
-    if src.is_dir() {
-        if std::fs::create_dir_all(dst).is_err() {
-            return Err(Error::CustomError(format!(
-                "could not create directory {}",
-                dst.display()
-            )));
-        }
-
-        if let Ok(entries) = std::fs::read_dir(src) {
-            for entry in entries {
-                if let Ok(entry) = entry {
-                    let path = entry.path();
-                    let dst_path = dst.join(entry.file_name());
-                    move_path(&path, &dst_path)?;
-                } else {
-                    return Err(Error::CustomError(format!(
-                        "could not read directory {}",
-                        src.display()
-                    )));
-                }
-            }
-        } else {
-            return Err(Error::CustomError(format!(
-                "could not create directory {}",
-                dst.display()
-            )));
-        }
-        if std::fs::remove_dir(src).is_err() {
-            return Err(Error::CustomError(format!(
-                "could not remove directory {}",
-                src.display()
-            )));
-        }
-    } else if std::fs::rename(src, dst).is_err() {
+    // Attempt to rename the source to the destination.
+    if std::fs::rename(src, dst).is_err() {
         return Err(Error::CustomError(format!(
-            "could not move file {} to {}",
+            "could not move {} to {}",
             src.display(),
             dst.display()
         )));
@@ -705,17 +674,25 @@ fn remove_path(path: &Path) -> Result<(), Error> {
 /// Removes a file or directory from the file system.
 fn list_directory(dir: &Path) -> Result<Expression, Error> {
     if dir.is_dir() {
+        // The list of paths (as strings) in the directory we will return.
         let mut result = vec![];
 
+        // Read the directory's items
         if let Ok(entries) = std::fs::read_dir(dir) {
             for entry in entries {
+                // For every valid entry in the directory,
+                // add it's filename as a string to the result list.
                 if let Ok(entry) = entry {
                     let file_name_osstring = entry.file_name();
                     result.push(match file_name_osstring.into_string() {
                         Ok(file_name) => file_name,
+                        // If we cannot directly convert the filename to a string,
+                        // it's probably an invalid UTF-8 string.
+                        // In this case, we remove the invalid bytes and try again.
                         Err(file_name) => file_name.to_string_lossy().to_string(),
                     });
                 } else {
+                    // If an entry is invalid, throw an error.
                     return Err(Error::CustomError(format!(
                         "could not read entries in {}",
                         dir.display()
@@ -723,16 +700,20 @@ fn list_directory(dir: &Path) -> Result<Expression, Error> {
                 }
             }
         } else {
+            // If we cannot read the directory's entries, throw an error.
             return Err(Error::CustomError(format!(
                 "could not read directory {}",
                 dir.display()
             )));
         }
 
+        // Return the list of paths as a list.
         Ok(result.into())
     } else if dir.is_file() {
+        // If the path is a file, return the file's name as a string in a list.
         return Ok(Expression::List(vec![format!("{}", dir.display()).into()]));
     } else {
+        // Otherwise, the path is neither a file nor a directory, so throw an error.
         return Err(Error::CustomError(format!(
             "{} does not exist",
             dir.display()
