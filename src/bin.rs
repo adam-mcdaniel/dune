@@ -1361,7 +1361,7 @@ fn main() -> Result<(), Error> {
                 }
 
                 Ok(Expression::None)
-            }, "create a directory and all its required parent directories"),
+            }, "create a directory and its parent directories"),
             String::from("rmdir") => Expression::builtin("rmdir", |args, env| {
                 check_exact_args_len("rmdir", &args, 1)?;
                 let cwd = PathBuf::from(env.get_cwd());
@@ -1408,7 +1408,7 @@ fn main() -> Result<(), Error> {
                 let dir = cwd.join(args[0].eval(env)?.to_string());
 
                 list_directory(&dir)
-            }, "retrieve the entries of a given directory as a list of strings"),
+            }, "get a directory's entries as a list of strings"),
             String::from("exists") => Expression::builtin("exists", |args, env| {
                 check_exact_args_len("exists", &args, 1)?;
                 let path = PathBuf::from(env.get_cwd());
@@ -1445,7 +1445,7 @@ fn main() -> Result<(), Error> {
                         Err(_) => Err(Error::CustomError(format!("could not read file {}", file)))
                     }
                 }
-            }, "read a file"),
+            }, "read a file's contents"),
 
             String::from("write") => Expression::builtin("write", |args, env| {
                 check_exact_args_len("write", &args, 2)?;
@@ -1467,7 +1467,7 @@ fn main() -> Result<(), Error> {
                     Ok(()) => Ok(Expression::None),
                     Err(e) => Err(Error::CustomError(format!("could not write to file {}: {:?}", file, e)))
                 }
-            }, "write to a file"),
+            }, "write to a file with some contents"),
         }
         .into(),
     );
