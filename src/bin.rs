@@ -131,45 +131,50 @@ impl Completer for DuneHelper {
         ctx: &Context<'_>,
     ) -> Result<(usize, Vec<PairComplete>), ReadlineError> {
         let mut path = PathBuf::from(self.env.get_cwd());
-        let mut segment = String::new();
-
-        if !line.is_empty() {
-            for (i, ch) in line.chars().enumerate() {
-                if ch.is_whitespace()
-                    || ch == ';'
-                    || ch == '\''
-                    || ch == '('
-                    || ch == ')'
-                    || ch == '{'
-                    || ch == '}'
-                    || ch == '"'
-                {
-                    segment = String::new();
-                } else {
-                    segment.push(ch);
+        if std::env::set_current_dir(&path).is_ok() {
+            self.completer.complete(line, pos, ctx)
+        } else {
+            let mut segment = String::new();
+    
+            if !line.is_empty() {
+                for (i, ch) in line.chars().enumerate() {
+                    if ch.is_whitespace()
+                        || ch == ';'
+                        || ch == '\''
+                        || ch == '"'
+                        || ch == '('
+                        || ch == ')'
+                        || ch == '{'
+                        || ch == '}'
+                        || ch == '"'
+                    {
+                        segment = String::new();
+                    } else {
+                        segment.push(ch);
+                    }
+    
+                    if i == pos {
+                        break;
+                    }
                 }
-
-                if i == pos {
-                    break;
+    
+                if !segment.is_empty() {
+                    path.push(segment.clone());
                 }
             }
-
-            if !segment.is_empty() {
-                path.push(segment.clone());
+    
+            let path_str = (path.into_os_string().into_string().unwrap()
+                + if segment.is_empty() { "/" } else { "" })
+            .replace("/./", "/")
+            .replace("//", "/");
+            let (pos, mut pairs) = self
+                .completer
+                .complete(path_str.as_str(), path_str.len(), ctx)?;
+            for pair in &mut pairs {
+                pair.replacement = String::from(line) + &pair.replacement.replace(&path_str, "");
             }
+            Ok((pos, pairs))
         }
-
-        let path_str = (path.into_os_string().into_string().unwrap()
-            + if segment.is_empty() { "/" } else { "" })
-        .replace("/./", "/")
-        .replace("//", "/");
-        let (pos, mut pairs) = self
-            .completer
-            .complete(path_str.as_str(), path_str.len(), ctx)?;
-        for pair in &mut pairs {
-            pair.replacement = String::from(line) + &pair.replacement.replace(&path_str, "");
-        }
-        Ok((pos, pairs))
     }
 }
 
