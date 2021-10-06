@@ -2487,6 +2487,7 @@ $ let cat = 'bat
         |args, env| match args[0].clone().eval(env)? {
             Expression::Symbol(path) | Expression::String(path) => {
                 if let Ok(new_cwd) = dunce::canonicalize(PathBuf::from(env.get_cwd()).join(path)) {
+                    match std::env::set_current_dir(&new_cwd) { _ => {} }
                     env.set_cwd(new_cwd.into_os_string().into_string().unwrap());
                 }
                 Ok(Expression::None)
