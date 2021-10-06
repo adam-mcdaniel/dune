@@ -135,7 +135,7 @@ impl Completer for DuneHelper {
             self.completer.complete(line, pos, ctx)
         } else {
             let mut segment = String::new();
-    
+
             if !line.is_empty() {
                 for (i, ch) in line.chars().enumerate() {
                     if ch.is_whitespace()
@@ -152,24 +152,24 @@ impl Completer for DuneHelper {
                     } else {
                         segment.push(ch);
                     }
-    
+
                     if i == pos {
                         break;
                     }
                 }
-    
+
                 if !segment.is_empty() {
                     path.push(segment.clone());
                 }
             }
-    
+
             let path_str = (path.into_os_string().into_string().unwrap()
                 + if segment.is_empty() { "/" } else { "" })
             .replace("/./", "/")
             .replace("//", "/");
-            let (pos, mut pairs) = self
-                .completer
-                .complete(path_str.as_str(), path_str.len(), ctx)?;
+            let (pos, mut pairs) =
+                self.completer
+                    .complete(path_str.as_str(), path_str.len(), ctx)?;
             for pair in &mut pairs {
                 pair.replacement = String::from(line) + &pair.replacement.replace(&path_str, "");
             }
@@ -2487,7 +2487,7 @@ $ let cat = 'bat
         |args, env| match args[0].clone().eval(env)? {
             Expression::Symbol(path) | Expression::String(path) => {
                 if let Ok(new_cwd) = dunce::canonicalize(PathBuf::from(env.get_cwd()).join(path)) {
-                    match std::env::set_current_dir(&new_cwd) { _ => {} }
+                    let _ = std::env::set_current_dir(&new_cwd);
                     env.set_cwd(new_cwd.into_os_string().into_string().unwrap());
                 }
                 Ok(Expression::None)
