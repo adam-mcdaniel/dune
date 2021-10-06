@@ -131,45 +131,49 @@ impl Completer for DuneHelper {
         ctx: &Context<'_>,
     ) -> Result<(usize, Vec<PairComplete>), ReadlineError> {
         let mut path = PathBuf::from(self.env.get_cwd());
-        let mut segment = String::new();
+        if std::env::set_current_dir(&path).is_ok() {
+            self.completer.complete(line, pos, ctx)
+        } else {
+            let mut segment = String::new();
 
-        if !line.is_empty() {
-            for (i, ch) in line.chars().enumerate() {
-                if ch.is_whitespace()
-                    || ch == ';'
-                    || ch == '\''
-                    || ch == '('
-                    || ch == ')'
-                    || ch == '{'
-                    || ch == '}'
-                    || ch == '"'
-                {
-                    segment = String::new();
-                } else {
-                    segment.push(ch);
+            if !line.is_empty() {
+                for (i, ch) in line.chars().enumerate() {
+                    if ch.is_whitespace()
+                        || ch == ';'
+                        || ch == '\''
+                        || ch == '('
+                        || ch == ')'
+                        || ch == '{'
+                        || ch == '}'
+                        || ch == '"'
+                    {
+                        segment = String::new();
+                    } else {
+                        segment.push(ch);
+                    }
+
+                    if i == pos {
+                        break;
+                    }
                 }
 
-                if i == pos {
-                    break;
+                if !segment.is_empty() {
+                    path.push(segment.clone());
                 }
             }
 
-            if !segment.is_empty() {
-                path.push(segment.clone());
+            let path_str = (path.into_os_string().into_string().unwrap()
+                + if segment.is_empty() { "/" } else { "" })
+            .replace("/./", "/")
+            .replace("//", "/");
+            let (pos, mut pairs) =
+                self.completer
+                    .complete(path_str.as_str(), path_str.len(), ctx)?;
+            for pair in &mut pairs {
+                pair.replacement = String::from(line) + &pair.replacement.replace(&path_str, "");
             }
+            Ok((pos, pairs))
         }
-
-        let path_str = (path.into_os_string().into_string().unwrap()
-            + if segment.is_empty() { "/" } else { "" })
-        .replace("/./", "/")
-        .replace("//", "/");
-        let (pos, mut pairs) = self
-            .completer
-            .complete(path_str.as_str(), path_str.len(), ctx)?;
-        for pair in &mut pairs {
-            pair.replacement = String::from(line) + &pair.replacement.replace(&path_str, "");
-        }
-        Ok((pos, pairs))
     }
 }
 
@@ -2482,6 +2486,11 @@ $ let cat = 'bat
         |args, env| match args[0].clone().eval(env)? {
             Expression::Symbol(path) | Expression::String(path) => {
                 if let Ok(new_cwd) = dunce::canonicalize(PathBuf::from(env.get_cwd()).join(path)) {
+                    // It's not necessary that this succeeds, because
+                    // Dune does everything relative to the `CWD` bound variable.
+                    // This is mostly to reduce any unintended behavior from
+                    // other libraries like `rustyline`.
+                    let _ = std::env::set_current_dir(&new_cwd);
                     env.set_cwd(new_cwd.into_os_string().into_string().unwrap());
                 }
                 Ok(Expression::None)
