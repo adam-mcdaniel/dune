@@ -2486,6 +2486,10 @@ $ let cat = 'bat
         |args, env| match args[0].clone().eval(env)? {
             Expression::Symbol(path) | Expression::String(path) => {
                 if let Ok(new_cwd) = dunce::canonicalize(PathBuf::from(env.get_cwd()).join(path)) {
+                    // It's not necessary that this succeeds, because
+                    // Dune does everything relative to the `CWD` bound variable.
+                    // This is mostly to reduce any unintended behavior from
+                    // other libraries like `rustyline`.
                     let _ = std::env::set_current_dir(&new_cwd);
                     env.set_cwd(new_cwd.into_os_string().into_string().unwrap());
                 }
