@@ -141,7 +141,6 @@ impl Completer for DuneHelper {
                     if ch.is_whitespace()
                         || ch == ';'
                         || ch == '\''
-                        || ch == '"'
                         || ch == '('
                         || ch == ')'
                         || ch == '{'
