@@ -118,6 +118,7 @@ For more information about each, just run `echo library-name`.
 ## Installation
 
 To install, you must download Rust from [here](https://www.rust-lang.org/).
+_If you already have Rust installed **you will probably need to update**. Dune uses a lot of recently stabilized features._
 
 #### Development Build
 
