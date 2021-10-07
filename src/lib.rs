@@ -12,4 +12,10 @@ pub use error::*;
 mod parser;
 pub use parser::*;
 
+mod tokens;
+pub use tokens::{Token, TokenKind};
+
+mod tokenizer;
+pub use tokenizer::*;
+
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

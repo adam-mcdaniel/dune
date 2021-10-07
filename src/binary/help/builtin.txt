@@ -36,4 +36,5 @@ Dune offers the following builtin functions:
 32. `gt`: returns true if the first expression is greater than the second.
 33. `lte`: returns true if the first expression is less than or equal to the second.
 34. `gte`: returns true if the first expression is greater than or equal to the second.
-35. `str`: returns the string representation of an expression."
+35. `unbind`: unbinds a variable from the current scope.
+36. `str`: returns the string representation of an expression.

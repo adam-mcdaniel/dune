@@ -10,12 +10,14 @@ mod fs_module;
 mod math_module;
 mod operator_module;
 mod os_module;
+mod pipe_module;
 mod rand_module;
 mod shell_module;
 mod time_module;
 mod widget_module;
 
 pub fn init_environment(env: &mut Environment) {
+    pipe_module::add_to(env);
     env.define("math", math_module::get());
     env.define("shell", shell_module::get());
     env.define("os", os_module::get());
@@ -264,6 +266,39 @@ pub fn init_environment(env: &mut Environment) {
     );
 
     env.define_builtin(
+        "head",
+        |args, env| match args[0].eval(env)? {
+            Expression::List(x) => Ok(if x.is_empty() {
+                Expression::None
+            } else {
+                x[0].clone()
+            }),
+            otherwise => Err(Error::CustomError(format!(
+                "cannot get the head of a non-list {}",
+                otherwise
+            ))),
+        },
+        "get the first item in a list",
+    );
+
+    env.define_builtin(
+        "tail",
+        |args, env| match args[0].eval(env)? {
+            Expression::List(x) => Ok(if x.is_empty() {
+                vec![]
+            } else {
+                x[1..].to_vec()
+            }
+            .into()),
+            otherwise => Err(Error::CustomError(format!(
+                "cannot get the tail of a non-list {}",
+                otherwise
+            ))),
+        },
+        "get the last items in a list",
+    );
+
+    env.define_builtin(
         "lines",
         |args, env| match args[0].eval(env)? {
             Expression::String(x) => Ok(Expression::List(
@@ -290,6 +325,11 @@ pub fn init_environment(env: &mut Environment) {
         |args, env| match args[0].clone().eval(env)? {
             Expression::Symbol(path) | Expression::String(path) => {
                 if let Ok(new_cwd) = dunce::canonicalize(PathBuf::from(env.get_cwd()).join(path)) {
+                    // It's not necessary that this succeeds, because
+                    // Dune does everything relative to the `CWD` bound variable.
+                    // This is mostly to reduce any unintended behavior from
+                    // other libraries like `rustyline`.
+                    let _ = std::env::set_current_dir(&new_cwd);
                     env.set_cwd(new_cwd.into_os_string().into_string().unwrap());
                 }
                 Ok(Expression::None)
@@ -302,24 +342,23 @@ pub fn init_environment(env: &mut Environment) {
         "change directories",
     );
 
-    // env.define_builtin(
-    //     "prompt",
-    //     |_, env| Ok(Expression::String(format!("{}$ ", env.get_cwd()))),
-    //     "default prompt",
-    // );
-
-    // env.define_builtin(
-    //     "incomplete_prompt",
-    //     |_, env| {
-    //         Ok(Expression::String(format!(
-    //             "{}> ",
-    //             " ".repeat(env.get_cwd().len())
-    //         )))
-    //     },
-    //     "default prompt for incomplete commands",
-    // );
-    // let prompt = cwd -> fmt@bold ((fmt@dark@blue "(dune) ") + (fmt@bold (fmt@dark@green cwd)) + (fmt@bold (fmt@dark@blue "$ ")));
-    // let incomplete_prompt = cwd -> ((len cwd) + (len "(dune) ")) * " " + (fmt@bold (fmt@dark@yellow "> "));
+    env.define_builtin(
+        "unbind",
+        |args, env| {
+            check_exact_args_len("unbind", &args, 1)?;
+            match &args[0] {
+                Expression::Symbol(x) | Expression::String(x) => env.undefine(x),
+                _ => {
+                    return Err(Error::CustomError(format!(
+                        "expected string or symbol, but got {:?}",
+                        args[0]
+                    )))
+                }
+            }
+            Ok(Expression::None)
+        },
+        "unbind a variable from the environment",
+    );
 
     env.define_builtin("chess", chess_module::chess_fn, chess_module::HELP);
 

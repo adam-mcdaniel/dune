@@ -1,17 +1,15 @@
 use nom::{
     branch::alt,
-    bytes::complete::tag,
-    character::complete::one_of,
     combinator::{eof, map, opt},
     error::{ErrorKind, ParseError},
-    multi::{count, many0, many1, separated_list0},
-    sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
+    multi::{many0, many1, separated_list0},
+    sequence::{pair, preceded, separated_pair, terminated},
     IResult,
 };
 
 use std::collections::BTreeMap;
 
-use super::{Environment, Expression, Int};
+use super::{tokens::Tokens, Environment, Expression, Int, Token, TokenKind};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SyntaxError {
@@ -28,14 +26,15 @@ pub enum SyntaxError {
 }
 
 impl SyntaxError {
-    fn unrecoverable<A, B, T>(
-        input: T,
-        expected: T,
-        found: Option<T>,
-        hint: Option<T>,
+    pub(crate) fn unrecoverable<A, B, T1, T2>(
+        input: T1,
+        expected: T2,
+        found: Option<T2>,
+        hint: Option<T2>,
     ) -> IResult<A, B, Self>
     where
-        T: ToString,
+        T1: ToString,
+        T2: ToString,
     {
         Err(nom::Err::Failure(Self::Expected {
             input: input.to_string(),
@@ -45,14 +44,15 @@ impl SyntaxError {
         }))
     }
 
-    fn expected<A, B, T>(
-        input: T,
-        expected: T,
-        found: Option<T>,
-        hint: Option<T>,
+    pub(crate) fn expected<A, B, T1, T2>(
+        input: T1,
+        expected: T2,
+        found: Option<T2>,
+        hint: Option<T2>,
     ) -> IResult<A, B, Self>
     where
-        T: ToString,
+        T1: ToString,
+        T2: ToString,
     {
         Err(nom::Err::Error(Self::Expected {
             input: input.to_string(),
@@ -60,6 +60,24 @@ impl SyntaxError {
             found: found.map(|x| x.to_string()),
             hint: hint.map(|x| x.to_string()),
         }))
+    }
+
+    pub(crate) fn expected_err<T1, T2>(
+        input: T1,
+        expected: T2,
+        found: Option<T2>,
+        hint: Option<T2>,
+    ) -> nom::Err<Self>
+    where
+        T1: ToString,
+        T2: ToString,
+    {
+        nom::Err::Error(Self::Expected {
+            input: input.to_string(),
+            expected: expected.to_string(),
+            found: found.map(|x| x.to_string()),
+            hint: hint.map(|x| x.to_string()),
+        })
     }
 }
 
@@ -98,33 +116,89 @@ where
     }
 }
 
-const ASCII_ALPHA: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const ASCII_ALPHANUMERIC: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-const ASCII_NONZERO_DIGIT: &str = "123456789";
-const ASCII_DIGIT: &str = "0123456789";
-const ASCII_HEX_DIGIT: &str = "0123456789ABCDEFabcdef";
+fn kind(kind: TokenKind) -> impl Fn(Tokens<'_>) -> IResult<Tokens<'_>, &str, SyntaxError> {
+    move |input: Tokens<'_>| match input.first() {
+        Some(&token) if token.kind == kind => Ok((input.skip_n(1), token.text)),
+        _ => Err(nom::Err::Error(SyntaxError::InternalError)),
+    }
+}
 
-const ALLOWED_SYMBOL_PUNCTUATION: &'static str = "_+-.~\\/?&<>$%#^:";
+fn text<'a>(text: &'a str) -> impl Fn(Tokens<'a>) -> IResult<Tokens<'a>, Token<'a>, SyntaxError> {
+    move |input: Tokens<'a>| match input.first() {
+        Some(&token) if token.text == text => Ok((input.skip_n(1), token)),
+        _ => Err(nom::Err::Error(SyntaxError::InternalError)),
+    }
+}
 
-pub fn parse_script(input: &str, require_eof: bool) -> IResult<&str, Expression, SyntaxError> {
-    let (input, _) = try_parse_ws(input)?;
+fn empty(input: Tokens<'_>) -> IResult<Tokens<'_>, (), SyntaxError> {
+    match input.first() {
+        None => Ok((input, ())),
+        _ => Err(nom::Err::Error(SyntaxError::InternalError)),
+    }
+}
+
+pub fn parse_script(input: &str) -> Result<Expression, nom::Err<SyntaxError>> {
+    let (_, mut tokens) = super::parse_tokens(input)?;
+
+    for &token in &tokens {
+        if token.kind == TokenKind::Other {
+            return Err(nom::Err::Failure(SyntaxError::CustomError(format!(
+                "Illegal character `{}`",
+                token.text
+            ))));
+        }
+    }
+
+    for window in tokens.windows(2) {
+        let (a, b) = (window[0], window[1]);
+        if is_symbol_like(a.kind) && is_symbol_like(b.kind) {
+            return Err(nom::Err::Failure(SyntaxError::Expected {
+                input: input.to_string(),
+                expected: "whitespace".to_string(),
+                found: Some(b.text.to_string()),
+                hint: None,
+            }));
+        }
+    }
+    // remove whitespace
+    tokens.retain(|t| !matches!(t.kind, TokenKind::Whitespace | TokenKind::Comment));
+
+    let (_, expr) = parse_script_tokens(Tokens(tokens.as_slice()), true)?;
+    Ok(expr)
+}
+
+fn is_symbol_like(kind: TokenKind) -> bool {
+    matches!(
+        kind,
+        TokenKind::Symbol
+            | TokenKind::Keyword
+            | TokenKind::Operator
+            | TokenKind::BooleanLiteral
+            | TokenKind::FloatLiteral
+            | TokenKind::IntegerLiteral
+    )
+}
+
+fn parse_script_tokens(
+    input: Tokens<'_>,
+    require_eof: bool,
+) -> IResult<Tokens<'_>, Expression, SyntaxError> {
     let (input, mut exprs) = many0(alt((
-        terminated(parse_if, pair(try_parse_ws, opt(tag(";")))),
-        terminated(parse_for_loop, pair(try_parse_ws, opt(tag(";")))),
-        terminated(parse_expression, pair(try_parse_ws, tag(";"))),
+        terminated(parse_if, opt(text(";"))),
+        terminated(parse_for_loop, opt(text(";"))),
+        terminated(parse_expression, text(";")),
     )))(input)?;
 
     let (input, last) = opt(alt((
-        terminated(parse_if, pair(try_parse_ws, opt(tag(";")))),
-        terminated(parse_for_loop, pair(try_parse_ws, opt(tag(";")))),
-        terminated(parse_expression, pair(try_parse_ws, opt(tag(";")))),
+        terminated(parse_if, opt(text(";"))),
+        terminated(parse_for_loop, opt(text(";"))),
+        terminated(parse_expression, opt(text(";"))),
     )))(input)?;
 
     if let Some(expr) = last {
         exprs.push(expr);
     }
 
-    let (input, _) = try_parse_ws(input)?;
     if require_eof {
         let (input, _) = eof(input)?;
         Ok((input, Expression::Do(exprs)))
@@ -133,268 +207,69 @@ pub fn parse_script(input: &str, require_eof: bool) -> IResult<&str, Expression,
     }
 }
 
-fn try_parse_ws(input: &str) -> IResult<&str, (), SyntaxError> {
-    let (i, _) = many0(one_of(" \r\t\n"))(input)?;
-    Ok((i, ()))
+fn parse_symbol(input: Tokens<'_>) -> IResult<Tokens<'_>, String, SyntaxError> {
+    map(kind(TokenKind::Symbol), |t| t.to_string())(input)
 }
 
-fn parse_ws(input: &str) -> IResult<&str, (), SyntaxError> {
-    let (i, _) = many1(one_of(" \r\t\n"))(input)?;
-    Ok((i, ()))
+fn parse_integer(input: Tokens<'_>) -> IResult<Tokens<'_>, Int, SyntaxError> {
+    let (new_input, num) = kind(TokenKind::IntegerLiteral)(input)?;
+    let num = num
+        .parse::<Int>()
+        .map_err(|_| SyntaxError::expected_err(input, "integer", Some(num), None))?;
+    Ok((new_input, num))
 }
 
-fn parse_keyword(input: &str) -> IResult<&str, &str, SyntaxError> {
-    alt((
-        tag("False"),
-        tag("True"),
-        tag("None"),
-        tag("then"),
-        tag("else"),
-        tag("let"),
-        tag("for"),
-        tag("if"),
-        tag("in"),
-        tag("to"),
-        tag("->"),
-        tag("~>"),
-        alt((
-            tag("=="),
-            tag("!="),
-            tag(">="),
-            tag("<="),
-            tag("&&"),
-            tag("||"),
-            tag("//"),
-            tag("<"),
-            tag(">"),
-            tag("+"),
-            tag("-"),
-            tag("'"),
-            tag("@"),
-        )),
-    ))(input)
-}
-
-fn parse_symbol(input: &str) -> IResult<&str, String, SyntaxError> {
-    match tuple((parse_keyword, parse_ws))(input) {
-        Ok(_) => SyntaxError::expected(
-            input,
-            "symbol",
-            Some("keyword"),
-            Some("try using an unreserved symbol"),
-        ),
-        Err(_) => {
-            let old_input = input;
-
-            let (input, head) = alt((one_of(ASCII_ALPHA), one_of(ALLOWED_SYMBOL_PUNCTUATION)))(input)?;
-
-            let (input, tail) = many0(alt((
-                one_of(ASCII_ALPHANUMERIC),
-                one_of(ALLOWED_SYMBOL_PUNCTUATION),
-            )))(input)?;
-
-            let mut result = String::from(head);
-
-            for ch in tail {
-                result.push(ch);
-            }
-
-            if let Ok((i, _)) = parse_keyword(&result) {
-                if i.is_empty() {
-                    return SyntaxError::unrecoverable(
-                        old_input,
-                        "symbol",
-                        Some("keyword"),
-                        Some("try using an unreserved symbol"),
-                    );
-                }
-            }
-
-            Ok((input, result))
-        }
-    }
-}
-
-fn parse_digits(input: &str) -> IResult<&str, String, SyntaxError> {
-    alt((
-        map(tag("0"), |x: &str| x.to_string()),
-        map(
-            tuple((one_of(ASCII_NONZERO_DIGIT), many0(one_of(ASCII_DIGIT)))),
-            |(head, tail)| {
-                let mut result = String::from(head);
-                for ch in tail {
-                    result.push(ch)
-                }
-                result
-            },
-        ),
-    ))(input)
-}
-
-fn parse_any_digits(input: &str) -> IResult<&str, String, SyntaxError> {
-    map(many1(one_of(ASCII_DIGIT)), |digits| {
-        let mut result = String::new();
-        for ch in digits {
-            result.push(ch)
-        }
-        result
-    })(input)
-}
-
-fn parse_integer(input: &str) -> IResult<&str, Int, SyntaxError> {
-    let (input, is_positive) = map(opt(tag("-")), |x| x.is_none())(input)?;
-
-    let sign = if is_positive { 1 } else { -1 };
-
-    match parse_digits(input) {
-        Ok((input, digits)) => match digits.parse::<Int>() {
-            Ok(n) => Ok((input, sign * n)),
-            Err(_) => SyntaxError::expected(input, "integer", None, None),
-        },
-        _ => SyntaxError::expected(input, "integer", None, None),
-    }
-}
-
-fn parse_float(input: &str) -> IResult<&str, f64, SyntaxError> {
-    let (input, is_positive) = map(opt(tag("-")), |x| x.is_none())(input)?;
-
-    let sign = if is_positive { 1.0 } else { -1.0 };
-
-    match parse_digits(input) {
-        Ok((input, first_digits)) => {
-            let (input, _) = tag(".")(input)?;
-
-            match parse_any_digits(input) {
-                Ok((input, last_digits)) => {
-                    match format!("{}.{}", first_digits, last_digits).parse::<f64>() {
-                        Ok(n) => Ok((input, sign * n)),
-                        Err(_) => SyntaxError::unrecoverable(
-                            input.to_string(),
-                            "float".to_string(),
-                            Some(format!("{}.{}", first_digits, last_digits)),
-                            Some("valid floats can be written like 1.0 or 5.23".to_string()),
-                        ),
-                    }
-                }
-                _ => SyntaxError::expected(
-                    input,
-                    "float",
-                    None,
-                    Some("valid floats can be written like 1.0 or 5.23"),
-                ),
-            }
-        }
-
-        _ => SyntaxError::expected(
+fn parse_float(input: Tokens<'_>) -> IResult<Tokens<'_>, f64, SyntaxError> {
+    let (new_input, num) = kind(TokenKind::FloatLiteral)(input)?;
+    let num = num.parse::<f64>().map_err(|_| {
+        SyntaxError::expected_err(
             input,
             "float",
-            None,
+            Some(num),
             Some("valid floats can be written like 1.0 or 5.23"),
-        ),
+        )
+    })?;
+    Ok((new_input, num))
+}
+
+fn parse_boolean(input: Tokens<'_>) -> IResult<Tokens<'_>, bool, SyntaxError> {
+    map(kind(TokenKind::BooleanLiteral), |s| s == "True")(input)
+}
+
+fn parse_none(input: Tokens<'_>) -> IResult<Tokens<'_>, (), SyntaxError> {
+    if let Ok((input, _)) = text("None")(input) {
+        Ok((input, ()))
+    } else if input.len() >= 2 && input[0].text == "(" && input[1].text == ")" {
+        Ok((input.skip_n(2), ()))
+    } else {
+        SyntaxError::expected(input, "()", None, None)
     }
 }
 
-fn parse_boolean(input: &str) -> IResult<&str, bool, SyntaxError> {
-    match tag::<&str, &str, SyntaxError>("True")(input) {
-        Ok((input, _)) => Ok((input, true)),
-        Err(_) => match tag::<&str, &str, SyntaxError>("False")(input) {
-            Ok((input, _)) => Ok((input, false)),
-            Err(_) => SyntaxError::expected(input, "bool", None, None),
-        },
-    }
-}
-
-fn parse_none(input: &str) -> IResult<&str, (), SyntaxError> {
-    match tag::<&str, &str, SyntaxError>("None")(input) {
-        Ok((input, _)) => Ok((input, ())),
-        Err(_) => match tag::<&str, &str, SyntaxError>("()")(input) {
-            Ok((input, _)) => Ok((input, ())),
-            Err(_) => SyntaxError::expected(input, "()", None, None),
-        },
-    }
-}
-fn parse_quote(input: &str) -> IResult<&str, Expression, SyntaxError> {
-    let (input, _) = try_parse_ws(input)?;
-    let (input, _) = tag("'")(input)?;
+fn parse_quote(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
+    let (input, _) = text("'")(input)?;
 
     map(parse_expression_prec_four, |x| {
         Expression::Quote(Box::new(x))
     })(input)
 }
 
-fn parse_not(input: &str) -> IResult<&str, Expression, SyntaxError> {
-    let (input, _) = try_parse_ws(input)?;
-    let (input, _) = tag("!")(input)?;
+fn parse_not(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
+    let (input, _) = text("!")(input)?;
 
     map(parse_expression_prec_four, |x| {
         Expression::Apply(Box::new(Expression::Symbol("not".to_string())), vec![x])
     })(input)
 }
 
-fn parse_string(input: &str) -> IResult<&str, String, SyntaxError> {
-    let old_input = input;
-    let (input, _) = tag("\"")(input)?;
-
-    let (input, _) = parse_string_inner(input)?;
-
-    let (input, _) = alt((tag("\""), eof))(input)?;
-
-    Ok((
-        input,
-        snailquote::unescape(&old_input[0..old_input.len() - input.len()]).unwrap(),
-    ))
+fn parse_string(input: Tokens<'_>) -> IResult<Tokens<'_>, String, SyntaxError> {
+    let (input, string) = kind(TokenKind::StringLiteral)(input)?;
+    Ok((input, snailquote::unescape(string).unwrap()))
 }
 
-fn parse_string_inner(mut input: &str) -> IResult<&str, String, SyntaxError> {
-    let old_input = input;
+fn parse_assign(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
+    let (input, _) = text("let")(input)?;
 
-    loop {
-        match input.chars().next() {
-            Some('\"') | None => break,
-            Some('\\') => {
-                match parse_escape(input) {
-                    Ok((i, _)) => input = i,
-                    Err(_) => return SyntaxError::unrecoverable(
-                        input,
-                        "string",
-                        Some("invalid escape"),
-                        Some(
-                            "escape codes can be one of: \\\", \\\\, \\/, \\b, \\f, \\n, \\r, \\t ",
-                        ),
-                    ),
-                }
-            }
-            Some(ch) => {
-                input = &input[ch.len_utf8()..];
-            }
-        }
-    }
-
-    let result = old_input[0..old_input.len() - input.len()].to_string();
-
-    Ok((input, result))
-}
-
-fn parse_escape(input: &str) -> IResult<&str, (), SyntaxError> {
-    let (input, _) = tag("\\")(input)?;
-    let (input, _) = alt((
-        tag("\""),
-        tag("\\"),
-        tag("/"),
-        tag("b"),
-        tag("f"),
-        tag("n"),
-        tag("r"),
-        tag("t"),
-        map(count(one_of(ASCII_HEX_DIGIT), 4), |_| ""),
-    ))(input)?;
-    Ok((input, ()))
-}
-
-fn parse_assign(input: &str) -> IResult<&str, Expression, SyntaxError> {
-    let (input, _) = try_parse_ws(input)?;
-    let (input, _) = tag("let")(input)?;
-    let (input, _) = try_parse_ws(input)?;
     let (input, symbol) = match parse_symbol(input) {
         Ok(result) => result,
         Err(_) => {
@@ -406,8 +281,7 @@ fn parse_assign(input: &str) -> IResult<&str, Expression, SyntaxError> {
             )
         }
     };
-    let (input, _) = try_parse_ws(input)?;
-    let (input, _) = match tag::<&str, &str, SyntaxError>("=")(input) {
+    let (input, _) = match text("=")(input) {
         Ok(result) => result,
         Err(_) => {
             return SyntaxError::unrecoverable(
@@ -422,12 +296,10 @@ fn parse_assign(input: &str) -> IResult<&str, Expression, SyntaxError> {
     Ok((input, Expression::Assign(symbol, Box::new(expr))))
 }
 
-fn parse_group(input: &str) -> IResult<&str, Expression, SyntaxError> {
-    let (input, _) = try_parse_ws(input)?;
-    let (input, _) = tag("(")(input)?;
+fn parse_group(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
+    let (input, _) = text("(")(input)?;
     let (input, expr) = parse_expression(input)?;
-    let (input, _) = try_parse_ws(input)?;
-    let (input, _) = match alt((tag::<&str, &str, SyntaxError>(")"), eof))(input) {
+    let (input, _) = match alt((map(text(")"), |_| ()), empty))(input) {
         Ok(result) => result,
         Err(_) => {
             return SyntaxError::unrecoverable(
@@ -442,12 +314,10 @@ fn parse_group(input: &str) -> IResult<&str, Expression, SyntaxError> {
     Ok((input, Expression::Group(Box::new(expr))))
 }
 
-fn parse_list(input: &str) -> IResult<&str, Expression, SyntaxError> {
-    let (input, _) = try_parse_ws(input)?;
-    let (input, _) = tag("[")(input)?;
-    let (input, expr_list) = separated_list0(tag(","), parse_expression)(input)?;
-    let (input, _) = try_parse_ws(input)?;
-    let (input, _) = match tag::<&str, &str, SyntaxError>("]")(input) {
+fn parse_list(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
+    let (input, _) = text("[")(input)?;
+    let (input, expr_list) = separated_list0(text(","), parse_expression)(input)?;
+    let (input, _) = match text("]")(input) {
         Ok(result) => result,
         Err(_) => {
             return SyntaxError::unrecoverable(
@@ -462,19 +332,13 @@ fn parse_list(input: &str) -> IResult<&str, Expression, SyntaxError> {
     Ok((input, Expression::List(expr_list)))
 }
 
-fn parse_map(input: &str) -> IResult<&str, Expression, SyntaxError> {
-    let (input, _) = try_parse_ws(input)?;
-    let (input, _) = tag("{")(input)?;
+fn parse_map(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
+    let (input, _) = text("{")(input)?;
     let (input, expr_map) = separated_list0(
-        tag(","),
-        separated_pair(
-            delimited(try_parse_ws, parse_symbol, try_parse_ws),
-            tag("="),
-            parse_expression,
-        ),
+        text(","),
+        separated_pair(parse_symbol, text("="), parse_expression),
     )(input)?;
-    let (input, _) = try_parse_ws(input)?;
-    let (input, _) = match tag::<&str, &str, SyntaxError>("}")(input) {
+    let (input, _) = match text("}")(input) {
         Ok(result) => result,
         Err(_) if expr_map.is_empty() => {
             return SyntaxError::expected(
@@ -504,14 +368,11 @@ fn parse_map(input: &str) -> IResult<&str, Expression, SyntaxError> {
     ))
 }
 
-fn parse_for_loop(input: &str) -> IResult<&str, Expression, SyntaxError> {
-    let (input, _) = try_parse_ws(input)?;
-    let (input, _) = tag("for")(input)?;
-    let (input, _) = try_parse_ws(input)?;
+fn parse_for_loop(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
+    let (input, _) = text("for")(input)?;
     let (input, symbol) = parse_symbol(input)?;
-    let (input, _) = try_parse_ws(input)?;
 
-    let (input, _) = match tag::<&str, &str, SyntaxError>("in")(input) {
+    let (input, _) = match text("in")(input) {
         Ok(result) => result,
         Err(_) => {
             return SyntaxError::unrecoverable(
@@ -534,7 +395,6 @@ fn parse_for_loop(input: &str) -> IResult<&str, Expression, SyntaxError> {
             )
         }
     };
-    let (input, _) = try_parse_ws(input)?;
     let (input, body) =
         match parse_block(input) {
             Ok(result) => result,
@@ -554,9 +414,8 @@ fn parse_for_loop(input: &str) -> IResult<&str, Expression, SyntaxError> {
     ))
 }
 
-fn parse_if(input: &str) -> IResult<&str, Expression, SyntaxError> {
-    let (input, _) = try_parse_ws(input)?;
-    let (input, _) = tag("if")(input)?;
+fn parse_if(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
+    let (input, _) = text("if")(input)?;
 
     let (input, cond) = match parse_expression_prec_six(input) {
         Ok(result) => result,
@@ -583,7 +442,7 @@ fn parse_if(input: &str) -> IResult<&str, Expression, SyntaxError> {
     };
 
     let (input, maybe_e) = opt(preceded(
-        pair(try_parse_ws, tag("else")),
+        text("else"),
         alt((parse_block, parse_expression_prec_four, parse_if)),
     ))(input)?;
 
@@ -599,15 +458,9 @@ fn parse_if(input: &str) -> IResult<&str, Expression, SyntaxError> {
     Ok((input, result))
 }
 
-fn parse_callable(input: &str) -> IResult<&str, Expression, SyntaxError> {
-    let (input, _) = try_parse_ws(input)?;
-    let (input, arg) = match parse_symbol(input) {
-        Ok((input, symbol)) => (input, symbol),
-        Err(nom::Err::Failure(e)) => return Err(nom::Err::Error(e)),
-        Err(e) => return Err(e),
-    };
-    let (input, _) = try_parse_ws(input)?;
-    let (input, fn_type) = alt((tag("->"), tag("~>")))(input)?;
+fn parse_callable(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
+    let (input, arg) = parse_symbol(input)?;
+    let (input, fn_type) = alt((text("->"), text("~>")))(input)?;
     let (input, body) = match parse_expression(input) {
         Ok(result) => result,
         Err(_) => {
@@ -621,7 +474,7 @@ fn parse_callable(input: &str) -> IResult<&str, Expression, SyntaxError> {
     };
     Ok((
         input,
-        match fn_type {
+        match fn_type.text {
             "->" => Expression::Lambda(arg, Box::new(body), Environment::new()),
             "~>" => Expression::Macro(arg, Box::new(body)),
             _ => unreachable!(),
@@ -629,14 +482,12 @@ fn parse_callable(input: &str) -> IResult<&str, Expression, SyntaxError> {
     ))
 }
 
-fn parse_block(input: &str) -> IResult<&str, Expression, SyntaxError> {
-    let (input, _) = try_parse_ws(input)?;
-    let (input, _) = tag("{")(input)?;
+fn parse_block(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
+    let (input, _) = text("{")(input)?;
 
-    let (input, expr) = parse_script(input, false)?;
+    let (input, expr) = parse_script_tokens(input, false)?;
 
-    let (input, _) = try_parse_ws(input)?;
-    let (input, _) = match tag::<&str, &str, SyntaxError>("}")(input) {
+    let (input, _) = match text("}")(input) {
         Ok(result) => result,
         Err(_) => {
             return SyntaxError::unrecoverable(
@@ -651,14 +502,46 @@ fn parse_block(input: &str) -> IResult<&str, Expression, SyntaxError> {
     Ok((input, expr))
 }
 
-fn parse_apply(input: &str) -> IResult<&str, Expression, SyntaxError> {
+fn parse_apply(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
     let (input, f) = parse_expression_prec_three(input)?;
     let (input, args) = many1(parse_expression_prec_five)(input)?;
 
     Ok((input, Expression::Apply(Box::new(f), args)))
 }
 
-fn parse_expression(input: &str) -> IResult<&str, Expression, SyntaxError> {
+fn parse_expression(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
+    let expr_parser = parse_expression_prec_seven;
+
+    let (input, head) = expr_parser(input)?;
+
+    let (input, list) = many0(pair(alt((text("|"), text(">>"))), expr_parser))(input)?;
+
+    if list.is_empty() {
+        return Ok((input, head));
+    }
+
+    let mut args = vec![head];
+    for (op, item) in list {
+        args.push(match op.text {
+            "|" => item,
+            ">>" => Expression::Apply(
+                Box::new(Expression::Symbol("redirect-out".to_string())),
+                vec![item],
+            ),
+            _ => unreachable!(),
+        })
+    }
+
+    Ok((
+        input,
+        Expression::Group(Box::new(Expression::Apply(
+            Box::new(Expression::Symbol("pipe".to_string())),
+            args,
+        ))),
+    ))
+}
+
+fn parse_expression_prec_seven(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
     alt((
         parse_for_loop,
         parse_if,
@@ -669,60 +552,41 @@ fn parse_expression(input: &str) -> IResult<&str, Expression, SyntaxError> {
     ))(input)
 }
 
-fn parse_expression_prec_six(input: &str) -> IResult<&str, Expression, SyntaxError> {
+fn parse_expression_prec_six(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
     let expr_parser = parse_expression_prec_five;
 
-    let (input, head) = expr_parser(input)?;
+    let (input, mut head) = expr_parser(input)?;
 
-    let (input, mut list) = many0(pair(
-        delimited(parse_ws, alt((tag("&&"), tag("||"))), parse_ws),
-        expr_parser,
-    ))(input)?;
+    let (input, mut list) = many0(pair(alt((text("&&"), text("||"))), expr_parser))(input)?;
 
     if list.is_empty() {
         return Ok((input, head));
     }
 
-    let (mut op, mut result) = list.pop().unwrap();
-    while !list.is_empty() {
-        if let Some((next_op, item)) = list.pop() {
-            let op_fun = Expression::Symbol(
-                match op {
-                    "&&" => "and",
-                    "||" => "or",
-                    _ => unreachable!(),
-                }
-                .to_string(),
-            );
+    list.reverse();
 
-            result = Expression::Group(Box::new(Expression::Apply(
-                Box::new(op_fun.clone()),
-                vec![item, result],
-            )));
+    while let Some((op, item)) = list.pop() {
+        let op_fun = Expression::Symbol(
+            match op.text {
+                "&&" => "and",
+                "||" => "or",
+                _ => unreachable!(),
+            }
+            .to_string(),
+        );
 
-            op = next_op;
-        }
+        head = Expression::Group(Box::new(Expression::Apply(
+            Box::new(op_fun.clone()),
+            vec![head, item],
+        )));
     }
 
-    let op_fun = Expression::Symbol(
-        match op {
-            "&&" => "and",
-            "||" => "or",
-            _ => unreachable!(),
-        }
-        .to_string(),
-    );
-
-    Ok((
-        input,
-        Expression::Apply(Box::new(op_fun), vec![head, result]),
-    ))
+    Ok((input, head))
 }
 
-fn parse_range(input: &str) -> IResult<&str, Expression, SyntaxError> {
+fn parse_range(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
     let (input, from) = parse_expression_prec_four(input)?;
-    let (input, _) = try_parse_ws(input)?;
-    let (input, _) = tag("to")(input)?;
+    let (input, _) = text("to")(input)?;
 
     let (input, to) = match parse_expression_prec_four(input) {
         Ok(result) => result,
@@ -745,28 +609,24 @@ fn parse_range(input: &str) -> IResult<&str, Expression, SyntaxError> {
     ))
 }
 
-fn parse_expression_prec_five(input: &str) -> IResult<&str, Expression, SyntaxError> {
+fn parse_expression_prec_five(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
     let expr_parser = parse_expression_prec_four;
 
     if let Ok(result) = parse_range(input) {
         return Ok(result);
     }
 
-    let (input, head) = expr_parser(input)?;
+    let (input, mut head) = expr_parser(input)?;
 
     let (input, mut list) = many0(pair(
-        delimited(
-            parse_ws,
-            alt((
-                tag("=="),
-                tag("!="),
-                tag(">="),
-                tag("<="),
-                tag(">"),
-                tag("<"),
-            )),
-            parse_ws,
-        ),
+        alt((
+            text("=="),
+            text("!="),
+            text(">="),
+            text("<="),
+            text(">"),
+            text("<"),
+        )),
         expr_parser,
     ))(input)?;
 
@@ -778,161 +638,100 @@ fn parse_expression_prec_five(input: &str) -> IResult<&str, Expression, SyntaxEr
         return Ok((input, head));
     }
 
-    let (mut op, mut result) = list.pop().unwrap();
-    while !list.is_empty() {
-        if let Some((next_op, item)) = list.pop() {
-            let op_fun = Expression::Symbol(
-                match op {
-                    "==" => "eq",
-                    "!=" => "neq",
-                    ">=" => "gte",
-                    "<=" => "lte",
-                    ">" => "gt",
-                    "<" => "lt",
-                    _ => unreachable!(),
-                }
-                .to_string(),
-            );
+    list.reverse();
 
-            result = Expression::Group(Box::new(Expression::Apply(
-                Box::new(op_fun.clone()),
-                vec![item, result],
-            )));
+    while let Some((op, item)) = list.pop() {
+        let op_fun = Expression::Symbol(
+            match op.text {
+                "==" => "eq",
+                "!=" => "neq",
+                ">=" => "gte",
+                "<=" => "lte",
+                ">" => "gt",
+                "<" => "lt",
+                _ => unreachable!(),
+            }
+            .to_string(),
+        );
 
-            op = next_op;
-        }
+        head = Expression::Group(Box::new(Expression::Apply(
+            Box::new(op_fun.clone()),
+            vec![head, item],
+        )));
     }
 
-    let op_fun = Expression::Symbol(
-        match op {
-            "==" => "eq",
-            "!=" => "neq",
-            ">=" => "gte",
-            "<=" => "lte",
-            ">" => "gt",
-            "<" => "lt",
-            _ => unreachable!(),
-        }
-        .to_string(),
-    );
-
-    Ok((
-        input,
-        Expression::Apply(Box::new(op_fun), vec![head, result]),
-    ))
+    Ok((input, head))
 }
 
-fn parse_expression_prec_four(input: &str) -> IResult<&str, Expression, SyntaxError> {
+fn parse_expression_prec_four(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
     let expr_parser = parse_expression_prec_three;
 
-    let (input, head) = expr_parser(input)?;
+    let (input, mut head) = expr_parser(input)?;
 
-    let (input, mut list) = many0(pair(
-        delimited(parse_ws, alt((tag("+"), tag("-"))), parse_ws),
-        expr_parser,
-    ))(input)?;
+    let (input, mut list) = many0(pair(alt((text("+"), text("-"))), expr_parser))(input)?;
 
     if list.is_empty() {
         return Ok((input, head));
     }
 
-    let (mut op, mut result) = list.pop().unwrap();
-    while !list.is_empty() {
-        if let Some((next_op, item)) = list.pop() {
-            let op_fun = Expression::Symbol(
-                match op {
-                    "+" => "add",
-                    "-" => "sub",
-                    _ => unreachable!(),
-                }
-                .to_string(),
-            );
+    list.reverse();
 
-            result = Expression::Group(Box::new(Expression::Apply(
-                Box::new(op_fun.clone()),
-                vec![item, result],
-            )));
+    while let Some((op, item)) = list.pop() {
+        let op_fun = Expression::Symbol(
+            match op.text {
+                "+" => "add",
+                "-" => "sub",
+                _ => unreachable!(),
+            }
+            .to_string(),
+        );
 
-            op = next_op;
-        }
+        head = Expression::Group(Box::new(Expression::Apply(
+            Box::new(op_fun.clone()),
+            vec![head, item],
+        )));
     }
 
-    let op_fun = Expression::Symbol(
-        match op {
-            "+" => "add",
-            "-" => "sub",
-            _ => unreachable!(),
-        }
-        .to_string(),
-    );
-
-    Ok((
-        input,
-        Expression::Group(Box::new(Expression::Apply(
-            Box::new(op_fun),
-            vec![head, result],
-        ))),
-    ))
+    Ok((input, head))
 }
 
-fn parse_expression_prec_three(input: &str) -> IResult<&str, Expression, SyntaxError> {
+fn parse_expression_prec_three(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
     let expr_parser = parse_expression_prec_two;
 
-    let (input, head) = expr_parser(input)?;
+    let (input, mut head) = expr_parser(input)?;
 
-    let (input, mut list) = many0(pair(
-        delimited(parse_ws, alt((tag("*"), tag("//"), tag("%"))), parse_ws),
-        expr_parser,
-    ))(input)?;
+    let (input, mut list) =
+        many0(pair(alt((text("*"), text("//"), text("%"))), expr_parser))(input)?;
 
     if list.is_empty() {
         return Ok((input, head));
     }
 
-    let (mut op, mut result) = list.pop().unwrap();
-    while !list.is_empty() {
-        if let Some((next_op, item)) = list.pop() {
-            let op_fun = Expression::Symbol(
-                match op {
-                    "*" => "mul",
-                    "//" => "div",
-                    "%" => "rem",
-                    _ => unreachable!(),
-                }
-                .to_string(),
-            );
+    list.reverse();
 
-            result = Expression::Group(Box::new(Expression::Apply(
-                Box::new(op_fun.clone()),
-                vec![item, result],
-            )));
+    while let Some((op, item)) = list.pop() {
+        let op_fun = Expression::Symbol(
+            match op.text {
+                "*" => "mul",
+                "//" => "div",
+                "%" => "rem",
+                _ => unreachable!(),
+            }
+            .to_string(),
+        );
 
-            op = next_op;
-        }
+        head = Expression::Group(Box::new(Expression::Apply(
+            Box::new(op_fun.clone()),
+            vec![head, item],
+        )));
     }
 
-    let op_fun = Expression::Symbol(
-        match op {
-            "*" => "mul",
-            "//" => "div",
-            "%" => "rem",
-            _ => unreachable!(),
-        }
-        .to_string(),
-    );
-
-    Ok((
-        input,
-        Expression::Group(Box::new(Expression::Apply(
-            Box::new(op_fun),
-            vec![head, result],
-        ))),
-    ))
+    Ok((input, head))
 }
 
-fn parse_expression_prec_two(input: &str) -> IResult<&str, Expression, SyntaxError> {
+fn parse_expression_prec_two(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
     let (input, head) = parse_expression_prec_one(input)?;
-    let (input, args) = many0(preceded(tag("@"), parse_expression_prec_one))(input)?;
+    let (input, args) = many0(preceded(text("@"), parse_expression_prec_one))(input)?;
 
     if args.is_empty() {
         return Ok((input, head));
@@ -947,8 +746,7 @@ fn parse_expression_prec_two(input: &str) -> IResult<&str, Expression, SyntaxErr
     ))
 }
 
-fn parse_expression_prec_one(input: &str) -> IResult<&str, Expression, SyntaxError> {
-    let (input, _) = try_parse_ws(input)?;
+fn parse_expression_prec_one(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
     alt((
         parse_group,
         parse_quote,

@@ -2,16 +2,16 @@
 
 mod binary;
 
-use dune::{parse_script, Environment, Error, Expression, SyntaxError};
+use dune::{parse_script, Environment, Error, Expression, SyntaxError, TokenKind};
 
 use rustyline::completion::{Completer, FilenameCompleter, Pair as PairComplete};
 use rustyline::config::OutputStreamType;
-use rustyline::highlight::{Highlighter, MatchingBracketHighlighter};
+use rustyline::highlight::Highlighter;
 use rustyline::hint::{Hinter, HistoryHinter};
 use rustyline::validate::{
     MatchingBracketValidator, ValidationContext, ValidationResult, Validator,
 };
-use rustyline::{error::ReadlineError, Editor, Helper};
+use rustyline::{error::ReadlineError, Editor};
 use rustyline::{CompletionType, Config, Context, EditMode};
 use rustyline_derive::Helper;
 
@@ -20,6 +20,7 @@ use os_info::Type;
 use std::{
     borrow::Cow::{self, Borrowed, Owned},
     path::PathBuf,
+    process::exit,
     sync::{Arc, Mutex},
 };
 
@@ -33,34 +34,77 @@ fn new_editor(env: &Environment) -> Editor<DuneHelper> {
         .auto_add_history(false)
         .completion_type(CompletionType::List)
         .edit_mode(EditMode::Emacs)
+        .check_cursor_position(true)
         .output_stream(OutputStreamType::Stdout)
         .build();
 
     let mut rl = Editor::with_config(config);
-
     let h = DuneHelper {
         completer: FilenameCompleter::new(),
-        highlighter: MatchingBracketHighlighter::new(),
         hinter: HistoryHinter {},
-        colored_prompt: "".to_string(),
         validator: MatchingBracketValidator::new(),
+        colored_prompt: "".to_string(),
         env: env.clone(),
     };
     rl.set_helper(Some(h));
     rl
 }
 
+fn strip_ansi_escapes(text: impl ToString) -> String {
+    let text = text.to_string();
+
+    let mut result = String::new();
+    let mut is_in_escape = false;
+    for ch in text.chars() {
+        // If this is the start of a new escape
+        if ch == '\x1b' {
+            is_in_escape = true;
+        // If this is the end of an escape
+        } else if is_in_escape && ch == 'm' {
+            is_in_escape = false;
+        // If this is any other sort of text
+        } else if !is_in_escape {
+            result.push(ch);
+        }
+    }
+
+    result
+}
+
+fn readline(prompt: impl ToString, rl: &mut Editor<DuneHelper>) -> String {
+    let prompt = prompt.to_string();
+    loop {
+        // This MUST be called to update the prompt.
+        if let Some(helper) = rl.helper_mut() {
+            helper.set_prompt(&prompt);
+        }
+
+        match rl.readline(&strip_ansi_escapes(&prompt)) {
+            Ok(line) => return line,
+            Err(ReadlineError::Interrupted) => {
+                return String::new();
+            }
+            Err(ReadlineError::Eof) => exit(0),
+            Err(err) => {
+                eprintln!("error: {:?}", err);
+            }
+        }
+    }
+}
+
 #[derive(Helper)]
 struct DuneHelper {
     completer: FilenameCompleter,
-    highlighter: MatchingBracketHighlighter,
-    validator: MatchingBracketValidator,
     hinter: HistoryHinter,
     colored_prompt: String,
+    validator: MatchingBracketValidator,
     env: Environment,
 }
 
 impl DuneHelper {
+    /// This method MUST be called to update the prompt.
+    /// If this method is not called, the prompt will not
+    /// update.
     fn set_prompt(&mut self, prompt: impl ToString) {
         self.colored_prompt = prompt.to_string();
     }
@@ -80,92 +124,135 @@ impl Completer for DuneHelper {
         ctx: &Context<'_>,
     ) -> Result<(usize, Vec<PairComplete>), ReadlineError> {
         let mut path = PathBuf::from(self.env.get_cwd());
-        let mut segment = String::new();
+        if std::env::set_current_dir(&path).is_ok() {
+            self.completer.complete(line, pos, ctx)
+        } else {
+            let mut segment = String::new();
 
-        if !line.is_empty() {
-            for (i, ch) in line.chars().enumerate() {
-                if ch.is_whitespace()
-                    || ch == ';'
-                    || ch == '\''
-                    || ch == '('
-                    || ch == ')'
-                    || ch == '{'
-                    || ch == '}'
-                    || ch == '"'
-                {
-                    segment = String::new();
-                } else {
-                    segment.push(ch);
+            if !line.is_empty() {
+                for (i, ch) in line.chars().enumerate() {
+                    if ch.is_whitespace()
+                        || ch == ';'
+                        || ch == '\''
+                        || ch == '('
+                        || ch == ')'
+                        || ch == '{'
+                        || ch == '}'
+                        || ch == '"'
+                    {
+                        segment = String::new();
+                    } else {
+                        segment.push(ch);
+                    }
+
+                    if i == pos {
+                        break;
+                    }
                 }
 
-                if i == pos {
-                    break;
+                if !segment.is_empty() {
+                    path.push(segment.clone());
                 }
             }
 
-            if !segment.is_empty() {
-                path.push(segment.clone());
+            let path_str = (path.into_os_string().into_string().unwrap()
+                + if segment.is_empty() { "/" } else { "" })
+            .replace("/./", "/")
+            .replace("//", "/");
+            let (pos, mut pairs) =
+                self.completer
+                    .complete(path_str.as_str(), path_str.len(), ctx)?;
+            for pair in &mut pairs {
+                pair.replacement = String::from(line) + &pair.replacement.replace(&path_str, "");
             }
+            Ok((pos, pairs))
         }
-
-        let path_str = (path.into_os_string().into_string().unwrap()
-            + if segment.is_empty() { "/" } else { "" })
-        .replace("/./", "/")
-        .replace("//", "/");
-        let (pos, mut pairs) = self
-            .completer
-            .complete(path_str.as_str(), path_str.len(), ctx)?;
-        for pair in &mut pairs {
-            pair.replacement = String::from(line) + &pair.replacement.replace(&path_str, "");
-        }
-        Ok((pos, pairs))
     }
 }
 
-#[rustfmt::skip]
-fn syntax_highlight(line: impl ToString) -> String {
-    line.to_string()
-        .replace("False", "\x1b[95mFalse\x1b[m\x1b[0m")
-        .replace("True", "\x1b[95mTrue\x1b[m\x1b[0m")
+fn syntax_highlight(line: &str) -> String {
+    let tokens = match dune::parse_tokens(line) {
+        Ok((_, t)) => t,
+        Err(_) => return line.to_string(),
+    };
 
-        .replace("None", "\x1b[91mNone\x1b[m\x1b[0m")
-        .replace("()", "\x1b[91m()\x1b[m\x1b[0m")
+    let mut result = String::new();
+    let mut is_colored = false;
 
-        .replace("clear ", "\x1b[94mclear \x1b[m\x1b[0m")
-        .replace("echo ", "\x1b[94mecho \x1b[m\x1b[0m")
-        .replace("exit ", "\x1b[94mexit \x1b[m\x1b[0m")
-        .replace("cd ", "\x1b[94mcd \x1b[m\x1b[0m")
-        .replace("rm ", "\x1b[94mrm \x1b[m\x1b[0m")
+    for token in tokens {
+        match (token.kind, token.text) {
+            (TokenKind::BooleanLiteral, b) => {
+                result.push_str("\x1b[95m");
+                is_colored = true;
+                result.push_str(b);
+            }
+            (TokenKind::Punctuation, o @ ("@" | "\'" | "=" | "|" | ">>" | "->" | "~>")) => {
+                result.push_str("\x1b[96m");
+                is_colored = true;
+                result.push_str(o);
+            }
+            (TokenKind::Punctuation, o) => {
+                if is_colored {
+                    result.push_str("\x1b[m\x1b[0m");
+                    is_colored = false;
+                }
+                result.push_str(o);
+            }
+            (TokenKind::Keyword, k) => {
+                result.push_str("\x1b[95m");
+                is_colored = true;
+                result.push_str(k);
+            }
+            (TokenKind::Operator, k) => {
+                result.push_str("\x1b[38;5;220m");
+                is_colored = true;
+                result.push_str(k);
+            }
+            (TokenKind::StringLiteral, s) => {
+                result.push_str("\x1b[38;5;208m");
+                is_colored = true;
+                result.push_str(s);
+            }
+            (TokenKind::IntegerLiteral | TokenKind::FloatLiteral, l) => {
+                if is_colored {
+                    result.push_str("\x1b[m\x1b[0m");
+                    is_colored = false;
+                }
+                result.push_str(l);
+            }
+            (TokenKind::Symbol, l) => {
+                if l == "None" {
+                    result.push_str("\x1b[91m");
+                    is_colored = true;
+                } else if matches!(l, "echo" | "exit" | "clear" | "cd" | "rm") {
+                    result.push_str("\x1b[94m");
+                    is_colored = true;
+                } else if is_colored {
+                    result.push_str("\x1b[m\x1b[0m");
+                    is_colored = false;
+                }
+                result.push_str(l);
+            }
+            (TokenKind::Whitespace, w) => {
+                result.push_str(w);
+            }
+            (TokenKind::Comment, w) => {
+                result.push_str("\x1b[38;5;247m");
+                is_colored = true;
+                result.push_str(w);
+            }
+            (TokenKind::Other, o) => {
+                result.push_str("\x1b[38;5;9m");
+                is_colored = true;
+                result.push_str(o);
+            }
+        }
+    }
+    if is_colored {
+        result.push_str("\x1b[m\x1b[0m");
+    }
 
-
-        .replace("else ", "\x1b[94melse \x1b[m\x1b[0m")
-        .replace("let ", "\x1b[94mlet \x1b[m\x1b[0m")
-        .replace("for ", "\x1b[94mfor \x1b[m\x1b[0m")
-        .replace("if ", "\x1b[94mif \x1b[m\x1b[0m")
-        .replace(" in ", "\x1b[94m in \x1b[m\x1b[0m")
-        .replace(" to ", "\x1b[94m to \x1b[m\x1b[0m")
-
-        .replace(" == ", "\x1b[96m == \x1b[m\x1b[0m")
-        .replace(" != ", "\x1b[96m != \x1b[m\x1b[0m")
-        .replace(" <= ", "\x1b[96m <= \x1b[m\x1b[0m")
-        .replace(" >= ", "\x1b[96m >= \x1b[m\x1b[0m")
-        .replace(" && ", "\x1b[96m && \x1b[m\x1b[0m")
-        .replace(" || ", "\x1b[96m || \x1b[m\x1b[0m")
-
-        .replace("@", "\x1b[96m@\x1b[m\x1b[0m")
-        .replace("'", "\x1b[96m'\x1b[m\x1b[0m")
-
-        .replace("->", "\x1b[95m->\x1b[m\x1b[0m")
-        .replace("~>", "\x1b[95m~>\x1b[m\x1b[0m")
-
-
-        .replace(" > ", "\x1b[96m > \x1b[m\x1b[0m")
-        .replace(" < ", "\x1b[96m < \x1b[m\x1b[0m")
-
-        .replace(" + ", "\x1b[96m + \x1b[m\x1b[0m")
-        .replace(" - ", "\x1b[96m - \x1b[m\x1b[0m")
-        .replace(" * ", "\x1b[96m * \x1b[m\x1b[0m")
-        .replace(" // ", "\x1b[96m // \x1b[m\x1b[0m")
+    result
 }
 
 impl Hinter for DuneHelper {
@@ -215,32 +302,21 @@ impl Hinter for DuneHelper {
 impl Highlighter for DuneHelper {
     fn highlight_prompt<'b, 's: 'b, 'p: 'b>(
         &'s self,
-        prompt: &'p str,
+        _prompt: &'p str,
         _default: bool,
     ) -> Cow<'b, str> {
-        // if default {
-        //     Borrowed(&self.colored_prompt)
-        // } else {
-        //     Borrowed(prompt)
-        // }
-        Borrowed(prompt)
+        Borrowed(&self.colored_prompt)
     }
 
     fn highlight_hint<'h>(&self, hint: &'h str) -> Cow<'h, str> {
         Owned("\x1b[1m".to_owned() + hint + "\x1b[m")
     }
 
-    fn highlight<'l>(&self, line: &'l str, pos: usize) -> Cow<'l, str> {
-        match self.highlighter.highlight(line, pos) {
-            Owned(x) => Owned(syntax_highlight(x)),
-            Borrowed(x) => Owned(syntax_highlight(x.to_owned())),
-        }
+    fn highlight<'l>(&self, line: &'l str, _pos: usize) -> Cow<'l, str> {
+        Owned(syntax_highlight(line))
     }
 
-    fn highlight_char(&self, line: &str, pos: usize) -> bool {
-        if self.highlighter.highlight_char(line, pos) {
-            return true;
-        }
+    fn highlight_char(&self, line: &str, _pos: usize) -> bool {
         syntax_highlight(line) != line
     }
 }
@@ -252,21 +328,6 @@ impl Validator for DuneHelper {
 
     fn validate_while_typing(&self) -> bool {
         self.validator.validate_while_typing()
-    }
-}
-
-fn readline(prompt: impl ToString, rl: &mut Editor<impl Helper>) -> String {
-    loop {
-        match rl.readline(&prompt.to_string()) {
-            Ok(line) => return line,
-            Err(ReadlineError::Interrupted) => {
-                return String::new();
-            }
-            Err(ReadlineError::Eof) => std::process::exit(0),
-            Err(err) => {
-                eprintln!("error: {:?}", err);
-            }
-        }
     }
 }
 
@@ -328,23 +389,11 @@ fn get_os_family(t: &Type) -> String {
     .to_string()
 }
 
-fn parse(input: impl ToString) -> Result<Expression, Error> {
-    if let Ok(input) = comment::python::strip(input) {
-        match parse_script(input.as_str(), true) {
-            Ok((unparsed, result)) => {
-                if !unparsed.is_empty() {
-                    eprintln!("UNPARSED: `{}`", unparsed);
-                    return Err(Error::CustomError("incomplete input".to_string()));
-                }
-                Ok(result)
-            }
-            Err(nom::Err::Error(e)) | Err(nom::Err::Failure(e)) => Err(Error::SyntaxError(e)),
-            Err(nom::Err::Incomplete(_)) => Err(Error::SyntaxError(SyntaxError::InternalError)),
-        }
-    } else {
-        Err(Error::CustomError(
-            "could not strip comments from command".to_string(),
-        ))
+fn parse(input: impl AsRef<str>) -> Result<Expression, Error> {
+    match parse_script(input.as_ref()) {
+        Ok(result) => Ok(result),
+        Err(nom::Err::Error(e)) | Err(nom::Err::Failure(e)) => Err(Error::SyntaxError(e)),
+        Err(nom::Err::Incomplete(_)) => Err(Error::SyntaxError(SyntaxError::InternalError)),
     }
 }
 
@@ -371,7 +420,7 @@ fn repl(
             vec![cwd.clone().into()],
         )
         .eval(&mut env)
-        .unwrap_or_else(|_| format!("{}$", cwd).into())
+        .unwrap_or_else(|_| format!("{}$ ", cwd).into())
         .to_string();
         rl.helper_mut()
             .expect("No helper")
@@ -435,6 +484,18 @@ fn main() -> Result<(), Error> {
 
     binary::init_environment(&mut env);
 
+    parse("let clear = _ ~> console@clear ()")?.eval(&mut env)?;
+    parse("let pwd = _ ~> echo CWD")?.eval(&mut env)?;
+    parse(
+        "let join = sep -> list -> {
+            let sep = str sep;
+            fn@reduce (x -> y -> x + sep + (str y)) (str list@0) (tail list)
+        }",
+    )?
+    .eval(&mut env)?;
+
+    parse("let redirect-out = file -> contents -> fs@write file contents")?.eval(&mut env)?;
+
     parse(
         "let prompt = cwd -> \
             fmt@bold ((fmt@dark@blue \"(dune) \") + \
@@ -443,7 +504,7 @@ fn main() -> Result<(), Error> {
     )?
     .eval(&mut env)?;
     parse(
-        r#"let incomplete_prompt = cwd -> \
+        r#"let incomplete_prompt = cwd ->
             ((len cwd) + (len "(dune) ")) * " " + (fmt@bold (fmt@dark@yellow "> "));"#,
     )?
     .eval(&mut env)?;
