@@ -242,7 +242,7 @@ impl fmt::Display for Expression {
                 for (key, val) in exprs {
                     match &val {
                         Self::Builtin(Builtin { help, .. }) => {
-                            t.add_row(row!(key, format!("{}", val), textwrap::fill(&help, 20)));
+                            t.add_row(row!(key, format!("{}", val), textwrap::fill(help, 20)));
                         }
                         Self::Map(_) => {
                             t.add_row(row!(key, format!("{}", val)));
