@@ -240,10 +240,16 @@ impl fmt::Display for Expression {
                 fmt.separator(LinePosition::Intern, LineSeparator::new('─', '┼', '├', '┤'));
                 fmt.separator(LinePosition::Bottom, LineSeparator::new('─', '┴', '└', '┘'));
                 for (key, val) in exprs {
-                    if let Self::Builtin(Builtin { help, .. }) = &val {
-                        t.add_row(row!(key, format!("{}", val), help));
-                    } else {
-                        t.add_row(row!(key, format!("{}", val)));
+                    match &val {
+                        Self::Builtin(Builtin { help, .. }) => {
+                            t.add_row(row!(key, format!("{}", val), textwrap::fill(&help, 20)));
+                        }
+                        Self::Map(_) => {
+                            t.add_row(row!(key, format!("{}", val)));
+                        }
+                        _ => {
+                            t.add_row(row!(key, textwrap::fill(&format!("{}", val), 20)));
+                        }
                     }
                 }
                 write!(f, "{}", t)
