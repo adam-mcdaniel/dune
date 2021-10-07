@@ -12,6 +12,9 @@ pub use error::*;
 mod parser;
 pub use parser::*;
 
+mod tokens;
+pub use tokens::{Token, TokenKind};
+
 mod tokenizer;
 pub use tokenizer::*;
 
