@@ -16,6 +16,7 @@ name = "dune"
 path = "src/bin.rs"
 
 [dependencies]
+terminal_size = "0.1.17"
 chrono = "0.4"
 textwrap = "0.14"
 prettytable-rs = "0.8"
