@@ -8,7 +8,7 @@ use std::{
     process::Command,
 };
 
-use terminal_size::{Width, terminal_size};
+use terminal_size::{terminal_size, Width};
 
 use prettytable::{
     cell,
@@ -242,7 +242,6 @@ impl fmt::Display for Expression {
                 fmt.separator(LinePosition::Intern, LineSeparator::new('─', '┼', '├', '┤'));
                 fmt.separator(LinePosition::Bottom, LineSeparator::new('─', '┴', '└', '┘'));
 
-
                 let width = match terminal_size() {
                     Some((Width(width), _)) => Some(width as usize),
                     _ => None,
@@ -251,20 +250,27 @@ impl fmt::Display for Expression {
                 for (key, val) in exprs {
                     match &val {
                         Self::Builtin(Builtin { help, .. }) => {
-                            t.add_row(row!(key, format!("{}", val), match width {
-                                Some(w) => textwrap::fill(help, w / 6),
-                                None => help.to_string()
-                            }));
+                            t.add_row(row!(
+                                key,
+                                format!("{}", val),
+                                match width {
+                                    Some(w) => textwrap::fill(help, w / 6),
+                                    None => help.to_string(),
+                                }
+                            ));
                         }
                         Self::Map(_) => {
                             t.add_row(row!(key, format!("{}", val)));
                         }
                         _ => {
-                            let s = format!("{}", val);
-                            t.add_row(row!(key, match width {
-                                Some(w) => textwrap::fill(&s, w / 5),
-                                None => s
-                            }));
+                            let formatted = format!("{}", val);
+                            t.add_row(row!(
+                                key,
+                                match width {
+                                    Some(w) => textwrap::fill(&formatted, w / 5),
+                                    None => formatted,
+                                }
+                            ));
                         }
                     }
                 }
