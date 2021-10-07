@@ -176,31 +176,31 @@ if os@name != "windows" {
 
             (widget@joinx
             (widget@create "Features"
-    "Dune has a wide set of
-    features, it's basically a
-    full blown language!
+"Dune has a wide set of
+features, it's basically a
+full blown language!
 
-    It supports several uncommon
-    features in a shell, such as:
-    operator overloading,
-    lambdas, macros, quoted
-    expressions like Lisp, and
-    more!
+It supports several uncommon
+features in a shell, such as:
+operator overloading,
+lambdas, macros, quoted
+expressions like Lisp, and
+more!
 
-    Dune's libraries are very
-    extensive. There are
-    libraries for:
+Dune's libraries are very
+extensive. There are
+libraries for:
 
-    ☞ A simple widget system🪟
-    ☞ OS information        💽
-    ☞ Randomness            🔀
-    ☞ Basic math, trig, etc.🧮
-    ☞ File system operations📂
-    ☞ Text color and styling📝
-    ☞ Functional programming🔗
-    ☞ Date and time         🕒
+☞ A simple widget system🪟
+☞ OS information        💽
+☞ Randomness            🔀
+☞ Basic math, trig, etc.🧮
+☞ File system operations📂
+☞ Text color and styling📝
+☞ Functional programming🔗
+☞ Date and time         🕒
 
-    And more!"
+And more!"
     30 28)
 
             (widget@joiny
