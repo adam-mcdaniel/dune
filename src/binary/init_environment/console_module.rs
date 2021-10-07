@@ -2,11 +2,11 @@ use common_macros::b_tree_map;
 use dune::{Environment, Error, Expression};
 
 pub fn get() -> Expression {
-    b_tree_map! {
+    (b_tree_map! {
         String::from("write") => Expression::builtin("write", write, "write text to a specific position in the console"),
         String::from("title") => Expression::builtin("title", title, "set the title of the console"),
         String::from("clear") => Expression::builtin("clear", clear, "clear the console"),
-    }
+    })
     .into()
 }
 

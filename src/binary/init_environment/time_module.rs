@@ -5,12 +5,12 @@ use common_macros::b_tree_map;
 use dune::{Environment, Error, Expression};
 
 pub fn get() -> Expression {
-    b_tree_map! {
+    (b_tree_map! {
         String::from("sleep") => Expression::builtin("sleep", sleep,
             "sleep for a given number of milliseconds"),
         String::from("now") => Expression::builtin("now", now,
             "get information about the current time"),
-    }
+    })
     .into()
 }
 

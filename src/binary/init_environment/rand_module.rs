@@ -48,10 +48,10 @@ pub fn get() -> Expression {
         }
     }
 
-    b_tree_map! {
+    (b_tree_map! {
         String::from("int") => Expression::builtin("int", int, "get a random integer between two numbers (exclusive)"),
         String::from("choose") => Expression::builtin("choose", choose, "choose a random item in a list"),
         String::from("shuffle") => Expression::builtin("shuffle", shuffle, "shuffle a list randomly"),
-    }
+    })
     .into()
 }

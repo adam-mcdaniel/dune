@@ -2,7 +2,7 @@ use common_macros::b_tree_map;
 use dune::{Environment, Error, Expression};
 
 pub fn get() -> Expression {
-    b_tree_map! {
+    (b_tree_map! {
         String::from("strip") => Expression::builtin("strip", |args, env| {
             super::check_exact_args_len("strip", &args, 1)?;
             Ok(crate::strip_ansi_escapes(args[0].eval(env)?).into())
@@ -107,7 +107,7 @@ pub fn get() -> Expression {
                 Ok(format!("\x1b[37m{}\x1b[m\x6b[0m", args[0].eval(env)?).into())
             }, "convert text to white on the console"),
         }.into()
-    }
+    })
     .into()
 }
 

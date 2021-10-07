@@ -2,7 +2,7 @@ use common_macros::b_tree_map;
 use dune::{Error, Expression, Int};
 
 pub fn get() -> Expression {
-    b_tree_map! {
+    (b_tree_map! {
         String::from("E")   => std::f64::consts::E.into(),
         String::from("PI")  => std::f64::consts::PI.into(),
         String::from("TAU") => std::f64::consts::TAU.into(),
@@ -198,6 +198,6 @@ pub fn get() -> Expression {
 
             Ok(x.atan().into())
         }, "get the inverse tangent of a number"),
-    }
+    })
     .into()
 }

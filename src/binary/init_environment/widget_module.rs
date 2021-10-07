@@ -2,11 +2,12 @@ use common_macros::b_tree_map;
 use dune::{Environment, Error, Expression};
 
 pub fn get() -> Expression {
-    b_tree_map! {
+    (b_tree_map! {
         String::from("create") => Expression::builtin("create", create, "create a text widget"),
         String::from("joinx") => Expression::builtin("joinx", joinx, "join two widgets horizontally"),
         String::from("joiny") => Expression::builtin("joiny", joiny, "join two widgets vertically")
-    }.into()
+    })
+    .into()
 }
 
 fn create(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Error> {
