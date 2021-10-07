@@ -76,6 +76,7 @@ fn short_operator(input: &str) -> IResult<&str, &'static str, ()> {
         keyword_tag("+"),
         keyword_tag("-"),
         keyword_tag("*"),
+        keyword_tag("%"),
     ))(input)
 }
 
