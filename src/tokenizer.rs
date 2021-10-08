@@ -2,6 +2,8 @@ use nom::{
     branch::alt,
     bytes::complete::tag,
     combinator::{eof, map},
+    multi::fold_many_m_n,
+    sequence::tuple,
     IResult,
 };
 
@@ -76,6 +78,7 @@ fn short_operator(input: &str) -> IResult<&str, &'static str, ()> {
         keyword_tag("+"),
         keyword_tag("-"),
         keyword_tag("*"),
+        keyword_tag("%"),
     ))(input)
 }
 
@@ -225,20 +228,32 @@ fn ignore_string_inner(mut input: &str) -> IResult<&str, (), SyntaxError> {
 }
 
 fn parse_escape(input: &str) -> IResult<&str, (), SyntaxError> {
-    // const ASCII_HEX_DIGIT: &str = "0123456789ABCDEFabcdef";
+    fn parse_hex_digit(input: &str) -> IResult<&str, &str, SyntaxError> {
+        let mut chars = input.chars();
+        chars
+            .next()
+            .filter(char::is_ascii_hexdigit)
+            .ok_or(nom::Err::Error(SyntaxError::InternalError))?;
+        Ok((chars.as_str(), ""))
+    }
 
     let (input, _) = tag("\\")(input)?;
     let (input, _) = alt((
         tag("\""),
         tag("\\"),
-        tag("/"),
         tag("b"),
         tag("f"),
         tag("n"),
         tag("r"),
         tag("t"),
-        // This doesn't actually work!
-        // map(count(one_of(ASCII_HEX_DIGIT), 4), |_| ""),
+        map(
+            tuple((
+                tag("u{"),
+                fold_many_m_n(1, 5, parse_hex_digit, || "", |_, _| ""),
+                tag("}"),
+            )),
+            |_| "",
+        ),
     ))(input)?;
     Ok((input, ()))
 }
@@ -312,58 +327,5 @@ pub fn parse_tokens(mut input: &str) -> IResult<&str, Vec<Token>, SyntaxError> {
         Ok((input, result))
     } else {
         Err(nom::Err::Failure(SyntaxError::InternalError))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{parse_tokens, SyntaxError};
-
-    fn test(input: &str, expected: &str) -> Result<(), nom::Err<SyntaxError>> {
-        let (rest, tokens) = parse_tokens(input)?;
-        assert!(
-            rest.is_empty(),
-            "Not all input was tokenized. Rest: {:?}",
-            rest
-        );
-        let got = format!("{:#?}", tokens);
-        assert_eq!(expected, got.as_str());
-        Ok(())
-    }
-
-    #[test]
-    fn test1() -> Result<(), nom::Err<SyntaxError>> {
-        test(
-            r#"let a = foo -> bar -> {
-    foo == bar
-}"#,
-            r#"[
-    Keyword(let),
-    Whitespace( ),
-    Symbol(a),
-    Whitespace( ),
-    Punctuation(=),
-    Whitespace( ),
-    Symbol(foo),
-    Whitespace( ),
-    Punctuation(->),
-    Whitespace( ),
-    Symbol(bar),
-    Whitespace( ),
-    Punctuation(->),
-    Whitespace( ),
-    Punctuation({),
-    Whitespace(
-        ),
-    Symbol(foo),
-    Whitespace( ),
-    Operator(==),
-    Whitespace( ),
-    Symbol(bar),
-    Whitespace(
-    ),
-    Punctuation(}),
-]"#,
-        )
     }
 }
