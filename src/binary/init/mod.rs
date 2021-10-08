@@ -16,7 +16,7 @@ mod shell_module;
 mod time_module;
 mod widget_module;
 
-pub fn init_environment(env: &mut Environment) {
+pub fn init(env: &mut Environment) {
     pipe_module::add_to(env);
     env.define("math", math_module::get());
     env.define("shell", shell_module::get());

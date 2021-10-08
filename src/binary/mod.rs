@@ -1,3 +1,3 @@
-mod init_environment;
+mod init;
 
-pub use init_environment::init_environment;
+pub use init::init;

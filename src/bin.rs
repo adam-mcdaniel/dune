@@ -482,7 +482,7 @@ fn repl(
 fn main() -> Result<(), Error> {
     let mut env = Environment::new();
 
-    binary::init_environment(&mut env);
+    binary::init(&mut env);
 
     parse("let clear = _ ~> console@clear ()")?.eval(&mut env)?;
     parse("let pwd = _ ~> echo CWD")?.eval(&mut env)?;
