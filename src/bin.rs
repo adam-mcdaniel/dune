@@ -2495,7 +2495,7 @@ $ let cat = 'bat
                 Ok(Expression::None)
             }
             _ => Err(Error::CustomError(format!(
-                "expected string, got {:?}",
+                "expected string or symbol, got {:?}",
                 args[0]
             ))),
         },
