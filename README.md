@@ -145,5 +145,5 @@ _Currently, since Dune is in its early stages of development, I would recommend 
 
 ```bash
 # Just run the dune executable!
-dune
+dunesh
 ```
