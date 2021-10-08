@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod tests;
+
 pub type Int = i64;
 
 mod expr;
