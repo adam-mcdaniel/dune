@@ -47,11 +47,11 @@ impl fmt::Display for Token<'_> {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Tokens<'a>(pub &'a [Token<'a>]);
 
-// type Tokens<'a> = &'a [Token<'a>];
 
+const MAX_TOKENS_TO_DISPLAY: usize = 10;
 impl fmt::Display for Tokens<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for t in self.0.iter() {
+        for t in self.0.iter().take(MAX_TOKENS_TO_DISPLAY) {
             write!(f, "{} ", t)?;
         }
         Ok(())
