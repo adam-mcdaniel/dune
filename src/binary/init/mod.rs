@@ -54,25 +54,25 @@ pub fn init(env: &mut Environment) {
             for arg in args {
                 match &arg {
                     Expression::Symbol(name) if name == "me" => {
-                        println!(include_str!("help/me.txt"));
+                        println!(include_str!("../help/me.txt"));
                     }
                     Expression::Symbol(name) if name == "prelude" => {
-                        println!(include_str!("help/prelude.txt"));
+                        println!(include_str!("../help/prelude.txt"));
                     }
                     Expression::Symbol(name) if name == "types" => {
-                        println!(include_str!("help/types.txt"));
+                        println!(include_str!("../help/types.txt"));
                     }
                     Expression::Symbol(name) if name == "scripting" => {
-                        println!(include_str!("help/scripting.txt"));
+                        println!(include_str!("../help/scripting.txt"));
                     }
                     Expression::Symbol(name) if name == "builtin" => {
-                        println!(include_str!("help/builtin.txt"));
+                        println!(include_str!("../help/builtin.txt"));
                     }
                     Expression::Symbol(name) if name == "lib" => {
-                        println!(include_str!("help/lib.txt"));
+                        println!(include_str!("../help/lib.txt"));
                     }
                     Expression::Symbol(name) if name == "syntax" => {
-                        println!(include_str!("help/syntax.txt"));
+                        println!(include_str!("../help/syntax.txt"));
                     }
                     otherwise => {
                         if let Expression::Builtin(Builtin { help, .. }) = otherwise.eval(env)? {
