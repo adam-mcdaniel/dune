@@ -31,3 +31,10 @@ rustyline-derive = "0.5"
 dirs = "3.0"
 dunce = "1.0"
 chess-engine = "0.1.2"
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "parser_benchmark"
+harness = false
