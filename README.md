@@ -3,7 +3,7 @@
 A shell by the beach!
 
 <p float="left">
-  <a href="https://asciinema.org/a/7Cr96ndSzsIch7oGVYI3aIaX9"><img src="./assets/welcome2.png" width="48%"/></a>
+  <a href="https://asciinema.org/a/7Cr96ndSzsIch7oGVYI3aIaX9"><img src="./assets/welcome2.png" width="47.5%"/></a>
   <a href="https://asciinema.org/a/7Cr96ndSzsIch7oGVYI3aIaX9"><img src="./assets/about.png" width="48%"/></a>
 </p>
 
@@ -13,7 +13,9 @@ A shell by the beach!
 
 I'm a *bored* sophomore in college working on projects to fill the time. If you enjoy my work, consider supporting me by buying me a coffee! 
 
-<a href="https://www.buymeacoffee.com/adam.mcdaniel" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-violet.png" height=41px width=174px style="!important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
+<a href="https://www.buymeacoffee.com/adam.mcdaniel" target="_blank">
+  <img src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png" alt="Buy Me A Coffee" height="60px" width="217px"/>
+</a>
 
 ## Why write another shell?
 
@@ -34,8 +36,8 @@ I put a *lot* of work into making Dune just fun to use. It's like a neat little 
 Dune also attempts to be a usable scripting language, and even offers a few niche metaprogramming features such as quoting *(borrowed from [Lisp](https://github.com/adam-mcdaniel/wisp))*, operator overloading, and macros!
 
 <p float="left">
-  <a href="https://asciinema.org/a/7Cr96ndSzsIch7oGVYI3aIaX9"><img src="./assets/metaprogramming.png" width="33%"/></a>
-  <a href="https://asciinema.org/a/7Cr96ndSzsIch7oGVYI3aIaX9"><img src="./assets/operator-overloading.png" width="57%"/></a>
+  <a href="https://asciinema.org/a/7Cr96ndSzsIch7oGVYI3aIaX9"><img src="./assets/metaprogramming.png" width="45%"/></a>
+  <a href="https://asciinema.org/a/7Cr96ndSzsIch7oGVYI3aIaX9"><img src="./assets/operator-overloading.png" width="52.85%"/></a>
 </p>
 
 Overall, I wrote Dune to have a *complete* shell of my own: one that's fast, useful, and pretty.
