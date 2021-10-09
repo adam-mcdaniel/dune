@@ -1,0 +1,92 @@
+Hello, welcome to Dune's help macro!
+
+Dune has a very simple syntax.
+To apply functions, macros, or programs to arguments, simply juxtapose them!
+
+$ echo 1 2 + 3
+
+To write anonymous functions and macros, use the arrow syntax:
+
+$ # an anonymous incrementing function
+$ x -> x + 1
+$ # an anonymous incrementing macro
+$ # (macros are just like functions,
+$ # but they are executed within the current scope)
+$ x ~> x + 1
+$
+$ let identity = x -> x
+$
+$ # an anonymous function that returns the sum of two numbers
+$ x -> y -> {{
+>    echo \"your numbers are \" x \"and\" y
+>    x + y
+> }}
+
+To make lists, use the `[]` or the `to` syntax:
+
+$ [1, 2, 3, 2 + 2, \"testing!\"]
+$ # lists are zero indexed
+$ echo [1, 2, 3]@0
+$ # lists can also be made using the `to` syntax
+$ echo 0 to 5
+
+To make dictionaries, use the `{{}}` syntax:
+
+$ let origin = {{x: 0, y: 0}}
+$ # use the `@` syntax to index a list or dictionary
+$ echo origin@x origin@y
+
+To write an expression that is the result of many statements, use the following syntax:
+
+$ let x = {{
+>     let y = 1;
+>     let z = 2;
+>     y + z
+> }}
+
+To write math expressions, use the following operators:
+
+$ # addition
+$ x + y
+$ # subtraction
+$ x - y
+$ # multiplication
+$ x + y
+$ # division
+$ x // y
+$ # remainder
+$ x % y
+$ # logical and
+$ x && y
+$ # logical or
+$ x || y
+$ # logical not
+$ !x
+
+Dune also supports if statements and for loops.
+
+$ if True 1 else if False 2 else 3
+$ if x > y {{
+>     echo \"x is greater than y\"
+> }} else {{
+>     echo \"x is not greater than y\"
+> }}
+$
+$ for item in [1, 2, 3, 4] {{
+>     echo item
+> }}
+$ for x in 0 to 5 {{
+>     echo x
+> }}
+
+If you're a fan of Lisp, you can also try quoting expressions!
+
+$ # when evaluated, a quoted expression returns its expression
+$ let expression = '(x + y)
+$ let x = 5
+$ let y = 6
+$ # this will evaluate the expression stored in `expression`
+$ echo (eval expression)
+$
+$ # make `cat` an alias for the program `bat`
+$ let cat = 'bat
