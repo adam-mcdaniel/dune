@@ -5,6 +5,13 @@ use std::{
 
 use dune::{Environment, Error, Expression};
 
+pub fn add_to(env: &mut Environment) {
+    // This is a special form that takes a list of expressions
+    // and interprets them as a commands.
+    // It pipes the result of each command to the next one.
+    env.define_builtin("__pipe__", pipe_builtin, "pipe input through a list of commands");
+}
+
 fn pipe_builtin(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Error> {
     if args.len() <= 1 {
         return Err(Error::CustomError(
@@ -154,13 +161,6 @@ fn pipe_builtin(args: Vec<Expression>, env: &mut Environment) -> Result<Expressi
     }
     // Return the accumulated Dune expression.
     Ok(result_of_last_cmd)
-}
-
-pub fn add_to(env: &mut Environment) {
-    // This is a special form that takes a list of expressions
-    // and interprets them as a commands.
-    // It pipes the result of each command to the next one.
-    env.define_builtin("pipe", pipe_builtin, "pipe commands");
 }
 
 /// Interpret a Dune expression as a program to be executed.

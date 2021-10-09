@@ -2,7 +2,7 @@ use dune::{Environment, Error, Expression};
 
 pub fn add_to(env: &mut Environment) {
     env.define_builtin(
-        "add",
+        "__add__",
         |args, env| {
             let mut result = args[0].clone().eval(env)?;
             for arg in &args[1..] {
@@ -18,11 +18,11 @@ pub fn add_to(env: &mut Environment) {
             }
             Ok(result)
         },
-        "add two numbers",
+        "add two expressions",
     );
 
     env.define_builtin(
-        "sub",
+        "__sub__",
         |args, env| {
             let mut result = args[0].clone().eval(env)?;
             for arg in &args[1..] {
@@ -38,21 +38,11 @@ pub fn add_to(env: &mut Environment) {
             }
             Ok(result)
         },
-        "subtract two numbers",
+        "subtract two expressions",
     );
 
     env.define_builtin(
-        "neg",
-        |args, env| match args[0].clone().eval(env)? {
-            Expression::Integer(n) => Ok(Expression::Integer(-n)),
-            Expression::Float(n) => Ok(Expression::Float(-n)),
-            x => Err(Error::CustomError(format!("cannot negate {:?}", x))),
-        },
-        "negate a number",
-    );
-
-    env.define_builtin(
-        "mul",
+        "__mul__",
         |args, env| {
             let mut result = args[0].clone().eval(env)?;
             for arg in &args[1..] {
@@ -68,11 +58,11 @@ pub fn add_to(env: &mut Environment) {
             }
             Ok(result)
         },
-        "multiply two numbers",
+        "multiply two expressions",
     );
 
     env.define_builtin(
-        "div",
+        "__div__",
         |args, env| {
             let mut result = args[0].clone().eval(env)?;
             for arg in &args[1..] {
@@ -88,11 +78,11 @@ pub fn add_to(env: &mut Environment) {
             }
             Ok(result)
         },
-        "divide two numbers",
+        "divide two expressions",
     );
 
     env.define_builtin(
-        "rem",
+        "__rem__",
         |args, env| {
             let mut result = args[0].clone().eval(env)?;
             for arg in &args[1..] {
@@ -108,11 +98,11 @@ pub fn add_to(env: &mut Environment) {
             }
             Ok(result)
         },
-        "remainder two numbers",
+        "get the remainder of two expressions",
     );
 
     env.define_builtin(
-        "and",
+        "__and__",
         |args, env| {
             Ok(Expression::Boolean(
                 args.into_iter()
@@ -126,7 +116,7 @@ pub fn add_to(env: &mut Environment) {
     );
 
     env.define_builtin(
-        "or",
+        "__or__",
         |args, env| {
             Ok(Expression::Boolean(
                 args.into_iter()
@@ -140,7 +130,7 @@ pub fn add_to(env: &mut Environment) {
     );
 
     env.define_builtin(
-        "not",
+        "__not__",
         |args, env| {
             Ok(Expression::Boolean(
                 args.into_iter()
@@ -154,7 +144,7 @@ pub fn add_to(env: &mut Environment) {
     );
 
     env.define_builtin(
-        "eq",
+        "__eq__",
         |args, env| {
             Ok(Expression::Boolean(
                 args[0].eval(env)? == args[1].eval(env)?,
@@ -164,7 +154,7 @@ pub fn add_to(env: &mut Environment) {
     );
 
     env.define_builtin(
-        "neq",
+        "__neq__",
         |args, env| {
             Ok(Expression::Boolean(
                 args[0].eval(env)? != args[1].eval(env)?,
@@ -174,7 +164,7 @@ pub fn add_to(env: &mut Environment) {
     );
 
     env.define_builtin(
-        "lt",
+        "__lt__",
         |args, env| {
             Ok(Expression::Boolean(
                 args[0].clone().eval(env)? < args[1].clone().eval(env)?,
@@ -184,7 +174,7 @@ pub fn add_to(env: &mut Environment) {
     );
 
     env.define_builtin(
-        "lte",
+        "__lte__",
         |args, env| {
             Ok(Expression::Boolean(
                 args[0].clone().eval(env)? <= args[1].clone().eval(env)?,
@@ -194,7 +184,7 @@ pub fn add_to(env: &mut Environment) {
     );
 
     env.define_builtin(
-        "gt",
+        "__gt__",
         |args, env| {
             Ok(Expression::Boolean(
                 args[0].clone().eval(env)? > args[1].clone().eval(env)?,
@@ -204,7 +194,7 @@ pub fn add_to(env: &mut Environment) {
     );
 
     env.define_builtin(
-        "gte",
+        "__gte__",
         |args, env| {
             Ok(Expression::Boolean(
                 args[0].clone().eval(env)? >= args[1].clone().eval(env)?,
@@ -214,7 +204,7 @@ pub fn add_to(env: &mut Environment) {
     );
 
     env.define_builtin(
-        "index",
+        "__idx__",
         |args, env| {
             let mut val = args[0].eval(env)?;
             for arg in &args[1..] {

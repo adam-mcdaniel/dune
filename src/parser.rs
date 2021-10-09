@@ -291,7 +291,7 @@ fn parse_not(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> 
     let (input, _) = text("!")(input)?;
 
     map(parse_expression_prec_four, |x| {
-        Expression::Apply(Box::new(Expression::Symbol("not".to_string())), vec![x])
+        Expression::Apply(Box::new(Expression::Symbol("__not__".to_string())), vec![x])
     })(input)
 }
 
@@ -579,7 +579,7 @@ fn parse_expression(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, Syntax
     Ok((
         input,
         Expression::Group(Box::new(Expression::Apply(
-            Box::new(Expression::Symbol("pipe".to_string())),
+            Box::new(Expression::Symbol("__pipe__".to_string())),
             args,
         ))),
     ))
@@ -614,8 +614,8 @@ fn parse_expression_prec_six(input: Tokens<'_>) -> IResult<Tokens<'_>, Expressio
     while let Some((op, item)) = list.pop() {
         let op_fun = Expression::Symbol(
             match op.text {
-                "&&" => "and",
-                "||" => "or",
+                "&&" => "__and__",
+                "||" => "__or__",
                 _ => unreachable!(),
             }
             .to_string(),
@@ -707,12 +707,12 @@ fn parse_expression_prec_five(input: Tokens<'_>) -> IResult<Tokens<'_>, Expressi
     while let Some((op, item)) = list.pop() {
         let op_fun = Expression::Symbol(
             match op.text {
-                "==" => "eq",
-                "!=" => "neq",
-                ">=" => "gte",
-                "<=" => "lte",
-                ">" => "gt",
-                "<" => "lt",
+                "==" => "__eq__",
+                "!=" => "__neq__",
+                ">=" => "__gte__",
+                "<=" => "__lte__",
+                ">" => "__gt__",
+                "<" => "__lt__",
                 _ => unreachable!(),
             }
             .to_string(),
@@ -744,8 +744,8 @@ fn parse_expression_prec_four(input: Tokens<'_>) -> IResult<Tokens<'_>, Expressi
     while let Some((op, item)) = list.pop() {
         let op_fun = Expression::Symbol(
             match op.text {
-                "+" => "add",
-                "-" => "sub",
+                "+" => "__add__",
+                "-" => "__sub__",
                 _ => unreachable!(),
             }
             .to_string(),
@@ -778,9 +778,9 @@ fn parse_expression_prec_three(input: Tokens<'_>) -> IResult<Tokens<'_>, Express
     while let Some((op, item)) = list.pop() {
         let op_fun = Expression::Symbol(
             match op.text {
-                "*" => "mul",
-                "//" => "div",
-                "%" => "rem",
+                "*" => "__mul__",
+                "//" => "__div__",
+                "%" => "__rem__",
                 _ => unreachable!(),
             }
             .to_string(),
@@ -810,7 +810,7 @@ fn parse_expression_prec_two(input: Tokens<'_>) -> IResult<Tokens<'_>, Expressio
 
     Ok((
         input,
-        Expression::Apply(Box::new(Expression::Symbol("index".to_string())), result),
+        Expression::Apply(Box::new(Expression::Symbol("__idx__".to_string())), result),
     ))
 }
 
