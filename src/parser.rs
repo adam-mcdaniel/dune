@@ -1,3 +1,4 @@
+use detached_str::StrSlice;
 use nom::{
     branch::alt,
     combinator::{eof, map, opt},
@@ -9,102 +10,89 @@ use nom::{
 
 use std::collections::BTreeMap;
 
+use crate::{tokens::Input, TokenizationError};
+
 use super::{tokens::Tokens, Environment, Expression, Int, Token, TokenKind};
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SyntaxError {
+    TokenizationError(TokenizationError),
     Expected {
-        input: String,
-        expected: String,
+        input: StrSlice,
+        expected: &'static str,
         found: Option<String>,
-        hint: Option<String>,
+        hint: Option<&'static str>,
     },
-    Union(Box<Self>, Box<Self>),
-    At(String, Box<Self>),
-    CustomError(String),
+    ExpectedChar {
+        expected: char,
+        at: Option<StrSlice>,
+    },
+    InvalidToken(StrSlice),
+    NomError {
+        kind: nom::error::ErrorKind,
+        at: Option<StrSlice>,
+        cause: Option<Box<SyntaxError>>,
+    },
     InternalError,
 }
 
+impl From<TokenizationError> for SyntaxError {
+    fn from(t: TokenizationError) -> Self {
+        SyntaxError::TokenizationError(t)
+    }
+}
+
 impl SyntaxError {
-    pub(crate) fn unrecoverable<A, B, T1, T2>(
-        input: T1,
-        expected: T2,
-        found: Option<T2>,
-        hint: Option<T2>,
-    ) -> IResult<A, B, Self>
-    where
-        T1: ToString,
-        T2: ToString,
-    {
-        Err(nom::Err::Failure(Self::Expected {
-            input: input.to_string(),
-            expected: expected.to_string(),
-            found: found.map(|x| x.to_string()),
-            hint: hint.map(|x| x.to_string()),
-        }))
+    pub(crate) fn unrecoverable(
+        input: StrSlice,
+        expected: &'static str,
+        found: Option<String>,
+        hint: Option<&'static str>,
+    ) -> nom::Err<SyntaxError> {
+        nom::Err::Failure(Self::Expected {
+            input,
+            expected,
+            found,
+            hint,
+        })
     }
 
-    pub(crate) fn expected<A, B, T1, T2>(
-        input: T1,
-        expected: T2,
-        found: Option<T2>,
-        hint: Option<T2>,
-    ) -> IResult<A, B, Self>
-    where
-        T1: ToString,
-        T2: ToString,
-    {
-        Err(nom::Err::Error(Self::Expected {
-            input: input.to_string(),
-            expected: expected.to_string(),
-            found: found.map(|x| x.to_string()),
-            hint: hint.map(|x| x.to_string()),
-        }))
-    }
-
-    pub(crate) fn expected_err<T1, T2>(
-        input: T1,
-        expected: T2,
-        found: Option<T2>,
-        hint: Option<T2>,
-    ) -> nom::Err<Self>
-    where
-        T1: ToString,
-        T2: ToString,
-    {
+    pub(crate) fn expected(
+        input: StrSlice,
+        expected: &'static str,
+        found: Option<String>,
+        hint: Option<&'static str>,
+    ) -> nom::Err<SyntaxError> {
         nom::Err::Error(Self::Expected {
-            input: input.to_string(),
-            expected: expected.to_string(),
-            found: found.map(|x| x.to_string()),
-            hint: hint.map(|x| x.to_string()),
+            input,
+            expected,
+            found,
+            hint,
         })
     }
 }
 
-impl<T> ParseError<T> for SyntaxError
-where
-    T: ToString,
-{
-    fn from_error_kind(input: T, kind: ErrorKind) -> Self {
-        Self::At(
-            input.to_string(),
-            Box::new(Self::CustomError(format!("expected {:?}", kind))),
-        )
+impl ParseError<Tokens<'_>> for SyntaxError {
+    fn from_error_kind(input: Tokens<'_>, kind: ErrorKind) -> Self {
+        Self::NomError {
+            kind,
+            at: input.get(0).map(|t| t.range),
+            cause: None,
+        }
     }
 
-    fn append(input: T, kind: ErrorKind, other: Self) -> Self {
-        Self::Union(
-            Box::new(other),
-            Box::new(Self::from_error_kind(input, kind)),
-        )
+    fn append(input: Tokens<'_>, kind: ErrorKind, other: Self) -> Self {
+        Self::NomError {
+            kind,
+            at: input.get(0).map(|t| t.range),
+            cause: Some(Box::new(other)),
+        }
     }
 
-    fn from_char(input: T, expected: char) -> Self {
-        Self::Expected {
-            input: input.to_string(),
-            expected: expected.to_string(),
-            found: None,
-            hint: None,
+    fn from_char(input: Tokens<'_>, expected: char) -> Self {
+        Self::ExpectedChar {
+            expected,
+            at: input.get(0).map(|t| t.range),
         }
     }
 
@@ -117,17 +105,17 @@ where
 }
 
 #[inline]
-fn kind(kind: TokenKind) -> impl Fn(Tokens<'_>) -> IResult<Tokens<'_>, &str, SyntaxError> {
+fn kind(kind: TokenKind) -> impl Fn(Tokens<'_>) -> IResult<Tokens<'_>, StrSlice, SyntaxError> {
     move |input: Tokens<'_>| match input.first() {
-        Some(&token) if token.kind == kind => Ok((input.skip_n(1), token.text)),
+        Some(&token) if token.kind == kind => Ok((input.skip_n(1), token.range)),
         _ => Err(nom::Err::Error(SyntaxError::InternalError)),
     }
 }
 
 #[inline]
-fn text<'a>(text: &'a str) -> impl Fn(Tokens<'a>) -> IResult<Tokens<'a>, Token<'a>, SyntaxError> {
+fn text<'a>(text: &'a str) -> impl Fn(Tokens<'a>) -> IResult<Tokens<'a>, Token, SyntaxError> {
     move |input: Tokens<'a>| match input.first() {
-        Some(&token) if token.text == text => Ok((input.skip_n(1), token)),
+        Some(&token) if token.text(input) == text => Ok((input.skip_n(1), token)),
         _ => Err(nom::Err::Error(SyntaxError::InternalError)),
     }
 }
@@ -142,33 +130,44 @@ fn empty(input: Tokens<'_>) -> IResult<Tokens<'_>, (), SyntaxError> {
 }
 
 pub fn parse_script(input: &str) -> Result<Expression, nom::Err<SyntaxError>> {
-    let (_, mut tokens) = super::parse_tokens(input)?;
+    let str = input.into();
+    let tokenization_input = Input::new(&str);
+    let mut token_vec = super::parse_tokens(tokenization_input)
+        .map_err(|e| nom::Err::Failure(SyntaxError::TokenizationError(e)))?;
 
-    for &token in &tokens {
+    let tokens = Tokens {
+        str: &str,
+        slice: token_vec.as_slice(),
+    };
+
+    for &token in tokens.slice {
         if token.kind == TokenKind::Other {
-            return Err(nom::Err::Failure(SyntaxError::CustomError(format!(
-                "Illegal character `{}`",
-                token.text
-            ))));
+            return Err(nom::Err::Failure(SyntaxError::InvalidToken(token.range)));
         }
     }
 
-    for window in tokens.windows(2) {
+    for window in tokens.slice.windows(2) {
         let (a, b) = (window[0], window[1]);
         if is_symbol_like(a.kind) && is_symbol_like(b.kind) {
             return Err(nom::Err::Failure(SyntaxError::Expected {
-                input: input.to_string(),
-                expected: "whitespace".to_string(),
-                found: Some(b.text.to_string()),
+                input: a.range.join(b.range),
+                expected: "whitespace",
+                found: Some(b.text(tokens).to_string()),
                 hint: None,
             }));
         }
     }
 
     // remove whitespace
-    tokens.retain(|t| !matches!(t.kind, TokenKind::Whitespace | TokenKind::Comment));
+    token_vec.retain(|t| !matches!(t.kind, TokenKind::Whitespace | TokenKind::Comment));
 
-    let (_, expr) = parse_script_tokens(Tokens(tokens.as_slice()), true)?;
+    let (_, expr) = parse_script_tokens(
+        Tokens {
+            str: &str,
+            slice: token_vec.as_slice(),
+        },
+        true,
+    )?;
     Ok(expr)
 }
 
@@ -194,12 +193,12 @@ fn parse_statement(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxE
         (Expression::If(_, _, _), Err(_)) => Ok((input, expr)),
 
         (_, Ok((input, _))) => Ok((input, expr)),
-        (_, Err(_)) => SyntaxError::expected(
-            input,
+        (_, Err(_)) => Err(SyntaxError::expected(
+            input.get_str_slice(),
             ";",
-            input.first().map(|x| x.text),
+            None,
             Some("try adding a semicolon"),
-        ),
+        )),
     }
 }
 
@@ -217,7 +216,11 @@ fn parse_script_tokens(
     }
 
     if require_eof {
-        input = eof(input)?.0;
+        input = eof(input)
+            .map_err(|_: nom::Err<SyntaxError>| {
+                SyntaxError::expected(input.get_str_slice(), "end of input", None, None)
+            })?
+            .0;
     }
 
     Ok((input, Expression::Do(exprs)))
@@ -227,9 +230,14 @@ fn parse_script_tokens(
 pub fn no_terminating_punctuation(input: Tokens<'_>) -> IResult<Tokens<'_>, (), SyntaxError> {
     if let Some(token) = input.first() {
         if token.kind == TokenKind::Punctuation
-            && matches!(token.text, ";" | "," | "=" | "]" | ")" | "}" | "|")
+            && matches!(token.text(input), ";" | "," | "=" | "]" | ")" | "}" | "|")
         {
-            SyntaxError::expected(input, "a non-terminating punctuation", None, None)
+            Err(SyntaxError::expected(
+                input.get_str_slice(),
+                "a non-terminating punctuation",
+                None,
+                None,
+            ))
         } else {
             Ok((input, ()))
         }
@@ -240,42 +248,54 @@ pub fn no_terminating_punctuation(input: Tokens<'_>) -> IResult<Tokens<'_>, (), 
 
 #[inline]
 fn parse_symbol(input: Tokens<'_>) -> IResult<Tokens<'_>, String, SyntaxError> {
-    map(kind(TokenKind::Symbol), |t| t.to_string())(input)
+    map(kind(TokenKind::Symbol), |t| t.to_str(input.str).to_string())(input)
 }
 
 fn parse_integer(input: Tokens<'_>) -> IResult<Tokens<'_>, Int, SyntaxError> {
-    let (new_input, num) = kind(TokenKind::IntegerLiteral)(input)?;
-    let num = num
-        .parse::<Int>()
-        .map_err(|_| SyntaxError::expected_err(input, "integer", Some(num), None))?;
-    Ok((new_input, num))
+    let (input, num) = kind(TokenKind::IntegerLiteral)(input)?;
+    let num = num.to_str(input.str).parse::<Int>().map_err(|e| {
+        SyntaxError::unrecoverable(
+            num,
+            "integer",
+            Some(format!("error: {}", e.to_string())),
+            None,
+        )
+    })?;
+    Ok((input, num))
 }
 
 fn parse_float(input: Tokens<'_>) -> IResult<Tokens<'_>, f64, SyntaxError> {
-    let (new_input, num) = kind(TokenKind::FloatLiteral)(input)?;
-    let num = num.parse::<f64>().map_err(|_| {
-        SyntaxError::expected_err(
-            input,
+    let (input, num) = kind(TokenKind::FloatLiteral)(input)?;
+    let num = num.to_str(input.str).parse::<f64>().map_err(|e| {
+        SyntaxError::unrecoverable(
+            num,
             "float",
-            Some(num),
+            Some(format!("error: {}", e.to_string())),
             Some("valid floats can be written like 1.0 or 5.23"),
         )
     })?;
-    Ok((new_input, num))
+    Ok((input, num))
 }
 
 #[inline]
 fn parse_boolean(input: Tokens<'_>) -> IResult<Tokens<'_>, bool, SyntaxError> {
-    map(kind(TokenKind::BooleanLiteral), |s| s == "True")(input)
+    map(kind(TokenKind::BooleanLiteral), |s| {
+        s.to_str(input.str) == "True"
+    })(input)
 }
 
 fn parse_none(input: Tokens<'_>) -> IResult<Tokens<'_>, (), SyntaxError> {
     if let Ok((input, _)) = text("None")(input) {
         Ok((input, ()))
-    } else if input.0.len() >= 2 && input[0].text == "(" && input[1].text == ")" {
+    } else if input.len() >= 2 && input[0].text(input) == "(" && input[1].text(input) == ")" {
         Ok((input.skip_n(2), ()))
     } else {
-        SyntaxError::expected(input, "None or ()", None, None)
+        Err(SyntaxError::expected(
+            input.get_str_slice(),
+            "None or ()",
+            None,
+            None,
+        ))
     }
 }
 
@@ -298,34 +318,31 @@ fn parse_not(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> 
 #[inline]
 fn parse_string(input: Tokens<'_>) -> IResult<Tokens<'_>, String, SyntaxError> {
     let (input, string) = kind(TokenKind::StringLiteral)(input)?;
-    Ok((input, snailquote::unescape(string).unwrap()))
+    Ok((
+        input,
+        snailquote::unescape(string.to_str(input.str)).unwrap(),
+    ))
 }
 
 fn parse_assign(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
     let (input, _) = text("let")(input)?;
 
-    let (input, symbol) = match parse_symbol(input) {
-        Ok(result) => result,
-        Err(_) => {
-            return SyntaxError::unrecoverable(
-                input,
-                "symbol",
-                None,
-                Some("try using a valid symbol such as `x` in `let x = 5`"),
-            )
-        }
-    };
-    let (input, _) = match text("=")(input) {
-        Ok(result) => result,
-        Err(_) => {
-            return SyntaxError::unrecoverable(
-                input,
-                "`=`",
-                None,
-                Some("let expressions must use an `=` sign"),
-            )
-        }
-    };
+    let (input, symbol) = parse_symbol(input).map_err(|_| {
+        SyntaxError::unrecoverable(
+            input.get_str_slice(),
+            "symbol",
+            None,
+            Some("try using a valid symbol such as `x` in `let x = 5`"),
+        )
+    })?;
+    let (input, _) = text("=")(input).map_err(|_| {
+        SyntaxError::unrecoverable(
+            input.get_str_slice(),
+            "`=`",
+            None,
+            Some("let expressions must use an `=` sign"),
+        )
+    })?;
     let (input, expr) = parse_expression(input)?;
     Ok((input, Expression::Assign(symbol, Box::new(expr))))
 }
@@ -334,17 +351,14 @@ fn parse_group(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError
     let (input, _) = text("(")(input)?;
     let (input, expr) = parse_expression(input)?;
 
-    let (input, _) = match alt((map(text(")"), |_| ()), empty))(input) {
-        Ok(result) => result,
-        Err(_) => {
-            return SyntaxError::unrecoverable(
-                input,
-                "`)`",
-                Some("no matching parentheses"),
-                Some("try adding a matching `)` to the end of your expression"),
-            )
-        }
-    };
+    let (input, _) = alt((map(text(")"), |_| ()), empty))(input).map_err(|_| {
+        SyntaxError::unrecoverable(
+            input.get_str_slice(),
+            "`)`",
+            Some("no matching parentheses".into()),
+            Some("try adding a matching `)` to the end of your expression"),
+        )
+    })?;
 
     Ok((input, Expression::Group(Box::new(expr))))
 }
@@ -352,17 +366,14 @@ fn parse_group(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError
 fn parse_list(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
     let (input, _) = text("[")(input)?;
     let (input, expr_list) = separated_list0(text(","), parse_expression)(input)?;
-    let (input, _) = match text("]")(input) {
-        Ok(result) => result,
-        Err(_) => {
-            return SyntaxError::unrecoverable(
-                input,
-                "`]`",
-                Some("no matching `]`"),
-                Some("try adding a matching `]` to the end of your list"),
-            )
-        }
-    };
+    let (input, _) = text("]")(input).map_err(|_| {
+        SyntaxError::unrecoverable(
+            input.get_str_slice(),
+            "`]`",
+            Some("no matching `]`".into()),
+            Some("try adding a matching `]` to the end of your list"),
+        )
+    })?;
 
     Ok((input, Expression::List(expr_list)))
 }
@@ -373,85 +384,67 @@ fn parse_map(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> 
         text(","),
         separated_pair(parse_symbol, text("="), parse_expression),
     )(input)?;
-    let (input, _) = match text("}")(input) {
-        Ok(result) => result,
-        Err(_) if expr_map.is_empty() => {
-            return SyntaxError::expected(
-                input,
+    let (input, _) = text("}")(input).map_err(|_| {
+        if expr_map.is_empty() {
+            SyntaxError::expected(
+                input.get_str_slice(),
                 "`}`",
-                Some("no matching `}`"),
+                Some("no matching `}`".into()),
+                Some("try adding a matching `}` to the end of your map"),
+            )
+        } else {
+            SyntaxError::unrecoverable(
+                input.get_str_slice(),
+                "`}`",
+                Some("no matching `}`".into()),
                 Some("try adding a matching `}` to the end of your map"),
             )
         }
-        Err(_) => {
-            return SyntaxError::unrecoverable(
-                input,
-                "`}`",
-                Some("no matching `}`"),
-                Some("try adding a matching `}` to the end of your map"),
-            )
-        }
-    };
+    })?;
 
-    Ok((
-        input,
-        Expression::Map(
-            expr_map
-                .into_iter()
-                .collect::<BTreeMap<String, Expression>>(),
-        ),
-    ))
+    let expr_map = expr_map
+        .into_iter()
+        .collect::<BTreeMap<String, Expression>>();
+
+    Ok((input, Expression::Map(expr_map)))
 }
 
 fn parse_for_loop(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
     let (input, _) = text("for")(input)?;
-    let (input, symbol) = match parse_symbol(input) {
-        Ok(result) => result,
-        Err(_) => {
-            return SyntaxError::unrecoverable(
-                input,
-                "symbol",
-                None,
-                Some("try using a valid symbol such as `x` in `for x in 0 to 10 {}`"),
-            )
-        }
-    };
+    let (input, symbol) = parse_symbol(input).map_err(|_| {
+        SyntaxError::unrecoverable(
+            input.get_str_slice(),
+            "symbol",
+            None,
+            Some("try using a valid symbol such as `x` in `for x in 0 to 10 {}`"),
+        )
+    })?;
 
-    let (input, _) = match text("in")(input) {
-        Ok(result) => result,
-        Err(_) => {
-            return SyntaxError::unrecoverable(
-                input,
-                "`in` keyword",
-                None,
-                Some("try writing a for loop in the format of `for i in 0 to 10 {}`"),
-            )
-        }
-    };
+    let (input, _) = text("in")(input).map_err(|_| {
+        SyntaxError::unrecoverable(
+            input.get_str_slice(),
+            "`in` keyword",
+            None,
+            Some("try writing a for loop in the format of `for i in 0 to 10 {}`"),
+        )
+    })?;
 
-    let (input, list) = match alt((parse_range, parse_expression_prec_four))(input) {
-        Ok(result) => result,
-        Err(_) => {
-            return SyntaxError::unrecoverable(
-                input,
-                "iterable expression",
-                None,
-                Some("try adding an iterable expression such as `0 to 10` to your for loop"),
-            )
-        }
-    };
-    let (input, body) =
-        match parse_block(input) {
-            Ok(result) => result,
-            Err(_) => return SyntaxError::unrecoverable(
-                input,
-                "block",
-                None,
-                Some(
-                    "try adding a block, such as `{ print \"hello!\"}` to the end of your for loop",
-                ),
-            ),
-        };
+    let (input, list) = alt((parse_range, parse_expression_prec_four))(input).map_err(|_| {
+        SyntaxError::unrecoverable(
+            input.get_str_slice(),
+            "iterable expression",
+            None,
+            Some("try adding an iterable expression such as `0 to 10` to your for loop"),
+        )
+    })?;
+    let (input, body) = parse_block(input).map_err(|_| {
+        SyntaxError::unrecoverable(
+            input.get_str_slice(),
+            "block",
+            None,
+            Some("try adding a block, such as `{ print \"hello!\"}` to the end of your for loop"),
+        )
+    })?;
 
     Ok((
         input,
@@ -462,29 +455,23 @@ fn parse_for_loop(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxEr
 fn parse_if(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
     let (input, _) = text("if")(input)?;
 
-    let (input, cond) = match parse_expression_prec_six(input) {
-        Ok(result) => result,
-        Err(_) => {
-            return SyntaxError::unrecoverable(
-                input,
-                "condition expression",
-                None,
-                Some("try adding a condition expression to your if statement"),
-            )
-        }
-    };
+    let (input, cond) = parse_expression_prec_six(input).map_err(|_| {
+        SyntaxError::unrecoverable(
+            input.get_str_slice(),
+            "condition expression",
+            None,
+            Some("try adding a condition expression to your if statement"),
+        )
+    })?;
 
-    let (input, t) = match parse_expression_prec_four(input) {
-        Ok(result) => result,
-        Err(_) => {
-            return SyntaxError::unrecoverable(
-                input,
-                "then expression",
-                None,
-                Some("try adding an expression to the end of your if statement"),
-            )
-        }
-    };
+    let (input, t) = parse_expression_prec_four(input).map_err(|_| {
+        SyntaxError::unrecoverable(
+            input.get_str_slice(),
+            "then expression",
+            None,
+            Some("try adding an expression to the end of your if statement"),
+        )
+    })?;
 
     let (input, maybe_e) = opt(preceded(
         text("else"),
@@ -506,20 +493,17 @@ fn parse_if(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
 fn parse_callable(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
     let (input, arg) = parse_symbol(input)?;
     let (input, fn_type) = alt((text("->"), text("~>")))(input)?;
-    let (input, body) = match parse_expression(input) {
-        Ok(result) => result,
-        Err(_) => {
-            return SyntaxError::unrecoverable(
-                input,
-                "an expression",
-                None,
-                Some("try writing a lambda or macro like `x -> x + 1` or `y ~> let x = y`"),
-            )
-        }
-    };
+    let (input, body) = parse_expression(input).map_err(|_| {
+        SyntaxError::unrecoverable(
+            input.get_str_slice(),
+            "an expression",
+            None,
+            Some("try writing a lambda or macro like `x -> x + 1` or `y ~> let x = y`"),
+        )
+    })?;
     Ok((
         input,
-        match fn_type.text {
+        match fn_type.text(input) {
             "->" => Expression::Lambda(arg, Box::new(body), Environment::new()),
             "~>" => Expression::Macro(arg, Box::new(body)),
             _ => unreachable!(),
@@ -531,16 +515,15 @@ fn parse_block(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError
     let (input, _) = text("{")(input)?;
     let (input, expr) = parse_script_tokens(input, false)?;
 
-    if let Ok((input, _)) = text("}")(input) {
-        Ok((input, expr))
-    } else {
+    let (input, _) = text("}")(input).map_err(|_| {
         SyntaxError::unrecoverable(
-            input,
+            input.get_str_slice(),
             "`}`",
-            Some("no matching `}`"),
+            Some("no matching `}`".into()),
             Some("try adding a matching `}` to the end of your block"),
         )
-    }
+    })?;
+    Ok((input, expr))
 }
 
 #[inline]
@@ -566,7 +549,7 @@ fn parse_expression(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, Syntax
 
     let mut args = vec![head];
     for (op, item) in list {
-        args.push(match op.text {
+        args.push(match op.text(input) {
             "|" => item,
             ">>" => Expression::Apply(
                 Box::new(Expression::Symbol("redirect-out".to_string())),
@@ -613,7 +596,7 @@ fn parse_expression_prec_six(input: Tokens<'_>) -> IResult<Tokens<'_>, Expressio
 
     while let Some((op, item)) = list.pop() {
         let op_fun = Expression::Symbol(
-            match op.text {
+            match op.text(input) {
                 "&&" => "and",
                 "||" => "or",
                 _ => unreachable!(),
@@ -635,17 +618,14 @@ fn parse_range(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError
     let (input, from) = parse_expression_prec_four(input)?;
     let (input, _) = text("to")(input)?;
 
-    let (input, to) = match parse_expression_prec_four(input) {
-        Ok(result) => result,
-        Err(_) => {
-            return SyntaxError::unrecoverable(
-                input,
-                "a valid range expression",
-                None,
-                Some("try writing an expression like `0 to 10`"),
-            )
-        }
-    };
+    let (input, to) = parse_expression_prec_four(input).map_err(|_| {
+        SyntaxError::unrecoverable(
+            input.get_str_slice(),
+            "a valid range expression",
+            None,
+            Some("try writing an expression like `0 to 10`"),
+        )
+    })?;
 
     Ok((
         input,
@@ -676,17 +656,14 @@ fn parse_expression_prec_five(input: Tokens<'_>) -> IResult<Tokens<'_>, Expressi
 
     if list.is_empty() {
         if let Ok((input, _)) = text("to")(input) {
-            let (input, to) = match parse_expression_prec_four(input) {
-                Ok(result) => result,
-                Err(_) => {
-                    return SyntaxError::unrecoverable(
-                        input,
-                        "a valid range expression",
-                        None,
-                        Some("try writing an expression like `0 to 10`"),
-                    )
-                }
-            };
+            let (input, to) = parse_expression_prec_four(input).map_err(|_| {
+                SyntaxError::unrecoverable(
+                    input.get_str_slice(),
+                    "a valid range expression",
+                    None,
+                    Some("try writing an expression like `0 to 10`"),
+                )
+            })?;
 
             return Ok((
                 input,
@@ -706,7 +683,7 @@ fn parse_expression_prec_five(input: Tokens<'_>) -> IResult<Tokens<'_>, Expressi
 
     while let Some((op, item)) = list.pop() {
         let op_fun = Expression::Symbol(
-            match op.text {
+            match op.text(input) {
                 "==" => "eq",
                 "!=" => "neq",
                 ">=" => "gte",
@@ -743,7 +720,7 @@ fn parse_expression_prec_four(input: Tokens<'_>) -> IResult<Tokens<'_>, Expressi
 
     while let Some((op, item)) = list.pop() {
         let op_fun = Expression::Symbol(
-            match op.text {
+            match op.text(input) {
                 "+" => "add",
                 "-" => "sub",
                 _ => unreachable!(),
@@ -777,7 +754,7 @@ fn parse_expression_prec_three(input: Tokens<'_>) -> IResult<Tokens<'_>, Express
 
     while let Some((op, item)) = list.pop() {
         let op_fun = Expression::Symbol(
-            match op.text {
+            match op.text(input) {
                 "*" => "mul",
                 "//" => "div",
                 "%" => "rem",

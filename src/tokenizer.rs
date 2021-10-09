@@ -1,31 +1,60 @@
+use detached_str::StrSlice;
 use nom::{
     branch::alt,
-    bytes::complete::tag,
     combinator::{eof, map},
+    error::ParseError,
     multi::fold_many_m_n,
     sequence::tuple,
     IResult,
 };
 
-use crate::tokens::{Token, TokenKind};
-use crate::SyntaxError;
+use crate::tokens::{Input, Token, TokenKind};
 
-fn parse_token(input: &str) -> IResult<&str, Option<Token<'_>>, SyntaxError> {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TokenizationError {
+    NotFound,
+    InvalidString(StrSlice),
+    InvalidNumber(StrSlice),
+    Internal {
+        kind: nom::error::ErrorKind,
+        at: usize,
+    },
+    LeftoverTokens(StrSlice),
+}
+
+impl TokenizationError {
+    fn not_found() -> nom::Err<TokenizationError> {
+        nom::Err::Error(TokenizationError::NotFound)
+    }
+}
+
+impl ParseError<Input<'_>> for TokenizationError {
+    fn from_error_kind(input: Input<'_>, kind: nom::error::ErrorKind) -> Self {
+        TokenizationError::Internal {
+            kind,
+            at: input.offset(),
+        }
+    }
+
+    fn append(input: Input<'_>, kind: nom::error::ErrorKind, _: Self) -> Self {
+        TokenizationError::Internal {
+            kind,
+            at: input.offset(),
+        }
+    }
+}
+
+fn parse_token(input: Input) -> IResult<Input, Option<Token>, TokenizationError> {
     if input.is_empty() {
         Ok((input, None))
-    } else if let Ok((input, op)) = long_operator(input) {
-        Ok((input, Some(Token::new(TokenKind::Operator, op))))
-    } else if let Ok((input, op)) = any_punctuation(input) {
-        Ok((input, Some(Token::new(TokenKind::Punctuation, op))))
-    } else if let Ok((input, kwd)) = any_keyword(input) {
-        Ok((input, Some(Token::new(TokenKind::Keyword, kwd))))
-    } else if let Ok((input, op)) = short_operator(input) {
-        Ok((input, Some(Token::new(TokenKind::Operator, op))))
-    } else if let Ok((input, lit)) = bool_literal(input) {
-        Ok((input, Some(Token::new(TokenKind::BooleanLiteral, lit))))
     } else {
         map(
             alt((
+                map(long_operator, |s| Token::new(TokenKind::Operator, s)),
+                map(any_punctuation, |s| Token::new(TokenKind::Punctuation, s)),
+                map(any_keyword, |s| Token::new(TokenKind::Keyword, s)),
+                map(short_operator, |s| Token::new(TokenKind::Operator, s)),
+                map(bool_literal, |s| Token::new(TokenKind::BooleanLiteral, s)),
                 map(comment, |s| Token::new(TokenKind::Comment, s)),
                 map(string_literal, |s| Token::new(TokenKind::StringLiteral, s)),
                 number_literal,
@@ -38,7 +67,7 @@ fn parse_token(input: &str) -> IResult<&str, Option<Token<'_>>, SyntaxError> {
     }
 }
 
-fn any_punctuation(input: &str) -> IResult<&str, &'static str, ()> {
+fn any_punctuation(input: Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationError> {
     alt((
         punctuation_tag("("),
         punctuation_tag(")"),
@@ -58,7 +87,7 @@ fn any_punctuation(input: &str) -> IResult<&str, &'static str, ()> {
     ))(input)
 }
 
-fn long_operator(input: &str) -> IResult<&str, &'static str, ()> {
+fn long_operator(input: Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationError> {
     alt((
         keyword_tag("to"),
         keyword_tag("=="),
@@ -71,7 +100,7 @@ fn long_operator(input: &str) -> IResult<&str, &'static str, ()> {
     ))(input)
 }
 
-fn short_operator(input: &str) -> IResult<&str, &'static str, ()> {
+fn short_operator(input: Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationError> {
     alt((
         keyword_tag("<"),
         keyword_tag(">"),
@@ -82,7 +111,7 @@ fn short_operator(input: &str) -> IResult<&str, &'static str, ()> {
     ))(input)
 }
 
-fn any_keyword(input: &str) -> IResult<&str, &'static str, ()> {
+fn any_keyword(input: Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationError> {
     alt((
         keyword_tag("None"),
         keyword_tag("then"),
@@ -94,37 +123,36 @@ fn any_keyword(input: &str) -> IResult<&str, &'static str, ()> {
     ))(input)
 }
 
-fn string_literal(input: &str) -> IResult<&str, &str, SyntaxError> {
-    let old_input = input;
-    let (input, _) = tag("\"")(input)?;
-    let (input, _) = ignore_string_inner(input)?;
-    let (input, _) = alt((tag("\""), eof))(input)?;
+fn string_literal(input: Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationError> {
+    let (rest, _) = punctuation_tag("\"")(input)?;
+    let (rest, _) = parse_string_inner(rest)?;
+    let (rest, _) = alt((punctuation_tag("\""), map(eof, |_| input.split_empty())))(rest)?;
 
-    Ok((input, &old_input[0..old_input.len() - input.len()]))
+    Ok(input.split_until(rest))
 }
 
-fn number_literal(input: &str) -> IResult<&str, Token<'_>, SyntaxError> {
+fn number_literal(input: Input<'_>) -> IResult<Input<'_>, Token, TokenizationError> {
     // skip sign
-    let rest = input.strip_prefix('-').unwrap_or(input);
+    let (rest, _) = input.strip_prefix("-").unwrap_or_else(|| input.split_at(0));
 
     // skip places before the dot
-    let rest = match rest.strip_prefix('0') {
-        Some(s) => s,
-        None => {
+    let (rest, _) = rest
+        .strip_prefix("0")
+        .or_else(|| {
             let places = rest.chars().take_while(char::is_ascii_digit).count();
-            if places == 0 {
-                return Err(nom::Err::Error(SyntaxError::InternalError));
+            if places > 0 {
+                Some(rest.split_at(places))
+            } else {
+                None
             }
-            &rest[places..]
-        }
-    };
+        })
+        .ok_or_else(TokenizationError::not_found)?;
 
     // skip the dot, if present
-    let rest = match rest.strip_prefix('.') {
+    let (rest, _) = match rest.strip_prefix(".") {
         Some(s) => s,
         None => {
-            let number_len = input.len() - rest.len();
-            let (number, rest) = input.split_at(number_len);
+            let (rest, number) = input.split_until(rest);
             return Ok((rest, Token::new(TokenKind::IntegerLiteral, number)));
         }
     };
@@ -132,139 +160,129 @@ fn number_literal(input: &str) -> IResult<&str, Token<'_>, SyntaxError> {
     // skip places after the dot
     let places = rest.chars().take_while(char::is_ascii_digit).count();
     if places == 0 {
-        return SyntaxError::expected(
-            input,
-            "float",
-            None::<&str>,
-            Some("valid floats can be written like 1.0 or 5.23"),
-        );
+        return Err(nom::Err::Failure(TokenizationError::InvalidNumber(
+            input.split_until(rest).1,
+        )));
     }
-    let rest = &rest[places..];
+    let (rest, _) = rest.split_at(places);
 
-    let number_len = input.len() - rest.len();
-    let (number, rest) = input.split_at(number_len);
+    let (rest, number) = input.split_until(rest);
     Ok((rest, Token::new(TokenKind::FloatLiteral, number)))
 }
 
-fn bool_literal(input: &str) -> IResult<&str, &'static str, ()> {
+fn bool_literal(input: Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationError> {
     alt((keyword_tag("True"), keyword_tag("False")))(input)
 }
 
-fn symbol(input: &str) -> IResult<&str, &str, SyntaxError> {
-    let symbol_chars = input
+fn symbol(input: Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationError> {
+    let len = input
         .chars()
         .take_while(|&c| is_symbol_char(c))
-        .map(|c| c.len_utf8())
+        .map(char::len_utf8)
         .sum();
-    if symbol_chars == 0 {
-        return Err(nom::Err::Error(SyntaxError::InternalError));
+
+    if len == 0 {
+        return Err(TokenizationError::not_found());
     }
 
-    let (symbol, rest) = input.split_at(symbol_chars);
-    Ok((rest, symbol))
+    Ok(input.split_at(len))
 }
 
-fn whitespace(input: &str) -> IResult<&str, &str, SyntaxError> {
+fn whitespace(input: Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationError> {
     let ws_chars = input.chars().take_while(char::is_ascii_whitespace).count();
 
     if ws_chars == 0 {
-        return Err(nom::Err::Error(SyntaxError::InternalError));
+        return Err(TokenizationError::not_found());
     }
 
-    let (ws, rest) = input.split_at(ws_chars);
-    Ok((rest, ws))
+    Ok(input.split_at(ws_chars))
 }
 
-fn other(input: &str) -> IResult<&str, &str, SyntaxError> {
-    let mut chars = input.chars();
-    match chars.next() {
-        Some(_) => {
-            let rest = chars.as_str();
-            Ok((rest, &input[..input.len() - rest.len()]))
-        }
-        None => Err(nom::Err::Error(SyntaxError::InternalError)),
+fn other(input: Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationError> {
+    match input.chars().next() {
+        Some(c) => Ok(input.split_at(c.len_utf8())),
+        None => Err(TokenizationError::not_found()),
     }
 }
 
-fn comment(input: &str) -> IResult<&str, &str, SyntaxError> {
+fn comment(input: Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationError> {
     if input.starts_with('#') {
-        let index = input
+        let len = input
             .chars()
             .take_while(|&c| !matches!(c, '\r' | '\n'))
             .map(|c| c.len_utf8())
-            .sum::<usize>();
+            .sum();
 
-        let (comment, rest) = input.split_at(index);
-        Ok((rest, comment))
+        Ok(input.split_at(len))
     } else {
-        Err(nom::Err::Error(SyntaxError::InternalError))
+        Err(TokenizationError::not_found())
     }
 }
 
-fn ignore_string_inner(mut input: &str) -> IResult<&str, (), SyntaxError> {
+fn parse_string_inner(input: Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationError> {
+    let mut rest = input;
     loop {
-        match input.chars().next() {
-            Some('\"') | None => break,
-            Some('\\') => {
-                match parse_escape(input) {
-                    Ok((new_input, _)) => input = new_input,
-                    Err(_) => return SyntaxError::unrecoverable(
-                        input,
-                        "string",
-                        Some("invalid escape"),
-                        Some(
-                            "escape codes can be one of: \\\", \\\\, \\/, \\b, \\f, \\n, \\r, \\t ",
-                        ),
-                    ),
-                }
-            }
-            Some(ch) => {
-                input = &input[ch.len_utf8()..];
-            }
+        match rest.chars().next() {
+            Some('"') | None => break,
+            Some('\\') => rest = parse_escape(rest)?.0,
+            Some(ch) => rest = rest.split_at(ch.len_utf8()).0,
         }
     }
 
-    Ok((input, ()))
+    Ok(input.split_until(rest))
 }
 
-fn parse_escape(input: &str) -> IResult<&str, (), SyntaxError> {
-    fn parse_hex_digit(input: &str) -> IResult<&str, &str, SyntaxError> {
-        let mut chars = input.chars();
-        chars
+fn parse_escape(input: Input) -> IResult<Input, (), TokenizationError> {
+    fn parse_hex_digit(input: Input) -> IResult<Input, StrSlice, TokenizationError> {
+        input
+            .chars()
             .next()
             .filter(char::is_ascii_hexdigit)
-            .ok_or(nom::Err::Error(SyntaxError::InternalError))?;
-        Ok((chars.as_str(), ""))
+            .ok_or_else(TokenizationError::not_found)?;
+        Ok(input.split_at(1))
     }
 
-    let (input, _) = tag("\\")(input)?;
-    let (input, _) = alt((
-        tag("\""),
-        tag("\\"),
-        tag("b"),
-        tag("f"),
-        tag("n"),
-        tag("r"),
-        tag("t"),
+    let (rest, _) = punctuation_tag("\\")(input)?;
+    let (rest, _) = alt((
+        punctuation_tag("\""),
+        punctuation_tag("\\"),
+        punctuation_tag("b"),
+        punctuation_tag("f"),
+        punctuation_tag("n"),
+        punctuation_tag("r"),
+        punctuation_tag("t"),
         map(
             tuple((
-                tag("u{"),
-                fold_many_m_n(1, 5, parse_hex_digit, || "", |_, _| ""),
-                tag("}"),
+                punctuation_tag("u{"),
+                fold_many_m_n(
+                    1,
+                    5,
+                    parse_hex_digit,
+                    || rest.split_empty(),
+                    |_, _| rest.split_empty(),
+                ),
+                punctuation_tag("}"),
             )),
-            |_| "",
+            |_| rest.split_empty(),
         ),
-    ))(input)?;
-    Ok((input, ()))
+    ))(rest)
+    .map_err(|_| {
+        nom::Err::Failure(TokenizationError::InvalidString(
+            input.split_saturating(2).1,
+        ))
+    })?;
+    Ok((rest, ()))
 }
 
 /// Parses a word that contains characters which can also appear in a symbol.
 ///
 /// This parser ensures that the word is *not* immediately followed by symbol characters.
-fn keyword_tag<'a>(keyword: &'a str) -> impl Fn(&str) -> IResult<&str, &'a str, ()> {
-    move |input: &str| match input.strip_prefix(keyword) {
-        Some(rest) if !rest.starts_with(is_symbol_char) => Ok((rest, keyword)),
-        _ => Err(nom::Err::Error(())),
+fn keyword_tag(
+    keyword: &str,
+) -> impl '_ + Fn(Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationError> {
+    move |input: Input<'_>| match input.strip_prefix(keyword) {
+        Some((rest, keyword)) if !rest.starts_with(is_symbol_char) => Ok((rest, keyword)),
+        _ => Err(TokenizationError::not_found()),
     }
 }
 
@@ -272,10 +290,12 @@ fn keyword_tag<'a>(keyword: &'a str) -> impl Fn(&str) -> IResult<&str, &'a str, 
 ///
 /// This is essentially the same as `nom::bytes::complete::tag`, but with different lifetimes:
 /// If the provided string has a 'static lifetime, so does the returned string.
-fn punctuation_tag<'a>(punct: &'a str) -> impl Fn(&str) -> IResult<&str, &'a str, ()> {
-    move |input: &str| match input.strip_prefix(punct) {
-        Some(rest) => Ok((rest, punct)),
-        _ => Err(nom::Err::Error(())),
+fn punctuation_tag(
+    punct: &str,
+) -> impl '_ + Fn(Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationError> {
+    move |input: Input<'_>| match input.strip_prefix(punct) {
+        Some((rest, punct)) => Ok((rest, punct)),
+        None => Err(TokenizationError::not_found()),
     }
 }
 
@@ -311,7 +331,7 @@ fn is_symbol_char(c: char) -> bool {
     }
 }
 
-pub fn parse_tokens(mut input: &str) -> IResult<&str, Vec<Token>, SyntaxError> {
+pub(crate) fn parse_tokens(mut input: Input<'_>) -> Result<Vec<Token>, TokenizationError> {
     let mut result = Vec::new();
     loop {
         match parse_token(input) {
@@ -320,12 +340,40 @@ pub fn parse_tokens(mut input: &str) -> IResult<&str, Vec<Token>, SyntaxError> {
                 result.push(token);
             }
             Ok((_, None)) => break,
-            Err(e) => return Err(e),
+            Err(e) => match e {
+                nom::Err::Incomplete(_) => unreachable!(),
+                nom::Err::Error(e) | nom::Err::Failure(e) => return Err(e),
+            },
         }
     }
     if input.is_empty() {
-        Ok((input, result))
+        Ok(result)
     } else {
-        Err(nom::Err::Failure(SyntaxError::InternalError))
+        Err(TokenizationError::LeftoverTokens(input.as_str_slice()))
+    }
+}
+
+pub fn tokenize(input: &str) -> Result<Vec<Token>, TokenizationError> {
+    let str = input.into();
+    let mut input = Input::new(&str);
+
+    let mut result = Vec::new();
+    loop {
+        match parse_token(input) {
+            Ok((new_input, Some(token))) => {
+                input = new_input;
+                result.push(token);
+            }
+            Ok((_, None)) => break,
+            Err(e) => match e {
+                nom::Err::Incomplete(_) => unreachable!(),
+                nom::Err::Error(e) | nom::Err::Failure(e) => return Err(e),
+            },
+        }
+    }
+    if input.is_empty() {
+        Ok(result)
+    } else {
+        Err(TokenizationError::LeftoverTokens(input.as_str_slice()))
     }
 }
