@@ -3,7 +3,7 @@
 A shell by the beach!
 
 <p float="left">
-  <a href="https://asciinema.org/a/7Cr96ndSzsIch7oGVYI3aIaX9"><img src="./assets/welcome2.png" width="48%"/></a>
+  <a href="https://asciinema.org/a/7Cr96ndSzsIch7oGVYI3aIaX9"><img src="./assets/welcome2.png" width="46%"/></a>
   <a href="https://asciinema.org/a/7Cr96ndSzsIch7oGVYI3aIaX9"><img src="./assets/about.png" width="48%"/></a>
 </p>
 
