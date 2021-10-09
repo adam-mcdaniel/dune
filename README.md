@@ -36,8 +36,8 @@ I put a *lot* of work into making Dune just fun to use. It's like a neat little 
 Dune also attempts to be a usable scripting language, and even offers a few niche metaprogramming features such as quoting *(borrowed from [Lisp](https://github.com/adam-mcdaniel/wisp))*, operator overloading, and macros!
 
 <p float="left">
-  <a href="https://asciinema.org/a/7Cr96ndSzsIch7oGVYI3aIaX9"><img src="./assets/metaprogramming.png" width="45%"/></a>
-  <a href="https://asciinema.org/a/7Cr96ndSzsIch7oGVYI3aIaX9"><img src="./assets/operator-overloading.png" width="52.85%"/></a>
+  <a href="https://asciinema.org/a/7Cr96ndSzsIch7oGVYI3aIaX9"><img src="./assets/metaprogramming.png" width="46%"/></a>
+  <a href="https://asciinema.org/a/7Cr96ndSzsIch7oGVYI3aIaX9"><img src="./assets/operator-overloading.png" width="52.3%"/></a>
 </p>
 
 Overall, I wrote Dune to have a *complete* shell of my own: one that's fast, useful, and pretty.
