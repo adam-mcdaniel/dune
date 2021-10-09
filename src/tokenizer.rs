@@ -355,25 +355,6 @@ pub(crate) fn parse_tokens(mut input: Input<'_>) -> Result<Vec<Token>, Tokenizat
 
 pub fn tokenize(input: &str) -> Result<Vec<Token>, TokenizationError> {
     let str = input.into();
-    let mut input = Input::new(&str);
-
-    let mut result = Vec::new();
-    loop {
-        match parse_token(input) {
-            Ok((new_input, Some(token))) => {
-                input = new_input;
-                result.push(token);
-            }
-            Ok((_, None)) => break,
-            Err(e) => match e {
-                nom::Err::Incomplete(_) => unreachable!(),
-                nom::Err::Error(e) | nom::Err::Failure(e) => return Err(e),
-            },
-        }
-    }
-    if input.is_empty() {
-        Ok(result)
-    } else {
-        Err(TokenizationError::LeftoverTokens(input.as_str_slice()))
-    }
+    let input = Input::new(&str);
+    parse_tokens(input)
 }
