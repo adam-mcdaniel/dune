@@ -1,0 +1,5 @@
+Hello, welcome to Dune's help macro!
+
+The `prelude` is the startup file that Dune runs before executing
+interactive mode. This file is stored at `.dune-prelude` in your home
+directory. To do anything on Dune's startup, add it to the prelude!

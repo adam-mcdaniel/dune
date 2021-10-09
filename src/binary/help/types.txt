@@ -1,0 +1,15 @@
+Hello, welcome to Dune's help macro!
+
+Dune has the following types in its typesystem:
+1. `Integer`: a signed integer
+2. `Float`: a floating point number
+3. `String`: a string
+4. `Bytes`: a list of bytes from a file or from the stdout of a program
+5. `Boolean`: a boolean
+6. `None`: a null value
+7. `List`: a list of expressions
+8. `Map`: a table of expressions
+9. `Lambda`: a function
+10. `Macro`: a macro (exactly like a function, but executes within the current scope)
+11. `Builtin`: a builtin function
+12. `Symbol`: the type of a variable name like `x`
