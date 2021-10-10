@@ -243,17 +243,19 @@ fn syntax_highlight(line: &str) -> String {
                     result.push_str("\x1b[38;5;9m");
                     result.push_str(e.to_str(line));
                     is_colored = true;
-                } else if l == "None" {
-                    result.push_str("\x1b[91m");
-                    is_colored = true;
-                } else if matches!(l, "echo" | "exit" | "clear" | "cd" | "rm") {
-                    result.push_str("\x1b[94m");
-                    is_colored = true;
-                } else if is_colored {
-                    result.push_str("\x1b[m\x1b[0m");
-                    is_colored = false;
+                } else {
+                    if l == "None" {
+                        result.push_str("\x1b[91m");
+                        is_colored = true;
+                    } else if matches!(l, "echo" | "exit" | "clear" | "cd" | "rm") {
+                        result.push_str("\x1b[94m");
+                        is_colored = true;
+                    } else if is_colored {
+                        result.push_str("\x1b[m\x1b[0m");
+                        is_colored = false;
+                    }
+                    result.push_str(l);
                 }
-                result.push_str(l);
             }
             (TokenKind::Whitespace, w) => {
                 result.push_str(w);
