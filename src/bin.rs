@@ -2,7 +2,7 @@
 
 mod binary;
 
-use dune::{parse_script, Environment, Error, Expression, SyntaxError, TokenKind};
+use dune::{parse_script, Diagnostic, Environment, Error, Expression, SyntaxError, TokenKind};
 
 use rustyline::completion::{Completer, FilenameCompleter, Pair as PairComplete};
 use rustyline::config::OutputStreamType;
@@ -171,15 +171,12 @@ impl Completer for DuneHelper {
 }
 
 fn syntax_highlight(line: &str) -> String {
-    let tokens = match dune::tokenize(line) {
-        Ok(t) => t,
-        Err(_) => return line.to_string(),
-    };
+    let (tokens, diagnostics) = dune::tokenize(line);
 
     let mut result = String::new();
     let mut is_colored = false;
 
-    for token in tokens {
+    for (token, diagnostic) in tokens.iter().zip(&diagnostics) {
         match (token.kind, token.range.to_str(line)) {
             (TokenKind::BooleanLiteral, b) => {
                 result.push_str("\x1b[95m");
@@ -211,17 +208,42 @@ fn syntax_highlight(line: &str) -> String {
             (TokenKind::StringLiteral, s) => {
                 result.push_str("\x1b[38;5;208m");
                 is_colored = true;
-                result.push_str(s);
+
+                if let Diagnostic::InvalidStringEscapes(ranges) = diagnostic {
+                    let mut last_end = token.range.start();
+
+                    for &range in ranges.iter() {
+                        result.push_str(&line[last_end..range.start()]);
+                        result.push_str("\x1b[38;5;9m");
+                        result.push_str(range.to_str(line));
+                        result.push_str("\x1b[38;5;208m");
+                        last_end = range.end();
+                    }
+
+                    result.push_str(&line[last_end..token.range.end()]);
+                } else {
+                    result.push_str(s);
+                }
             }
             (TokenKind::IntegerLiteral | TokenKind::FloatLiteral, l) => {
-                if is_colored {
-                    result.push_str("\x1b[m\x1b[0m");
-                    is_colored = false;
+                if let Diagnostic::InvalidNumber(e) = diagnostic {
+                    result.push_str("\x1b[38;5;9m");
+                    result.push_str(e.to_str(line));
+                    is_colored = true;
+                } else {
+                    if is_colored {
+                        result.push_str("\x1b[m\x1b[0m");
+                        is_colored = false;
+                    }
+                    result.push_str(l);
                 }
-                result.push_str(l);
             }
             (TokenKind::Symbol, l) => {
-                if l == "None" {
+                if let Diagnostic::IllegalChar(e) = diagnostic {
+                    result.push_str("\x1b[38;5;9m");
+                    result.push_str(e.to_str(line));
+                    is_colored = true;
+                } else if l == "None" {
                     result.push_str("\x1b[91m");
                     is_colored = true;
                 } else if matches!(l, "echo" | "exit" | "clear" | "cd" | "rm") {
@@ -241,10 +263,14 @@ fn syntax_highlight(line: &str) -> String {
                 is_colored = true;
                 result.push_str(w);
             }
-            (TokenKind::Other, o) => {
+        }
+    }
+    if diagnostics.len() > tokens.len() {
+        for diagnostic in &diagnostics[tokens.len()..] {
+            if let Diagnostic::NotTokenized(e) = diagnostic {
                 result.push_str("\x1b[38;5;9m");
+                result.push_str(e.to_str(line));
                 is_colored = true;
-                result.push_str(o);
             }
         }
     }

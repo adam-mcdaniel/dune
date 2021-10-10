@@ -1,3 +1,5 @@
+use std::convert::TryFrom;
+
 use detached_str::StrSlice;
 use nom::{
     branch::alt,
@@ -10,64 +12,68 @@ use nom::{
 
 use crate::tokens::{Input, Token, TokenKind};
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+struct NotFoundError;
+
+const NOT_FOUND: nom::Err<NotFoundError> = nom::Err::Error(NotFoundError);
+
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TokenizationError {
-    NotFound,
-    InvalidString(StrSlice),
+pub enum Diagnostic {
+    Valid,
+    InvalidStringEscapes(Box<[StrSlice]>),
     InvalidNumber(StrSlice),
-    Internal {
-        kind: nom::error::ErrorKind,
-        at: usize,
-    },
-    LeftoverTokens(StrSlice),
+    IllegalChar(StrSlice),
+    NotTokenized(StrSlice),
 }
 
-impl TokenizationError {
-    fn not_found() -> nom::Err<TokenizationError> {
-        nom::Err::Error(TokenizationError::NotFound)
+impl<I> ParseError<I> for NotFoundError {
+    fn from_error_kind(_: I, _: nom::error::ErrorKind) -> Self {
+        NotFoundError
+    }
+
+    fn append(_: I, _: nom::error::ErrorKind, other: Self) -> Self {
+        other
     }
 }
 
-impl ParseError<Input<'_>> for TokenizationError {
-    fn from_error_kind(input: Input<'_>, kind: nom::error::ErrorKind) -> Self {
-        TokenizationError::Internal {
-            kind,
-            at: input.offset(),
-        }
-    }
+type TokenizationResult<'a, T = StrSlice> = IResult<Input<'a>, T, NotFoundError>;
 
-    fn append(input: Input<'_>, kind: nom::error::ErrorKind, _: Self) -> Self {
-        TokenizationError::Internal {
-            kind,
-            at: input.offset(),
-        }
-    }
-}
-
-fn parse_token(input: Input) -> IResult<Input, Option<Token>, TokenizationError> {
+fn parse_token(input: Input) -> TokenizationResult<'_, (Token, Diagnostic)> {
     if input.is_empty() {
-        Ok((input, None))
+        Err(NOT_FOUND)
     } else {
-        map(
-            alt((
-                map(long_operator, |s| Token::new(TokenKind::Operator, s)),
-                map(any_punctuation, |s| Token::new(TokenKind::Punctuation, s)),
-                map(any_keyword, |s| Token::new(TokenKind::Keyword, s)),
-                map(short_operator, |s| Token::new(TokenKind::Operator, s)),
-                map(bool_literal, |s| Token::new(TokenKind::BooleanLiteral, s)),
-                map(comment, |s| Token::new(TokenKind::Comment, s)),
-                map(string_literal, |s| Token::new(TokenKind::StringLiteral, s)),
-                number_literal,
-                map(symbol, |s| Token::new(TokenKind::Symbol, s)),
-                map(whitespace, |s| Token::new(TokenKind::Whitespace, s)),
-                map(other, |s| Token::new(TokenKind::Other, s)),
-            )),
-            Some,
-        )(input)
+        Ok(alt((
+            map_valid_token(long_operator, TokenKind::Operator),
+            map_valid_token(any_punctuation, TokenKind::Punctuation),
+            map_valid_token(any_keyword, TokenKind::Keyword),
+            map_valid_token(short_operator, TokenKind::Operator),
+            map_valid_token(bool_literal, TokenKind::BooleanLiteral),
+            map_valid_token(comment, TokenKind::Comment),
+            string_literal,
+            number_literal,
+            map_valid_token(symbol, TokenKind::Symbol),
+            map_valid_token(whitespace, TokenKind::Whitespace),
+        ))(input)
+        .unwrap_or_else(|_| {
+            let next = input.chars().next().unwrap();
+            let (rest, range) = input.split_at(next.len_utf8());
+            let token = Token::new(TokenKind::Symbol, range);
+            (rest, (token, Diagnostic::IllegalChar(range)))
+        }))
     }
 }
 
-fn any_punctuation(input: Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationError> {
+fn map_valid_token(
+    mut parser: impl FnMut(Input<'_>) -> TokenizationResult<'_>,
+    kind: TokenKind,
+) -> impl FnMut(Input<'_>) -> TokenizationResult<'_, (Token, Diagnostic)> {
+    move |input| {
+        let (input, s) = parser(input)?;
+        Ok((input, (Token::new(kind, s), Diagnostic::Valid)))
+    }
+}
+
+fn any_punctuation(input: Input<'_>) -> TokenizationResult<'_> {
     alt((
         punctuation_tag("("),
         punctuation_tag(")"),
@@ -87,7 +93,7 @@ fn any_punctuation(input: Input<'_>) -> IResult<Input<'_>, StrSlice, Tokenizatio
     ))(input)
 }
 
-fn long_operator(input: Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationError> {
+fn long_operator(input: Input<'_>) -> TokenizationResult<'_> {
     alt((
         keyword_tag("to"),
         keyword_tag("=="),
@@ -100,7 +106,7 @@ fn long_operator(input: Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationE
     ))(input)
 }
 
-fn short_operator(input: Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationError> {
+fn short_operator(input: Input<'_>) -> TokenizationResult<'_> {
     alt((
         keyword_tag("<"),
         keyword_tag(">"),
@@ -111,7 +117,7 @@ fn short_operator(input: Input<'_>) -> IResult<Input<'_>, StrSlice, Tokenization
     ))(input)
 }
 
-fn any_keyword(input: Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationError> {
+fn any_keyword(input: Input<'_>) -> TokenizationResult<'_> {
     alt((
         keyword_tag("None"),
         keyword_tag("then"),
@@ -123,15 +129,17 @@ fn any_keyword(input: Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationErr
     ))(input)
 }
 
-fn string_literal(input: Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationError> {
+fn string_literal(input: Input<'_>) -> TokenizationResult<'_, (Token, Diagnostic)> {
     let (rest, _) = punctuation_tag("\"")(input)?;
-    let (rest, _) = parse_string_inner(rest)?;
+    let (rest, diagnostics) = parse_string_inner(rest)?;
     let (rest, _) = alt((punctuation_tag("\""), map(eof, |_| input.split_empty())))(rest)?;
 
-    Ok(input.split_until(rest))
+    let (rest, range) = input.split_until(rest);
+    let token = Token::new(TokenKind::StringLiteral, range);
+    Ok((rest, (token, diagnostics)))
 }
 
-fn number_literal(input: Input<'_>) -> IResult<Input<'_>, Token, TokenizationError> {
+fn number_literal(input: Input<'_>) -> TokenizationResult<'_, (Token, Diagnostic)> {
     // skip sign
     let (rest, _) = input.strip_prefix("-").unwrap_or_else(|| input.split_at(0));
 
@@ -146,35 +154,37 @@ fn number_literal(input: Input<'_>) -> IResult<Input<'_>, Token, TokenizationErr
                 None
             }
         })
-        .ok_or_else(TokenizationError::not_found)?;
+        .ok_or(NOT_FOUND)?;
 
     // skip the dot, if present
     let (rest, _) = match rest.strip_prefix(".") {
         Some(s) => s,
         None => {
             let (rest, number) = input.split_until(rest);
-            return Ok((rest, Token::new(TokenKind::IntegerLiteral, number)));
+            let token = Token::new(TokenKind::IntegerLiteral, number);
+            return Ok((rest, (token, Diagnostic::Valid)));
         }
     };
 
     // skip places after the dot
     let places = rest.chars().take_while(char::is_ascii_digit).count();
     if places == 0 {
-        return Err(nom::Err::Failure(TokenizationError::InvalidNumber(
-            input.split_until(rest).1,
-        )));
+        let (rest, range) = input.split_until(rest);
+        let token = Token::new(TokenKind::FloatLiteral, range);
+        return Ok((rest, (token, Diagnostic::InvalidNumber(range))));
     }
     let (rest, _) = rest.split_at(places);
 
-    let (rest, number) = input.split_until(rest);
-    Ok((rest, Token::new(TokenKind::FloatLiteral, number)))
+    let (rest, range) = input.split_until(rest);
+    let token = Token::new(TokenKind::FloatLiteral, range);
+    Ok((rest, (token, Diagnostic::Valid)))
 }
 
-fn bool_literal(input: Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationError> {
+fn bool_literal(input: Input<'_>) -> TokenizationResult<'_> {
     alt((keyword_tag("True"), keyword_tag("False")))(input)
 }
 
-fn symbol(input: Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationError> {
+fn symbol(input: Input<'_>) -> TokenizationResult<'_> {
     let len = input
         .chars()
         .take_while(|&c| is_symbol_char(c))
@@ -182,30 +192,23 @@ fn symbol(input: Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationError> {
         .sum();
 
     if len == 0 {
-        return Err(TokenizationError::not_found());
+        return Err(NOT_FOUND);
     }
 
     Ok(input.split_at(len))
 }
 
-fn whitespace(input: Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationError> {
+fn whitespace(input: Input<'_>) -> TokenizationResult<'_> {
     let ws_chars = input.chars().take_while(char::is_ascii_whitespace).count();
 
     if ws_chars == 0 {
-        return Err(TokenizationError::not_found());
+        return Err(NOT_FOUND);
     }
 
     Ok(input.split_at(ws_chars))
 }
 
-fn other(input: Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationError> {
-    match input.chars().next() {
-        Some(c) => Ok(input.split_at(c.len_utf8())),
-        None => Err(TokenizationError::not_found()),
-    }
-}
-
-fn comment(input: Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationError> {
+fn comment(input: Input<'_>) -> TokenizationResult<'_> {
     if input.starts_with('#') {
         let len = input
             .chars()
@@ -215,35 +218,50 @@ fn comment(input: Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationError> 
 
         Ok(input.split_at(len))
     } else {
-        Err(TokenizationError::not_found())
+        Err(NOT_FOUND)
     }
 }
 
-fn parse_string_inner(input: Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationError> {
+fn parse_string_inner(input: Input<'_>) -> TokenizationResult<'_, Diagnostic> {
     let mut rest = input;
+    let mut errors = Vec::new();
+
     loop {
         match rest.chars().next() {
             Some('"') | None => break,
-            Some('\\') => rest = parse_escape(rest)?.0,
+            Some('\\') => {
+                let (r, diagnostic) = parse_escape(rest)?;
+                rest = r;
+                if let Diagnostic::InvalidStringEscapes(ranges) = diagnostic {
+                    errors.push(ranges[0]);
+                }
+            }
             Some(ch) => rest = rest.split_at(ch.len_utf8()).0,
         }
     }
 
-    Ok(input.split_until(rest))
+    let diagnostic = match errors.is_empty() {
+        true => Diagnostic::Valid,
+        false => Diagnostic::InvalidStringEscapes(errors.into_boxed_slice()),
+    };
+
+    Ok((rest, diagnostic))
 }
 
-fn parse_escape(input: Input) -> IResult<Input, (), TokenizationError> {
-    fn parse_hex_digit(input: Input) -> IResult<Input, StrSlice, TokenizationError> {
+fn parse_escape(input: Input<'_>) -> TokenizationResult<'_, Diagnostic> {
+    fn parse_hex_digit(input: Input<'_>) -> TokenizationResult<'_> {
         input
             .chars()
             .next()
             .filter(char::is_ascii_hexdigit)
-            .ok_or_else(TokenizationError::not_found)?;
+            .ok_or(NOT_FOUND)?;
+
         Ok(input.split_at(1))
     }
 
     let (rest, _) = punctuation_tag("\\")(input)?;
-    let (rest, _) = alt((
+
+    let mut parser1 = alt((
         punctuation_tag("\""),
         punctuation_tag("\\"),
         punctuation_tag("b"),
@@ -251,38 +269,63 @@ fn parse_escape(input: Input) -> IResult<Input, (), TokenizationError> {
         punctuation_tag("n"),
         punctuation_tag("r"),
         punctuation_tag("t"),
-        map(
-            tuple((
-                punctuation_tag("u{"),
-                fold_many_m_n(
-                    1,
-                    5,
-                    parse_hex_digit,
-                    || rest.split_empty(),
-                    |_, _| rest.split_empty(),
-                ),
-                punctuation_tag("}"),
-            )),
-            |_| rest.split_empty(),
+    ));
+    if let Ok((rest, _)) = parser1(rest) {
+        return Ok((rest, Diagnostic::Valid));
+    }
+
+    let mut parser2 = tuple((
+        punctuation_tag("u{"),
+        fold_many_m_n(
+            1,
+            5,
+            parse_hex_digit,
+            || None::<StrSlice>,
+            |a, b| match a {
+                Some(a) => Some(a.join(b)),
+                None => Some(b),
+            },
         ),
-    ))(rest)
-    .map_err(|_| {
-        nom::Err::Failure(TokenizationError::InvalidString(
-            input.split_saturating(2).1,
-        ))
-    })?;
-    Ok((rest, ()))
+    ));
+
+    let rest = match parser2(rest) {
+        Ok((rest, (_, range))) => {
+            let range = range.unwrap();
+            let hex = range.to_str(input.as_original_str());
+            let code_point = u32::from_str_radix(hex, 16).unwrap();
+            if char::try_from(code_point).is_ok() {
+                rest
+            } else {
+                let ranges = vec![range].into_boxed_slice();
+                return Ok((rest, Diagnostic::InvalidStringEscapes(ranges)));
+            }
+        }
+        Err(_) => {
+            let (rest, range) = input.split_saturating(2);
+            let ranges = vec![range].into_boxed_slice();
+            return Ok((rest, Diagnostic::InvalidStringEscapes(ranges)));
+        }
+    };
+
+    match punctuation_tag("}")(rest) {
+        Ok((rest, _)) => Ok((rest, Diagnostic::Valid)),
+        Err(_) => {
+            let (rest, range) = input.split_until(rest);
+            let ranges = vec![range].into_boxed_slice();
+            Ok((rest, Diagnostic::InvalidStringEscapes(ranges)))
+        }
+    }
 }
 
 /// Parses a word that contains characters which can also appear in a symbol.
 ///
 /// This parser ensures that the word is *not* immediately followed by symbol characters.
-fn keyword_tag(
-    keyword: &str,
-) -> impl '_ + Fn(Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationError> {
-    move |input: Input<'_>| match input.strip_prefix(keyword) {
-        Some((rest, keyword)) if !rest.starts_with(is_symbol_char) => Ok((rest, keyword)),
-        _ => Err(TokenizationError::not_found()),
+fn keyword_tag(keyword: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResult<'_> {
+    move |input: Input<'_>| {
+        input
+            .strip_prefix(keyword)
+            .filter(|(rest, _)| !rest.starts_with(is_symbol_char))
+            .ok_or(NOT_FOUND)
     }
 }
 
@@ -290,13 +333,8 @@ fn keyword_tag(
 ///
 /// This is essentially the same as `nom::bytes::complete::tag`, but with different lifetimes:
 /// If the provided string has a 'static lifetime, so does the returned string.
-fn punctuation_tag(
-    punct: &str,
-) -> impl '_ + Fn(Input<'_>) -> IResult<Input<'_>, StrSlice, TokenizationError> {
-    move |input: Input<'_>| match input.strip_prefix(punct) {
-        Some((rest, punct)) => Ok((rest, punct)),
-        None => Err(TokenizationError::not_found()),
-    }
+fn punctuation_tag(punct: &str) -> impl '_ + Fn(Input<'_>) -> TokenizationResult<'_> {
+    move |input: Input<'_>| input.strip_prefix(punct).ok_or(NOT_FOUND)
 }
 
 /// Checks whether the character is allowed in a symbol.
@@ -331,29 +369,26 @@ fn is_symbol_char(c: char) -> bool {
     }
 }
 
-pub(crate) fn parse_tokens(mut input: Input<'_>) -> Result<Vec<Token>, TokenizationError> {
-    let mut result = Vec::new();
+pub(crate) fn parse_tokens(mut input: Input<'_>) -> (Vec<Token>, Vec<Diagnostic>) {
+    let mut tokens = Vec::new();
+    let mut diagnostics = Vec::new();
     loop {
         match parse_token(input) {
-            Ok((new_input, Some(token))) => {
+            Err(_) => break,
+            Ok((new_input, (token, diagnostic))) => {
                 input = new_input;
-                result.push(token);
+                tokens.push(token);
+                diagnostics.push(diagnostic);
             }
-            Ok((_, None)) => break,
-            Err(e) => match e {
-                nom::Err::Incomplete(_) => unreachable!(),
-                nom::Err::Error(e) | nom::Err::Failure(e) => return Err(e),
-            },
         }
     }
-    if input.is_empty() {
-        Ok(result)
-    } else {
-        Err(TokenizationError::LeftoverTokens(input.as_str_slice()))
+    if !input.is_empty() {
+        diagnostics.push(Diagnostic::NotTokenized(input.as_str_slice()))
     }
+    (tokens, diagnostics)
 }
 
-pub fn tokenize(input: &str) -> Result<Vec<Token>, TokenizationError> {
+pub fn tokenize(input: &str) -> (Vec<Token>, Vec<Diagnostic>) {
     let str = input.into();
     let input = Input::new(&str);
     parse_tokens(input)

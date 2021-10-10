@@ -1,7 +1,10 @@
-use crate::{parse_script, tokenize, SyntaxError};
+use crate::{parse_script, tokenize, Diagnostic, SyntaxError};
 
 fn tokenize_test(input: &str, expected: &str) -> Result<(), SyntaxError> {
-    let tokens = tokenize(input)?;
+    let (tokens, mut diagnostics) = tokenize(input);
+    diagnostics.retain(|d| d != &Diagnostic::Valid);
+    assert_eq!(diagnostics.as_slice(), []);
+
     let got = format!("{:#?}", tokens);
     assert_eq!(got.as_str(), expected);
     Ok(())

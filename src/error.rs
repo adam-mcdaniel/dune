@@ -2,7 +2,7 @@ use detached_str::{Str, StrSlice};
 
 use core::fmt;
 
-use crate::TokenizationError;
+use crate::Diagnostic;
 
 use super::{Expression, SyntaxError};
 
@@ -45,10 +45,6 @@ impl fmt::Display for Error {
 
 fn fmt_syntax_error(string: &Str, err: &SyntaxError, f: &mut fmt::Formatter) -> fmt::Result {
     match err {
-        SyntaxError::InvalidToken(e) => {
-            write!(f, "{}{}syntax error{}: ", RED_START, BOLD, RESET)?;
-            writeln!(f, "invalid token {:?}", e.to_str(string))
-        }
         SyntaxError::Expected {
             input,
             expected,
@@ -67,7 +63,12 @@ fn fmt_syntax_error(string: &Str, err: &SyntaxError, f: &mut fmt::Formatter) -> 
             }
             Ok(())
         }
-        SyntaxError::TokenizationError(err) => fmt_token_error(string, err, f),
+        SyntaxError::TokenizationErrors(errors) => {
+            for err in errors.iter() {
+                fmt_token_error(string, err, f)?;
+            }
+            Ok(())
+        }
         SyntaxError::ExpectedChar { expected, at } => {
             write!(f, "{}{}syntax error{}: ", RED_START, BOLD, RESET)?;
             writeln!(f, "expected {:?}", expected)?;
@@ -93,27 +94,30 @@ fn fmt_syntax_error(string: &Str, err: &SyntaxError, f: &mut fmt::Formatter) -> 
     }
 }
 
-fn fmt_token_error(string: &Str, err: &TokenizationError, f: &mut fmt::Formatter) -> fmt::Result {
-    match *err {
-        TokenizationError::NotFound => unreachable!(),
-        TokenizationError::Internal { kind, at } => {
-            write!(f, "{}{}unexpected syntax error{}: ", RED_START, BOLD, RESET)?;
-            writeln!(f, "`{:?}`", kind)?;
-            print_error_lines(string, string.get(at..at + 1), f, 72)
+fn fmt_token_error(string: &Str, err: &Diagnostic, f: &mut fmt::Formatter) -> fmt::Result {
+    match err {
+        Diagnostic::Valid => Ok(()),
+        Diagnostic::InvalidStringEscapes(ranges) => {
+            for &at in ranges.iter() {
+                write!(f, "{}{}syntax error{}: ", RED_START, BOLD, RESET)?;
+                let escape = at.to_str(string).trim();
+                writeln!(f, "invalid string escape sequence `{}`", escape)?;
+                print_error_lines(string, at, f, 72)?;
+            }
+            Ok(())
         }
-        TokenizationError::InvalidString(at) => {
-            write!(f, "{}{}syntax error{}: ", RED_START, BOLD, RESET)?;
-            let escape = at.to_str(string).trim();
-            writeln!(f, "invalid string escape sequence `{}`", escape)?;
-            print_error_lines(string, at, f, 72)
-        }
-        TokenizationError::InvalidNumber(at) => {
+        &Diagnostic::InvalidNumber(at) => {
             write!(f, "{}{}syntax error{}: ", RED_START, BOLD, RESET)?;
             let num = at.to_str(string).trim();
             writeln!(f, "invalid number `{}`", num)?;
             print_error_lines(string, at, f, 72)
         }
-        TokenizationError::LeftoverTokens(at) => {
+        &Diagnostic::IllegalChar(at) => {
+            write!(f, "{}{}syntax error{}: ", RED_START, BOLD, RESET)?;
+            writeln!(f, "invalid token {:?}", at.to_str(string))?;
+            print_error_lines(string, at, f, 72)
+        }
+        &Diagnostic::NotTokenized(at) => {
             write!(f, "{}{}error{}: ", RED_START, BOLD, RESET)?;
             writeln!(
                 f,
