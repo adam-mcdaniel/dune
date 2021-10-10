@@ -171,8 +171,8 @@ impl Completer for DuneHelper {
 }
 
 fn syntax_highlight(line: &str) -> String {
-    let tokens = match dune::parse_tokens(line) {
-        Ok((_, t)) => t,
+    let tokens = match dune::tokenize(line) {
+        Ok(t) => t,
         Err(_) => return line.to_string(),
     };
 
@@ -180,7 +180,7 @@ fn syntax_highlight(line: &str) -> String {
     let mut is_colored = false;
 
     for token in tokens {
-        match (token.kind, token.text) {
+        match (token.kind, token.range.to_str(line)) {
             (TokenKind::BooleanLiteral, b) => {
                 result.push_str("\x1b[95m");
                 is_colored = true;
@@ -389,11 +389,15 @@ fn get_os_family(t: &Type) -> String {
     .to_string()
 }
 
-fn parse(input: impl AsRef<str>) -> Result<Expression, Error> {
-    match parse_script(input.as_ref()) {
+fn parse(input: &str) -> Result<Expression, Error> {
+    match parse_script(input) {
         Ok(result) => Ok(result),
-        Err(nom::Err::Error(e)) | Err(nom::Err::Failure(e)) => Err(Error::SyntaxError(e)),
-        Err(nom::Err::Incomplete(_)) => Err(Error::SyntaxError(SyntaxError::InternalError)),
+        Err(nom::Err::Error(e)) | Err(nom::Err::Failure(e)) => {
+            Err(Error::SyntaxError(input.into(), e))
+        }
+        Err(nom::Err::Incomplete(_)) => {
+            Err(Error::SyntaxError(input.into(), SyntaxError::InternalError))
+        }
     }
 }
 

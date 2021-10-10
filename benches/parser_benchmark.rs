@@ -4,7 +4,7 @@ const PRELUDE: &str = include_str!("./dune-prelude");
 
 pub fn tokenize_benchmark(c: &mut Criterion) {
     c.bench_function("tokenize prelude", |b| {
-        b.iter(|| dune::parse_tokens(black_box(PRELUDE)))
+        b.iter(|| dune::tokenize(black_box(PRELUDE)))
     });
 }
 
