@@ -3,8 +3,8 @@
 A shell by the beach!
 
 <p float="left">
-  <a href="https://asciinema.org/a/7Cr96ndSzsIch7oGVYI3aIaX9"><img src="./assets/welcome2.png" width="47.5%"/></a>
-  <a href="https://asciinema.org/a/7Cr96ndSzsIch7oGVYI3aIaX9"><img src="./assets/about.png" width="48%"/></a>
+  <a href="https://asciinema.org/a/441120"><img src="./assets/welcome2.png" width="47.5%"/></a>
+  <a href="https://asciinema.org/a/441120"><img src="./assets/about.png" width="48%"/></a>
 </p>
 
 ##### _NOTE: Click the image above for a video demonstration._
@@ -26,9 +26,9 @@ Dune, however, is designed ***completely*** differently from Atom (although you 
 This frontend implementation turns the coziness dial to 11. Just check out the shell's default startup script!
 
 <p float="left">
-  <a href="https://asciinema.org/a/7Cr96ndSzsIch7oGVYI3aIaX9"><img src="./assets/intro.png" width="32%"/></a>
-  <a href="https://asciinema.org/a/7Cr96ndSzsIch7oGVYI3aIaX9"><img src="./assets/help.png" width="32%"/></a>
-  <a href="https://asciinema.org/a/7Cr96ndSzsIch7oGVYI3aIaX9"><img src="./assets/bye.png" width="32%"/></a>
+  <img src="./assets/intro.png" width="32%"/>
+  <img src="./assets/help.png" width="32%"/>
+  <img src="./assets/bye.png" width="32%"/>
 </p>
 
 I put a *lot* of work into making Dune just fun to use. It's like a neat little operating system itself!
@@ -36,8 +36,8 @@ I put a *lot* of work into making Dune just fun to use. It's like a neat little 
 Dune also attempts to be a usable scripting language, and even offers a few niche metaprogramming features such as quoting *(borrowed from [Lisp](https://github.com/adam-mcdaniel/wisp))*, operator overloading, and macros!
 
 <p float="left">
-  <a href="https://asciinema.org/a/7Cr96ndSzsIch7oGVYI3aIaX9"><img src="./assets/metaprogramming.png" width="45%"/></a>
-  <a href="https://asciinema.org/a/7Cr96ndSzsIch7oGVYI3aIaX9"><img src="./assets/operator-overloading.png" width="52.85%"/></a>
+  <img src="./assets/metaprogramming.png" width="45%"/>
+  <img src="./assets/operator-overloading.png" width="52.85%"/>
 </p>
 
 Overall, I wrote Dune to have a *complete* shell of my own: one that's fast, useful, and pretty.
@@ -98,7 +98,7 @@ If a value is piped into a callable object, like a function or macro, it is perf
 
 Dune offers an extensive standard library, and also provides a pretty interface to see all the functions available in each module!
 
-<a href="https://asciinema.org/a/7Cr96ndSzsIch7oGVYI3aIaX9"><img src="./assets/math.png" width="48%"/></a>
+<img src="./assets/math.png" width="48%"/>
 
 Dune offers the following builtin libraries:
 
