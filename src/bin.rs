@@ -27,6 +27,12 @@ use std::{
 #[rustfmt::skip]
 const DEFAULT_PRELUDE: &str = include_str!(".dune-prelude");
 
+/// Get the path to the stored history of dune commands.
+fn get_history_path() -> Option<PathBuf> {
+    let home = dirs::home_dir()?;
+    Some(home.join(".dune-history"))
+}
+
 fn new_editor(env: &Environment) -> Editor<DuneHelper> {
     let config = Config::builder()
         .history_ignore_dups(true)
@@ -434,6 +440,8 @@ fn repl(
     atomic_env: Arc<Mutex<Environment>>,
 ) -> Result<(), Error> {
     let mut lines = vec![];
+
+    let history_path = get_history_path();
     loop {
         let mut env = atomic_env.lock().unwrap();
         let mut rl = atomic_rl.lock().unwrap();
@@ -465,7 +473,11 @@ fn repl(
         match parse(&text) {
             Ok(expr) => {
                 rl.add_history_entry(text.as_str());
-                rl.save_history("history.txt").unwrap();
+                if let Some(path) = &history_path {
+                    if rl.save_history(path).is_err() {
+                        eprintln!("Failed to save history");
+                    }
+                }
                 let val = expr.eval(&mut env);
                 match val.clone() {
                     Ok(Expression::Symbol(name)) => {
@@ -568,7 +580,10 @@ fn main() -> Result<(), Error> {
     }
 
     let mut rl = new_editor(&env);
-    if rl.load_history("history.txt").is_err() {}
+    let history_path = get_history_path();
+    if let Some(path) = history_path {
+        if rl.load_history(&path).is_err() {}
+    }
 
     let editor_ref = Arc::new(Mutex::new(rl));
     let editor_ref_copy = editor_ref.clone();
