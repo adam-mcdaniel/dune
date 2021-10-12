@@ -1,6 +1,6 @@
 use detached_str::{Str, StrSlice};
 
-use core::{fmt, cmp::max};
+use core::{cmp::max, fmt};
 
 use crate::Diagnostic;
 
