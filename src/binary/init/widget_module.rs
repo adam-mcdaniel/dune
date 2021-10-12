@@ -177,5 +177,10 @@ fn joiny(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Err
         }
     }
 
-    Ok(string_args.into_iter().map(|x| x.replace('\r', "")).collect::<Vec<_>>().join("\n").into())
+    Ok(string_args
+        .into_iter()
+        .map(|x| x.replace('\r', ""))
+        .collect::<Vec<_>>()
+        .join("\n")
+        .into())
 }
