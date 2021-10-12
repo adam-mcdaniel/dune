@@ -179,15 +179,13 @@ let turnedshrewsay = text -> {
     echo (turnedshrew ());
 };
 
-if os@name != "windows" {
-    let about = _ ~> {
-        echo (
-        widget@joiny
-            (widget@create "About"
-    "          Hello, welcome to " + (fmt@yellow "Dune Shell!") + "
-        Written by: " + (fmt@magenta "http://adam-mcdaniel.net") + "
-    I wrote Dune to be a nice environment for devs while they work! It's a very cozy shell with high customizability, so you can make it how you'd like."
-    50 10)
+
+let about = _ ~> {
+    echo (
+    widget@joiny
+        (widget@create "About"
+"          Hello, welcome to " + (fmt@yellow "Dune Shell!") + "
+      Written by: http://adam-mcdaniel.net\n\nI wrote Dune to be a nice environment for devs while they work! It's a very cozy shell with high customizability, so you can make it how you'd like." 50 10)
 
             (widget@joinx
             (widget@create "Features"
@@ -222,9 +220,7 @@ And more!"
                 (widget@create "About the Author" "I'm a sophomore at\nthe University of\nTennessee🏴󠁵󠁳󠁴󠁮󠁿\nstudying Computer💻\nScience🧪.\n\nI'm extremely \ninterested in\nlanguage design\n& compiler design.\nCheck out my other\nprojects on GitHub:\n\nadam-mcdaniel" 20 18)
                 (widget@create "Cat" (rand@choose CATS) 20 10)
     )))
-    };
-}
-
+};
 
 let welcomebanner = _ ~> {
 
@@ -387,12 +383,10 @@ let cal = _ ~> {
 let welcome = _ ~> {
     welcomebanner ();
     (_ -> {
-        if os@name != "windows" {
-            let now = time@now ();
-            echo (widget@joinx
-                (make-calendar now@month now@day now@year)
-                (widget@create "Cat" (rand@choose CATS) 20 10));
-        }
+        let now = time@now ();
+        echo (widget@joinx
+            (make-calendar now@month now@day now@year)
+            (widget@create "Cat" (rand@choose CATS) 20 10));
     }) ();
 };
 

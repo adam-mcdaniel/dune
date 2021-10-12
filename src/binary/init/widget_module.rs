@@ -61,7 +61,7 @@ fn create(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Er
 
         let mut lines = 1;
         let mut i = 0;
-        for ch in text.chars() {
+        for ch in text.replace('\r', "").chars() {
             if i == 0 {
                 result.push(' ');
                 i += 1;
@@ -141,7 +141,7 @@ fn joinx(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Err
 
     for line_n in 0..height {
         for arg in &string_args {
-            result += &arg[line_n];
+            result += &arg[line_n].replace('\r', "");
         }
         result += "\n";
     }
@@ -177,5 +177,10 @@ fn joiny(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Err
         }
     }
 
-    Ok(string_args.join("\n").into())
+    Ok(string_args
+        .into_iter()
+        .map(|x| x.replace('\r', ""))
+        .collect::<Vec<_>>()
+        .join("\n")
+        .into())
 }
