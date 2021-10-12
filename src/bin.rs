@@ -27,6 +27,7 @@ use std::{
 #[rustfmt::skip]
 const DEFAULT_PRELUDE: &str = include_str!(".dune-prelude");
 
+/// Get the path to the stored history of dune commands.
 fn get_history_path() -> Option<PathBuf> {
     let home = dirs::home_dir()?;
     Some(home.join(".dune-history"))

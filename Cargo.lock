@@ -273,6 +273,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "detached-str"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc5c511efd5e4142f1f9ab7b2b667eb24b411c0223b1520f82454ef26e5bbf74"
+
+[[package]]
 name = "dirs"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -339,6 +345,7 @@ dependencies = [
  "common_macros",
  "criterion",
  "ctrlc",
+ "detached-str",
  "dirs 3.0.2",
  "dunce",
  "nom",
