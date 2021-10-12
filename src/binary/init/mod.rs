@@ -105,6 +105,23 @@ pub fn init(env: &mut Environment) {
     );
 
     env.define_builtin(
+        "debug",
+        |args, env| {
+            for (i, arg) in args.iter().enumerate() {
+                let x = arg.clone().eval(env)?;
+                if i < args.len() - 1 {
+                    print!("{:?} ", x)
+                } else {
+                    println!("{:?}", x)
+                }
+            }
+
+            Ok(Expression::None)
+        },
+        "print the debug representation of the arguments and a newline",
+    );
+
+    env.define_builtin(
         "println",
         |args, env| {
             for (i, arg) in args.iter().enumerate() {
