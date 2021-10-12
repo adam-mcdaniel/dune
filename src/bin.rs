@@ -439,7 +439,6 @@ fn repl(
     atomic_env: Arc<Mutex<Environment>>,
 ) -> Result<(), Error> {
     let mut lines = vec![];
-    
 
     let history_path = get_history_path();
     loop {
