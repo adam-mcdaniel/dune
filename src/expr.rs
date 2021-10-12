@@ -18,7 +18,7 @@ use prettytable::{
 
 /// The maximum number of times that `eval` can recursively call itself
 /// on a given expression before throwing an error. Even though
-/// we could theoretically do tail call recursion fairly simply,
+/// we could theoretically keep the tail call recursion optimization,
 /// we don't really want to do this because it's better to halt.
 const MAX_RECURSION_DEPTH: usize = 800;
 
