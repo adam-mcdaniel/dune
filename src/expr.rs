@@ -426,7 +426,7 @@ impl Expression {
             if depth > MAX_RECURSION_DEPTH {
                 return Err(Error::RecursionDepth(self));
             }
-            
+
             match self {
                 Self::Quote(inner) => return Ok(*inner),
                 Self::Group(inner) => return inner.eval_mut(env, depth + 1),
