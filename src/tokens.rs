@@ -32,8 +32,8 @@ impl<'a> Input<'a> {
         self.offset == self.str.len()
     }
 
-    pub fn offset(self) -> usize {
-        self.offset
+    pub fn as_original_str(self) -> &'a str {
+        self.str
     }
 
     pub fn as_str_slice(self) -> StrSlice {
@@ -106,7 +106,6 @@ pub enum TokenKind {
     Symbol,
     Whitespace,
     Comment,
-    Other,
 }
 
 impl fmt::Debug for Token {

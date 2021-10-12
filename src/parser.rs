@@ -10,13 +10,14 @@ use nom::{
 
 use std::collections::BTreeMap;
 
-use crate::{tokens::Input, TokenizationError};
-
-use super::{tokens::Tokens, Environment, Expression, Int, Token, TokenKind};
+use crate::{
+    tokens::{Input, Tokens},
+    Diagnostic, Environment, Expression, Int, Token, TokenKind,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SyntaxError {
-    TokenizationError(TokenizationError),
+    TokenizationErrors(Box<[Diagnostic]>),
     Expected {
         input: StrSlice,
         expected: &'static str,
@@ -27,19 +28,12 @@ pub enum SyntaxError {
         expected: char,
         at: Option<StrSlice>,
     },
-    InvalidToken(StrSlice),
     NomError {
         kind: nom::error::ErrorKind,
         at: Option<StrSlice>,
         cause: Option<Box<SyntaxError>>,
     },
     InternalError,
-}
-
-impl From<TokenizationError> for SyntaxError {
-    fn from(t: TokenizationError) -> Self {
-        SyntaxError::TokenizationError(t)
-    }
 }
 
 impl SyntaxError {
@@ -132,19 +126,19 @@ fn empty(input: Tokens<'_>) -> IResult<Tokens<'_>, (), SyntaxError> {
 pub fn parse_script(input: &str) -> Result<Expression, nom::Err<SyntaxError>> {
     let str = input.into();
     let tokenization_input = Input::new(&str);
-    let mut token_vec = super::parse_tokens(tokenization_input)
-        .map_err(|e| nom::Err::Failure(SyntaxError::TokenizationError(e)))?;
+    let (mut token_vec, mut diagnostics) = super::parse_tokens(tokenization_input);
+
+    diagnostics.retain(|d| d != &Diagnostic::Valid);
+    if !diagnostics.is_empty() {
+        return Err(nom::Err::Failure(SyntaxError::TokenizationErrors(
+            diagnostics.into_boxed_slice(),
+        )));
+    }
 
     let tokens = Tokens {
         str: &str,
         slice: token_vec.as_slice(),
     };
-
-    for &token in tokens.slice {
-        if token.kind == TokenKind::Other {
-            return Err(nom::Err::Failure(SyntaxError::InvalidToken(token.range)));
-        }
-    }
 
     for window in tokens.slice.windows(2) {
         let (a, b) = (window[0], window[1]);
