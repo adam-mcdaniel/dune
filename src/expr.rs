@@ -421,12 +421,12 @@ impl Expression {
         self.clone().eval_mut(env, 0)
     }
 
-    fn eval_mut(mut self, env: &mut Environment, depth: usize) -> Result<Self, Error> {
-        if depth > MAX_RECURSION_DEPTH {
-            return Err(Error::RecursionDepth(self));
-        }
-
+    fn eval_mut(mut self, env: &mut Environment, mut depth: usize) -> Result<Self, Error> {
         loop {
+            if depth > MAX_RECURSION_DEPTH {
+                return Err(Error::RecursionDepth(self));
+            }
+            
             match self {
                 Self::Quote(inner) => return Ok(*inner),
                 Self::Group(inner) => return inner.eval_mut(env, depth + 1),
@@ -600,6 +600,7 @@ impl Expression {
                 | Self::Macro(_, _)
                 | Self::Builtin(_) => return Ok(self.clone()),
             }
+            depth += 1;
         }
     }
 }
