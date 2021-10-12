@@ -20,7 +20,7 @@ use prettytable::{
 /// on a given expression before throwing an error. Even though
 /// we could theoretically keep the tail call recursion optimization,
 /// we don't really want to do this because it's better to halt.
-const MAX_RECURSION_DEPTH: usize = 800;
+const MAX_RECURSION_DEPTH: Option<usize> = Some(800);
 
 impl From<Int> for Expression {
     fn from(x: Int) -> Self {
@@ -423,8 +423,10 @@ impl Expression {
 
     fn eval_mut(mut self, env: &mut Environment, mut depth: usize) -> Result<Self, Error> {
         loop {
-            if depth > MAX_RECURSION_DEPTH {
-                return Err(Error::RecursionDepth(self));
+            if let Some(max_depth) = MAX_RECURSION_DEPTH {
+                if depth > max_depth {
+                    return Err(Error::RecursionDepth(self));
+                }
             }
 
             match self {
