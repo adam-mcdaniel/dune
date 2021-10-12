@@ -423,7 +423,7 @@ impl Expression {
 
     fn eval_mut(mut self, env: &mut Environment, depth: usize) -> Result<Self, Error> {
         if depth > MAX_RECURSION_DEPTH {
-            return Err(Error::RecursionDepth(self))
+            return Err(Error::RecursionDepth(self));
         }
 
         loop {
@@ -522,8 +522,10 @@ impl Expression {
                         let mut new_env = old_env.clone();
                         new_env.set_cwd(env.get_cwd());
                         new_env.define(&param, args[0].clone().eval_mut(env, depth + 1)?);
-                        self =
-                            Self::Apply(Box::new(body.eval_mut(&mut new_env, depth + 1)?), args[1..].to_vec());
+                        self = Self::Apply(
+                            Box::new(body.eval_mut(&mut new_env, depth + 1)?),
+                            args[1..].to_vec(),
+                        );
                     }
 
                     Self::Macro(param, body) if args.len() == 1 => {
@@ -535,7 +537,10 @@ impl Expression {
                     Self::Macro(param, body) if args.len() > 1 => {
                         let x = args[0].clone().eval_mut(env, depth + 1)?;
                         env.define(&param, x);
-                        self = Self::Apply(Box::new(body.eval_mut(env, depth + 1)?), args[1..].to_vec());
+                        self = Self::Apply(
+                            Box::new(body.eval_mut(env, depth + 1)?),
+                            args[1..].to_vec(),
+                        );
                     }
 
                     Self::Builtin(Builtin { body, .. }) => {
