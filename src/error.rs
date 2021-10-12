@@ -1,6 +1,6 @@
 use detached_str::{Str, StrSlice};
 
-use core::fmt;
+use core::{cmp::max, fmt};
 
 use crate::Diagnostic;
 
@@ -151,7 +151,7 @@ fn print_error_lines(
     let line_before = before.lines().next_back().unwrap_or_default();
     let line_after = after.lines().next().unwrap_or_default();
 
-    let first_line_number = before.lines().count();
+    let first_line_number = max(before.lines().count(), 1);
 
     writeln!(f, "      |")?;
 
