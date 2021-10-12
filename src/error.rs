@@ -12,6 +12,7 @@ pub enum Error {
     SymbolNotDefined(String),
     CommandFailed(String, Vec<Expression>),
     ForNonList(Expression),
+    RecursionDepth(Expression),
     CustomError(String),
     SyntaxError(Str, SyntaxError),
 }
@@ -24,6 +25,9 @@ impl fmt::Display for Error {
             }
             Self::SymbolNotDefined(name) => {
                 write!(f, "symbol \"{}\" not defined", name)
+            }
+            Self::RecursionDepth(expr) => {
+                write!(f, "recursion depth exceeded while evaluating {:?}", expr)
             }
             Self::CommandFailed(name, args) => {
                 write!(

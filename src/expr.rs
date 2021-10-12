@@ -16,6 +16,12 @@ use prettytable::{
     row, Table,
 };
 
+/// The maximum number of times that `eval` can recursively call itself
+/// on a given expression before throwing an error. Even though
+/// we could theoretically do tail call recursion fairly simply,
+/// we don't really want to do this because it's better to halt.
+const MAX_RECURSION_DEPTH: usize = 800;
+
 impl From<Int> for Expression {
     fn from(x: Int) -> Self {
         Self::Integer(x)
@@ -412,14 +418,18 @@ impl Expression {
     }
 
     pub fn eval(&self, env: &mut Environment) -> Result<Self, Error> {
-        self.clone().eval_mut(env)
+        self.clone().eval_mut(env, 0)
     }
 
-    fn eval_mut(mut self, env: &mut Environment) -> Result<Self, Error> {
+    fn eval_mut(mut self, env: &mut Environment, depth: usize) -> Result<Self, Error> {
+        if depth > MAX_RECURSION_DEPTH {
+            return Err(Error::RecursionDepth(self))
+        }
+
         loop {
             match self {
                 Self::Quote(inner) => return Ok(*inner),
-                Self::Group(inner) => return inner.eval_mut(env),
+                Self::Group(inner) => return inner.eval_mut(env, depth + 1),
 
                 Self::Symbol(name) => {
                     return Ok(match env.get(&name) {
@@ -429,19 +439,19 @@ impl Expression {
                 }
 
                 Self::Assign(name, expr) => {
-                    let x = expr.eval_mut(env)?;
+                    let x = expr.eval_mut(env, depth + 1)?;
                     env.define(&name, x);
                     return Ok(Self::None);
                 }
 
                 Self::For(name, list, body) => {
-                    if let Expression::List(items) = list.clone().eval_mut(env)? {
+                    if let Expression::List(items) = list.clone().eval_mut(env, depth + 1)? {
                         return Ok(Self::List(
                             items
                                 .into_iter()
                                 .map(|item| {
                                     env.define(&name, item);
-                                    body.clone().eval_mut(env)
+                                    body.clone().eval_mut(env, depth + 1)
                                 })
                                 .collect::<Result<Vec<Self>, Error>>()?,
                         ));
@@ -451,15 +461,15 @@ impl Expression {
                 }
 
                 Self::If(cond, true_expr, false_expr) => {
-                    return if cond.eval_mut(env)?.is_truthy() {
+                    return if cond.eval_mut(env, depth + 1)?.is_truthy() {
                         true_expr
                     } else {
                         false_expr
                     }
-                    .eval_mut(env)
+                    .eval_mut(env, depth + 1)
                 }
 
-                Self::Apply(ref f, ref args) => match f.clone().eval_mut(env)? {
+                Self::Apply(ref f, ref args) => match f.clone().eval_mut(env, depth + 1)? {
                     Self::Symbol(name) | Self::String(name) => {
                         let bindings = env
                             .bindings
@@ -478,7 +488,7 @@ impl Expression {
                             .args(
                                 args.iter()
                                     .filter(|&x| x != &Self::None)
-                                    .map(|x| Ok(format!("{}", x.clone().eval_mut(env)?)))
+                                    .map(|x| Ok(format!("{}", x.clone().eval_mut(env, depth + 1)?)))
                                     .collect::<Result<Vec<String>, Error>>()?,
                             )
                             .envs(bindings)
@@ -504,28 +514,28 @@ impl Expression {
                     Self::Lambda(param, body, old_env) if args.len() == 1 => {
                         let mut new_env = old_env;
                         new_env.set_cwd(env.get_cwd());
-                        new_env.define(&param, args[0].clone().eval_mut(env)?);
-                        return body.eval_mut(&mut new_env);
+                        new_env.define(&param, args[0].clone().eval_mut(env, depth + 1)?);
+                        return body.eval_mut(&mut new_env, depth + 1);
                     }
 
                     Self::Lambda(param, body, old_env) if args.len() > 1 => {
                         let mut new_env = old_env.clone();
                         new_env.set_cwd(env.get_cwd());
-                        new_env.define(&param, args[0].clone().eval_mut(env)?);
+                        new_env.define(&param, args[0].clone().eval_mut(env, depth + 1)?);
                         self =
-                            Self::Apply(Box::new(body.eval_mut(&mut new_env)?), args[1..].to_vec());
+                            Self::Apply(Box::new(body.eval_mut(&mut new_env, depth + 1)?), args[1..].to_vec());
                     }
 
                     Self::Macro(param, body) if args.len() == 1 => {
-                        let x = args[0].clone().eval_mut(env)?;
+                        let x = args[0].clone().eval_mut(env, depth + 1)?;
                         env.define(&param, x);
                         self = *body;
                     }
 
                     Self::Macro(param, body) if args.len() > 1 => {
-                        let x = args[0].clone().eval_mut(env)?;
+                        let x = args[0].clone().eval_mut(env, depth + 1)?;
                         env.define(&param, x);
-                        self = Self::Apply(Box::new(body.eval_mut(env)?), args[1..].to_vec());
+                        self = Self::Apply(Box::new(body.eval_mut(env, depth + 1)?), args[1..].to_vec());
                     }
 
                     Self::Builtin(Builtin { body, .. }) => {
@@ -554,7 +564,7 @@ impl Expression {
                     return Ok(Self::List(
                         exprs
                             .into_iter()
-                            .map(|x| x.eval_mut(env))
+                            .map(|x| x.eval_mut(env, depth + 1))
                             .collect::<Result<Vec<Self>, Error>>()?,
                     ))
                 }
@@ -562,7 +572,7 @@ impl Expression {
                     return Ok(Self::Map(
                         exprs
                             .into_iter()
-                            .map(|(n, x)| Ok((n, x.eval_mut(env)?)))
+                            .map(|(n, x)| Ok((n, x.eval_mut(env, depth + 1)?)))
                             .collect::<Result<BTreeMap<String, Self>, Error>>()?,
                     ))
                 }
@@ -572,7 +582,7 @@ impl Expression {
                     }
 
                     for expr in &exprs[..exprs.len() - 1] {
-                        expr.clone().eval_mut(env)?;
+                        expr.clone().eval_mut(env, depth + 1)?;
                     }
                     self = exprs[exprs.len() - 1].clone();
                 }
