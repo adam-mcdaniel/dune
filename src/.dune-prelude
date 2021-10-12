@@ -169,9 +169,7 @@ let about = _ ~> {
     widget@joiny
         (widget@create "About"
 "          Hello, welcome to " + (fmt@yellow "Dune Shell!") + "
-    Written by: " + (fmt@magenta "http://adam-mcdaniel.net") + "
-I wrote Dune to be a nice environment for devs while they work! It's a very cozy shell with high customizability, so you can make it how you'd like."
-50 10)
+      Written by: http://adam-mcdaniel.net\n\nI wrote Dune to be a nice environment for devs while they work! It's a very cozy shell with high customizability, so you can make it how you'd like." 50 10)
 
             (widget@joinx
             (widget@create "Features"

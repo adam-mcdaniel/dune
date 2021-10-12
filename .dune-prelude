@@ -179,14 +179,13 @@ let turnedshrewsay = text -> {
     echo (turnedshrew ());
 };
 
+
 let about = _ ~> {
     echo (
     widget@joiny
         (widget@create "About"
 "          Hello, welcome to " + (fmt@yellow "Dune Shell!") + "
-    Written by: " + (fmt@magenta "http://adam-mcdaniel.net") + "
-I wrote Dune to be a nice environment for devs while they work! It's a very cozy shell with high customizability, so you can make it how you'd like."
-50 10)
+      Written by: http://adam-mcdaniel.net\n\nI wrote Dune to be a nice environment for devs while they work! It's a very cozy shell with high customizability, so you can make it how you'd like." 50 10)
 
             (widget@joinx
             (widget@create "Features"
@@ -222,7 +221,6 @@ And more!"
                 (widget@create "Cat" (rand@choose CATS) 20 10)
     )))
 };
-
 
 let welcomebanner = _ ~> {
 
