@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use dune::{Builtin, Environment, Error, Expression, Int};
 
+#[cfg(feature = "chess-engine")]
 mod chess_module;
 mod console_module;
 mod fmt_module;
@@ -360,6 +361,7 @@ pub fn init(env: &mut Environment) {
         "unbind a variable from the environment",
     );
 
+    #[cfg(feature = "chess-engine")]
     env.define_builtin("chess", chess_module::chess_fn, chess_module::HELP);
 
     env.define_builtin(
