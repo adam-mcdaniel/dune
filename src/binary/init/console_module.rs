@@ -34,9 +34,9 @@ fn write(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Err
             let content = content.to_string();
             for (y_offset, line) in content.lines().enumerate() {
                 print!(
-                    "\x1b[s\x1b[{line};{column}H\x1b[{line};{column}f{content}\x1b[u",
+                    "\x1b[s\x1b[{row};{column}H\x1b[{row};{column}f{content}\x1b[u",
                     column = x,
-                    line = y + y_offset as Int,
+                    row = y + y_offset as Int,
                     content = line
                 );
             }
