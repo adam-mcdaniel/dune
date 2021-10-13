@@ -1,13 +1,28 @@
 use common_macros::b_tree_map;
-use dune::{Environment, Error, Expression};
+use dune::{parse_script, Environment, Error, Expression, SyntaxError};
 use json::JsonValue;
 use std::collections::BTreeMap;
 
 pub fn get() -> Expression {
     (b_tree_map! {
         String::from("json") => Expression::builtin("json", parse_json, "parse a JSON value into a Dune expression"),
+        String::from("expr") => Expression::builtin("expr", parse_expr, "parse a Dune script"),
     })
     .into()
+}
+
+fn parse_expr(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Error> {
+    super::check_exact_args_len("json", &args, 1)?;
+    let script = args[0].eval(env)?.to_string();
+    match parse_script(&script) {
+        Ok(val) => Ok(val),
+        Err(nom::Err::Error(e)) | Err(nom::Err::Failure(e)) => {
+            Err(Error::SyntaxError(script.into(), e))
+        }
+        Err(nom::Err::Incomplete(_)) => {
+            Err(Error::SyntaxError(script.into(), SyntaxError::InternalError))
+        }
+    }
 }
 
 fn parse_json(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Error> {

@@ -10,6 +10,8 @@ Dune offers the following builtin libraries:
 7. `fmt`: a library with color, formatting, and other text functions.
 8. `widget`: a library for creating widgets on the console.
 9. `console`: a library for manipulating the terminal console.
+10. `shell`: a module with information about the Dune shell.
+11. `parse`: a library with functions for parsing text.
 
 To see all the different functions and constants for each library,
 simply print the library itself!
