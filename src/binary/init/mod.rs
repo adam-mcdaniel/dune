@@ -329,9 +329,7 @@ pub fn init(env: &mut Environment) {
 
     env.define_builtin(
         "exec",
-        |args, env| {
-            args[0].clone().eval(env)?.eval(env)
-        },
+        |args, env| args[0].clone().eval(env)?.eval(env),
         "evaluate an expression in the current environment",
     );
 

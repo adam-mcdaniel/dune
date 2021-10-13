@@ -19,9 +19,10 @@ fn parse_expr(args: Vec<Expression>, env: &mut Environment) -> Result<Expression
         Err(nom::Err::Error(e)) | Err(nom::Err::Failure(e)) => {
             Err(Error::SyntaxError(script.into(), e))
         }
-        Err(nom::Err::Incomplete(_)) => {
-            Err(Error::SyntaxError(script.into(), SyntaxError::InternalError))
-        }
+        Err(nom::Err::Incomplete(_)) => Err(Error::SyntaxError(
+            script.into(),
+            SyntaxError::InternalError,
+        )),
     }
 }
 
