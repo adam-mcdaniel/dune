@@ -33,14 +33,14 @@ fn json_to_expr(val: JsonValue) -> Expression {
         JsonValue::Array(a) => {
             let mut v = Vec::new();
             for e in a {
-                v.push(json_to_expr(e)?);
+                v.push(json_to_expr(e));
             }
             Expression::List(v)
         }
         JsonValue::Object(o) => {
             let mut m = BTreeMap::new();
             for (k, v) in o.iter() {
-                m.insert(k.to_string(), json_to_expr(v.clone())?);
+                m.insert(k.to_string(), json_to_expr(v.clone()));
             }
             Expression::Map(m)
         }
