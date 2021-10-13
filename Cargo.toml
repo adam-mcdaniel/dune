@@ -31,6 +31,10 @@ dirs = "3.0"
 dunce = "1.0"
 chess-engine = { version = "0.1.2", optional = true }
 
+[dependencies.toml]
+version = "0.5.8"
+default-features = false
+
 [dependencies.chrono]
 version = "0.4"
 default-features = false

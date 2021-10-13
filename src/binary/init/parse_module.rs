@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 
 pub fn get() -> Expression {
     (b_tree_map! {
+        String::from("toml") => Expression::builtin("toml", parse_toml, "parse a TOML value into a Dune expression"),
         String::from("json") => Expression::builtin("json", parse_json, "parse a JSON value into a Dune expression"),
         String::from("expr") => Expression::builtin("expr", parse_expr, "parse a Dune script"),
     })
@@ -57,6 +58,43 @@ fn json_to_expr(val: JsonValue) -> Expression {
             let mut m = BTreeMap::new();
             for (k, v) in o.iter() {
                 m.insert(k.to_string(), json_to_expr(v.clone()));
+            }
+            Expression::Map(m)
+        }
+    }
+}
+
+fn parse_toml(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Error> {
+    super::check_exact_args_len("toml", &args, 1)?;
+    let text = args[0].eval(env)?.to_string();
+    if let Ok(val) = text.parse::<toml::Value>() {
+        Ok(toml_to_expr(val))
+    } else {
+        Err(Error::CustomError(format!(
+            "could not parse `{}` as TOML",
+            text
+        )))
+    }
+}
+
+fn toml_to_expr(val: toml::Value) -> Expression {
+    match val {
+        toml::Value::Boolean(b) => Expression::Boolean(b),
+        toml::Value::Float(n) => Expression::Float(n),
+        toml::Value::Integer(n) => Expression::Integer(n),
+        toml::Value::Datetime(s) => Expression::String(s.to_string()),
+        toml::Value::String(s) => Expression::String(s),
+        toml::Value::Array(a) => {
+            let mut v = Vec::new();
+            for e in a {
+                v.push(toml_to_expr(e));
+            }
+            Expression::List(v)
+        }
+        toml::Value::Table(o) => {
+            let mut m = BTreeMap::new();
+            for (k, v) in o.iter() {
+                m.insert(k.to_string(), toml_to_expr(v.clone()));
             }
             Expression::Map(m)
         }
