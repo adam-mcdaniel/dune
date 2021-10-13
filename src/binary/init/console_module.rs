@@ -1,6 +1,6 @@
 use common_macros::b_tree_map;
-use dune::{Int, Environment, Error, Expression};
-use terminal_size::{terminal_size, Width, Height};
+use dune::{Environment, Error, Expression, Int};
+use terminal_size::{terminal_size, Height, Width};
 
 pub fn get() -> Expression {
     (b_tree_map! {
