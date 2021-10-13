@@ -12,12 +12,22 @@ pub fn get() -> Expression {
 
 fn write(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Error> {
     super::check_exact_args_len("write", &args, 3)?;
-    print!(
-        "\x1b[s\x1b[{line};{column}H\x1b[{line};{column}f{content}\x1b[u",
-        line = args[1].eval(env)?,
-        column = args[0].eval(env)?,
-        content = args[2].eval(env)?
-    );
+    match (args[0].eval(env)?, args[1].eval(env)?, args[2].eval(env)?) {
+        (Expression::Integer(x), Expression::Integer(y), Expression::String(text)) => {
+            print!(
+                "\x1b[s\x1b[{line};{column}H\x1b[{line};{column}f{content}\x1b[u",
+                line = x,
+                column = y,
+                content = text
+            );
+        }
+        (x, y, text) => {
+            return Err(Error::CustomError(format!(
+                "expected int, int, and a string, but got: `{:?}`, `{:?}`, and `{:?}`",
+                x, y, text
+            )))
+        }
+    }
     Ok(Expression::None)
 }
 
