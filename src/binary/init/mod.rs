@@ -144,7 +144,7 @@ pub fn init(env: &mut Environment) {
     );
 
     env.define_builtin(
-        "range",
+        "to",
         |args, env| {
             if args.len() == 2 {
                 match (args[0].clone().eval(env)?, args[1].clone().eval(env)?) {

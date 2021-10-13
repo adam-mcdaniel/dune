@@ -538,7 +538,7 @@ fn main() -> Result<(), Error> {
     )?
     .eval(&mut env)?;
 
-    parse("let redirect-out = file -> contents -> fs@write file contents")?.eval(&mut env)?;
+    parse("let >> = file -> contents -> fs@write file contents")?.eval(&mut env)?;
 
     parse(
         "let prompt = cwd -> \
