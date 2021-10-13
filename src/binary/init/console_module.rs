@@ -31,12 +31,15 @@ fn write(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Err
     super::check_exact_args_len("write", &args, 3)?;
     match (args[0].eval(env)?, args[1].eval(env)?, args[2].eval(env)?) {
         (Expression::Integer(x), Expression::Integer(y), content) => {
-            print!(
-                "\x1b[s\x1b[{line};{column}H\x1b[{line};{column}f{content}\x1b[u",
-                line = x,
-                column = y,
-                content = content.to_string()
-            );
+            let content = content.to_string();
+            for (y_offset, line) in content.lines().enumerate() {
+                print!(
+                    "\x1b[s\x1b[{line};{column}H\x1b[{line};{column}f{content}\x1b[u",
+                    column = x,
+                    line = y + y_offset as Int,
+                    content = line
+                );
+            }
         }
         (x, y, _) => {
             return Err(Error::CustomError(format!(
