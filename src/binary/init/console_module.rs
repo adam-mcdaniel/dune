@@ -30,18 +30,18 @@ fn height(_: Vec<Expression>, _: &mut Environment) -> Result<Expression, Error> 
 fn write(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Error> {
     super::check_exact_args_len("write", &args, 3)?;
     match (args[0].eval(env)?, args[1].eval(env)?, args[2].eval(env)?) {
-        (Expression::Integer(x), Expression::Integer(y), Expression::String(text)) => {
+        (Expression::Integer(x), Expression::Integer(y), content) => {
             print!(
                 "\x1b[s\x1b[{line};{column}H\x1b[{line};{column}f{content}\x1b[u",
                 line = x,
                 column = y,
-                content = text
+                content = content.to_string()
             );
         }
-        (x, y, text) => {
+        (x, y, _) => {
             return Err(Error::CustomError(format!(
-                "expected int, int, and a string, but got: `{:?}`, `{:?}`, and `{:?}`",
-                x, y, text
+                "expected first two arguments to be integers, but got: `{:?}`, `{:?}`",
+                x, y
             )))
         }
     }
