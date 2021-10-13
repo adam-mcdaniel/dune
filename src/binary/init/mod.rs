@@ -263,9 +263,7 @@ pub fn init(env: &mut Environment) {
 
     env.define_builtin(
         "environment",
-        |_, env| {
-            Ok(env.bindings.clone().into())
-        },
+        |_, env| Ok(env.bindings.clone().into()),
         "get a table of the environment",
     );
 
