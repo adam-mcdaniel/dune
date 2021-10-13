@@ -16,6 +16,7 @@ mod rand_module;
 mod shell_module;
 mod time_module;
 mod widget_module;
+mod parse_module;
 
 pub fn init(env: &mut Environment) {
     pipe_module::add_to(env);
@@ -29,6 +30,7 @@ pub fn init(env: &mut Environment) {
     env.define("fn", fn_module::get());
     env.define("console", console_module::get());
     env.define("fmt", fmt_module::get());
+    env.define("parse", parse_module::get());
     operator_module::add_to(env);
 
     env.define_builtin(

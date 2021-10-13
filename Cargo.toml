@@ -16,6 +16,7 @@ name = "dunesh"
 path = "src/bin.rs"
 
 [dependencies]
+json = "0.12.4"
 terminal_size = "0.1.17"
 textwrap = "0.14"
 nom = "7.0"
