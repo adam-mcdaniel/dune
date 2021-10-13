@@ -1,6 +1,6 @@
 [package]
 name = "dune"
-version = "0.1.6"
+version = "0.1.7"
 authors = ["Adam McDaniel <adam.mcdaniel17@gmail.com>"]
 edition = "2018"
 license = "Apache-2.0"
