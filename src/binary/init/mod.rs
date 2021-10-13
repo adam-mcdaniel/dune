@@ -11,12 +11,12 @@ mod fs_module;
 mod math_module;
 mod operator_module;
 mod os_module;
+mod parse_module;
 mod pipe_module;
 mod rand_module;
 mod shell_module;
 mod time_module;
 mod widget_module;
-mod parse_module;
 
 pub fn init(env: &mut Environment) {
     pipe_module::add_to(env);

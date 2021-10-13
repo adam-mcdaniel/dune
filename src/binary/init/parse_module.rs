@@ -1,7 +1,7 @@
 use common_macros::b_tree_map;
-use std::collections::BTreeMap;
 use dune::{Environment, Error, Expression};
 use json::JsonValue;
+use std::collections::BTreeMap;
 
 pub fn get() -> Expression {
     (b_tree_map! {
@@ -16,7 +16,10 @@ fn parse_json(args: Vec<Expression>, env: &mut Environment) -> Result<Expression
     if let Ok(val) = json::parse(&text) {
         Ok(json_to_expr(val))
     } else {
-        Err(Error::CustomError(format!("could not parse `{}` as JSON", text)))
+        Err(Error::CustomError(format!(
+            "could not parse `{}` as JSON",
+            text
+        )))
     }
 }
 
