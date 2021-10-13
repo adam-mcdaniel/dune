@@ -2,7 +2,7 @@ use dune::{Environment, Error, Expression};
 
 pub fn add_to(env: &mut Environment) {
     env.define_builtin(
-        "__add__",
+        "+",
         |args, env| {
             let mut result = args[0].clone().eval(env)?;
             for arg in &args[1..] {
@@ -22,7 +22,7 @@ pub fn add_to(env: &mut Environment) {
     );
 
     env.define_builtin(
-        "__sub__",
+        "-",
         |args, env| {
             let mut result = args[0].clone().eval(env)?;
             for arg in &args[1..] {
@@ -42,7 +42,7 @@ pub fn add_to(env: &mut Environment) {
     );
 
     env.define_builtin(
-        "__mul__",
+        "*",
         |args, env| {
             let mut result = args[0].clone().eval(env)?;
             for arg in &args[1..] {
@@ -62,7 +62,7 @@ pub fn add_to(env: &mut Environment) {
     );
 
     env.define_builtin(
-        "__div__",
+        "//",
         |args, env| {
             let mut result = args[0].clone().eval(env)?;
             for arg in &args[1..] {
@@ -82,7 +82,7 @@ pub fn add_to(env: &mut Environment) {
     );
 
     env.define_builtin(
-        "__rem__",
+        "%",
         |args, env| {
             let mut result = args[0].clone().eval(env)?;
             for arg in &args[1..] {
@@ -102,7 +102,7 @@ pub fn add_to(env: &mut Environment) {
     );
 
     env.define_builtin(
-        "__and__",
+        "&&",
         |args, env| {
             Ok(Expression::Boolean(
                 args.into_iter()
@@ -116,7 +116,7 @@ pub fn add_to(env: &mut Environment) {
     );
 
     env.define_builtin(
-        "__or__",
+        "||",
         |args, env| {
             Ok(Expression::Boolean(
                 args.into_iter()
@@ -130,7 +130,7 @@ pub fn add_to(env: &mut Environment) {
     );
 
     env.define_builtin(
-        "__not__",
+        "!",
         |args, env| {
             Ok(Expression::Boolean(
                 args.into_iter()
@@ -144,7 +144,7 @@ pub fn add_to(env: &mut Environment) {
     );
 
     env.define_builtin(
-        "__eq__",
+        "==",
         |args, env| {
             Ok(Expression::Boolean(
                 args[0].eval(env)? == args[1].eval(env)?,
@@ -154,7 +154,7 @@ pub fn add_to(env: &mut Environment) {
     );
 
     env.define_builtin(
-        "__neq__",
+        "!=",
         |args, env| {
             Ok(Expression::Boolean(
                 args[0].eval(env)? != args[1].eval(env)?,
@@ -164,7 +164,7 @@ pub fn add_to(env: &mut Environment) {
     );
 
     env.define_builtin(
-        "__lt__",
+        "<",
         |args, env| {
             Ok(Expression::Boolean(
                 args[0].clone().eval(env)? < args[1].clone().eval(env)?,
@@ -174,7 +174,7 @@ pub fn add_to(env: &mut Environment) {
     );
 
     env.define_builtin(
-        "__lte__",
+        "<=",
         |args, env| {
             Ok(Expression::Boolean(
                 args[0].clone().eval(env)? <= args[1].clone().eval(env)?,
@@ -184,7 +184,7 @@ pub fn add_to(env: &mut Environment) {
     );
 
     env.define_builtin(
-        "__gt__",
+        ">",
         |args, env| {
             Ok(Expression::Boolean(
                 args[0].clone().eval(env)? > args[1].clone().eval(env)?,
@@ -194,7 +194,7 @@ pub fn add_to(env: &mut Environment) {
     );
 
     env.define_builtin(
-        "__gte__",
+        ">=",
         |args, env| {
             Ok(Expression::Boolean(
                 args[0].clone().eval(env)? >= args[1].clone().eval(env)?,
@@ -204,7 +204,7 @@ pub fn add_to(env: &mut Environment) {
     );
 
     env.define_builtin(
-        "__idx__",
+        "@",
         |args, env| {
             let mut val = args[0].eval(env)?;
             for arg in &args[1..] {

@@ -151,7 +151,7 @@ let x # test
 #[test]
 fn tokenize_symbols_and_operators() {
     tokenize_test(
-        r#"to == != >= <= && || // < > + - * % _+-.~\/?&<>$%^: abcXYZ"#,
+        r#"to == != >= <= && || // < > + - * % | >> @ _+-.~\/?&<>$%^: abcXYZ"#,
         r#"[
     Operator(0..2),
     Whitespace(2..3),
@@ -181,9 +181,15 @@ fn tokenize_symbols_and_operators() {
     Whitespace(33..34),
     Operator(34..35),
     Whitespace(35..36),
-    Symbol(36..51),
-    Whitespace(51..52),
-    Symbol(52..58),
+    Operator(36..37),
+    Whitespace(37..38),
+    Operator(38..40),
+    Whitespace(40..41),
+    Operator(41..42),
+    Whitespace(42..43),
+    Symbol(43..58),
+    Whitespace(58..59),
+    Symbol(59..65),
 ]"#,
     );
 }
@@ -225,5 +231,13 @@ fn parse2() -> Result<(), nom::Err<SyntaxError>> {
     parse_test(
         r#"let hello = "world\u{21}";"#,
         r#"{ let hello = "world!" }"#,
+    )
+}
+
+#[test]
+fn parse3() -> Result<(), nom::Err<SyntaxError>> {
+    parse_test(
+        r#"let + = a -> b -> c -> (+ a b c)"#,
+        r#"{ let + = a -> b -> c -> (+ a b c) }"#,
     )
 }

@@ -81,13 +81,10 @@ fn any_punctuation(input: Input<'_>) -> TokenizationResult<'_> {
         punctuation_tag("]"),
         punctuation_tag("{"),
         punctuation_tag("}"),
-        punctuation_tag("@"),
         punctuation_tag("\'"),
         punctuation_tag(","),
         punctuation_tag(";"),
         punctuation_tag("="),
-        keyword_tag("|"),  // must be surrounded by whitespace
-        keyword_tag(">>"), // `>>foo` is also a valid symbol
         keyword_tag("->"), // `->foo` is also a valid symbol
         keyword_tag("~>"), // `~>foo` is also a valid symbol
     ))(input)
@@ -103,6 +100,7 @@ fn long_operator(input: Input<'_>) -> TokenizationResult<'_> {
         keyword_tag("&&"),
         keyword_tag("||"),
         keyword_tag("//"),
+        keyword_tag(">>"),
     ))(input)
 }
 
@@ -114,6 +112,9 @@ fn short_operator(input: Input<'_>) -> TokenizationResult<'_> {
         keyword_tag("-"),
         keyword_tag("*"),
         keyword_tag("%"),
+        keyword_tag("|"),
+        punctuation_tag("@"),
+        punctuation_tag("!"),
     ))(input)
 }
 
