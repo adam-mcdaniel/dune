@@ -1,6 +1,6 @@
 [package]
 name = "dune"
-version = "0.1.6"
+version = "0.1.7"
 authors = ["Adam McDaniel <adam.mcdaniel17@gmail.com>"]
 edition = "2018"
 license = "Apache-2.0"
@@ -16,6 +16,7 @@ name = "dunesh"
 path = "src/bin.rs"
 
 [dependencies]
+json = "0.12.4"
 terminal_size = "0.1.17"
 textwrap = "0.14"
 nom = "7.0"
@@ -29,6 +30,10 @@ rustyline-derive = "0.5"
 dirs = "3.0"
 dunce = "1.0"
 chess-engine = { version = "0.1.2", optional = true }
+
+[dependencies.toml]
+version = "0.5.8"
+default-features = false
 
 [dependencies.chrono]
 version = "0.4"

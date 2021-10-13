@@ -348,6 +348,7 @@ dependencies = [
  "detached-str",
  "dirs 3.0.2",
  "dunce",
+ "json",
  "nom",
  "os_info",
  "prettytable-rs",
@@ -357,6 +358,7 @@ dependencies = [
  "snailquote",
  "terminal_size",
  "textwrap 0.14.2",
+ "toml",
 ]
 
 [[package]]
@@ -457,6 +459,12 @@ checksum = "7cc9ffccd38c451a86bf13657df244e9c3f37493cce8e5e21e940963777acc84"
 dependencies = [
  "wasm-bindgen",
 ]
+
+[[package]]
+name = "json"
+version = "0.12.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "078e285eafdfb6c4b434e0d31e8cfcb5115b651496faca5749b88fafd4f23bfd"
 
 [[package]]
 name = "lazy_static"
@@ -1018,6 +1026,15 @@ checksum = "be4d6b5f19ff7664e8c98d03e2139cb510db9b0a60b55f8e8709b689d939b6bc"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "toml"
+version = "0.5.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a31142970826733df8241ef35dc040ef98c679ab14d7c3e54d827099b3acecaa"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

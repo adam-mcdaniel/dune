@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use dune::{Builtin, Environment, Error, Expression, Int};
 
 #[cfg(feature = "chess-engine")]
@@ -11,6 +9,7 @@ mod fs_module;
 mod math_module;
 mod operator_module;
 mod os_module;
+mod parse_module;
 mod pipe_module;
 mod rand_module;
 mod shell_module;
@@ -29,24 +28,11 @@ pub fn init(env: &mut Environment) {
     env.define("fn", fn_module::get());
     env.define("console", console_module::get());
     env.define("fmt", fmt_module::get());
+    env.define("parse", parse_module::get());
     operator_module::add_to(env);
 
-    env.define_builtin(
-        "exit",
-        |args, env| {
-            if args.is_empty() {
-                std::process::exit(0);
-            } else if let Expression::Integer(n) = args[0].clone().eval(env)? {
-                std::process::exit(n as i32);
-            } else {
-                Err(Error::CustomError(format!(
-                    "expected integer but got `{:?}`",
-                    args[0]
-                )))
-            }
-        },
-        "exit the shell",
-    );
+    env.define("exit", env.get("os").unwrap()["exit"].clone());
+    env.define("cd", env.get("os").unwrap()["cd"].clone());
     env.define("quit", env.get("exit").unwrap());
 
     env.define_builtin(
@@ -334,30 +320,17 @@ pub fn init(env: &mut Environment) {
 
     env.define_builtin(
         "eval",
-        |args, env| args[0].clone().eval(env)?.eval(env),
-        "evaluate an expression",
+        |args, env| {
+            let mut new_env = env.clone();
+            args[0].clone().eval(env)?.eval(&mut new_env)
+        },
+        "evaluate an expression without changing the environment",
     );
 
     env.define_builtin(
-        "cd",
-        |args, env| match args[0].clone().eval(env)? {
-            Expression::Symbol(path) | Expression::String(path) => {
-                if let Ok(new_cwd) = dunce::canonicalize(PathBuf::from(env.get_cwd()).join(path)) {
-                    // It's not necessary that this succeeds, because
-                    // Dune does everything relative to the `CWD` bound variable.
-                    // This is mostly to reduce any unintended behavior from
-                    // other libraries like `rustyline`.
-                    let _ = std::env::set_current_dir(&new_cwd);
-                    env.set_cwd(new_cwd.into_os_string().into_string().unwrap());
-                }
-                Ok(Expression::None)
-            }
-            _ => Err(Error::CustomError(format!(
-                "expected string or symbol, got {:?}",
-                args[0]
-            ))),
-        },
-        "change directories",
+        "exec",
+        |args, env| args[0].clone().eval(env)?.eval(env),
+        "evaluate an expression in the current environment",
     );
 
     env.define_builtin(
