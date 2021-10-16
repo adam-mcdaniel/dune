@@ -1,5 +1,5 @@
 use common_macros::b_tree_map;
-use dune::{Error, Expression};
+use dune::{Environment, Error, Expression};
 use std::path::PathBuf;
 
 pub fn get() -> Expression {
@@ -26,27 +26,54 @@ pub fn get() -> Expression {
             },
             "exit the shell",
         ),
-        String::from("cd") => Expression::builtin(
-            "cd",
-            |args, env| match args[0].clone().eval(env)? {
-                Expression::Symbol(path) | Expression::String(path) => {
-                    if let Ok(new_cwd) = dunce::canonicalize(PathBuf::from(env.get_cwd()).join(path)) {
-                        // It's not necessary that this succeeds, because
-                        // Dune does everything relative to the `CWD` bound variable.
-                        // This is mostly to reduce any unintended behavior from
-                        // other libraries like `rustyline`.
-                        let _ = std::env::set_current_dir(&new_cwd);
-                        env.set_cwd(new_cwd.into_os_string().into_string().unwrap());
-                    }
-                    Ok(Expression::None)
-                }
-                _ => Err(Error::CustomError(format!(
-                    "expected string or symbol, got {:?}",
-                    args[0]
-                ))),
-            },
-            "change directories",
-        )
+        String::from("cd") => Expression::builtin("cd", cd, "change directories"),
     })
     .into()
+}
+
+fn cd(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, dune::Error> {
+    super::check_exact_args_len("cd", &args, 1)?;
+
+    match args[0].eval(env)? {
+        Expression::Symbol(path) | Expression::String(path) => {
+            let abs_path = PathBuf::from(env.get_cwd()).join(path);
+
+            let new_cwd = dunce::canonicalize(&abs_path).map_err(|e| {
+                dune::Error::CustomError(match format!("{:?}", e.kind()).as_str() {
+                    "NotFound" => {
+                        format!("the directory {:?} does not exist", abs_path)
+                    }
+                    "NotADirectory" => {
+                        format!("a path segment in {:?} is not a directory", abs_path)
+                    }
+                    _ => format!(
+                        "could not change to directory {:?}\n  reason: {}",
+                        abs_path, e
+                    ),
+                })
+            })?;
+
+            std::env::set_current_dir(&new_cwd).map_err(|e| {
+                dune::Error::CustomError(match format!("{:?}", e.kind()).as_str() {
+                    "PermissionDenied" => {
+                        format!("you don't have permission to read directory {:?}", new_cwd)
+                    }
+                    "NotADirectory" => {
+                        format!("{:?} is not a directory", new_cwd)
+                    }
+                    _ => format!(
+                        "could not change directory to {:?}\n  reason: {}",
+                        new_cwd, e
+                    ),
+                })
+            })?;
+
+            env.set_cwd(new_cwd.into_os_string().into_string().unwrap());
+            Ok(Expression::None)
+        }
+        _ => Err(Error::CustomError(format!(
+            "expected string or symbol, got {:?}",
+            args[0]
+        ))),
+    }
 }
