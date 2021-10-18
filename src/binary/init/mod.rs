@@ -252,7 +252,7 @@ pub fn init(env: &mut Environment) {
     env.define_builtin(
         "vals",
         |args, env| match args[0].eval(env)? {
-            Expression::Map(m) => Ok(Expression::List(m.into_values().collect::<Vec<_>>().into())),
+            Expression::Map(m) => Ok(m.into_values().collect::<Vec<_>>().into()),
             otherwise => Err(Error::CustomError(format!(
                 "cannot get the values of {}",
                 otherwise
