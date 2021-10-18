@@ -238,6 +238,36 @@ pub fn init(env: &mut Environment) {
     );
 
     env.define_builtin(
+        "keys",
+        |args, env| match args[0].eval(env)? {
+            Expression::Map(m) => Ok(m.into_keys().collect::<Vec<_>>().into()),
+            otherwise => Err(Error::CustomError(format!(
+                "cannot get the keys of {}",
+                otherwise
+            ))),
+        },
+        "get the list of keys in a table",
+    );
+
+    env.define_builtin(
+        "vals",
+        |args, env| match args[0].eval(env)? {
+            Expression::Map(m) => Ok(m.into_values().collect::<Vec<_>>().into()),
+            otherwise => Err(Error::CustomError(format!(
+                "cannot get the values of {}",
+                otherwise
+            ))),
+        },
+        "get the list of values in a table",
+    );
+
+    env.define_builtin(
+        "vars",
+        |_, env| Ok(env.bindings.clone().into()),
+        "get a table of the defined variables",
+    );
+
+    env.define_builtin(
         "len",
         |args, env| match args[0].eval(env)? {
             Expression::Map(m) => Ok(Expression::Integer(m.len() as Int)),
