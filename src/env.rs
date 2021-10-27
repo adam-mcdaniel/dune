@@ -7,6 +7,7 @@ const CWD_ENV_VAR: &str = "CWD";
 pub struct Environment {
     pub bindings: BTreeMap<String, Expression>,
     parent: Option<Box<Self>>,
+    capture_stdio: bool,
 }
 
 impl Default for Environment {
@@ -20,18 +21,19 @@ impl Environment {
         Self {
             bindings: BTreeMap::new(),
             parent: None,
+            capture_stdio: false,
         }
     }
 
-    pub fn get_cwd(&self) -> String {
-        match self.get(CWD_ENV_VAR) {
+    pub fn get_cwd(&self) -> &str {
+        match self.get_ref(CWD_ENV_VAR) {
             Some(Expression::String(path)) => path,
-            _ => String::from("/"),
+            _ => "/",
         }
     }
 
-    pub fn set_cwd(&mut self, cwd: impl ToString) {
-        self.define(CWD_ENV_VAR, Expression::String(cwd.to_string()));
+    pub fn set_cwd(&mut self, cwd: impl Into<String>) {
+        self.define(CWD_ENV_VAR, Expression::String(cwd.into()));
     }
 
     pub fn get(&self, name: &str) -> Option<Expression> {
@@ -39,6 +41,30 @@ impl Environment {
             Some(expr) => Some(expr.clone()),
             None => match &self.parent {
                 Some(parent) => parent.get(name),
+                None => None,
+            },
+        }
+    }
+
+    pub fn capture_stdio<F, T>(&mut self, f: F) -> T
+    where
+        F: FnOnce(&mut Self) -> T,
+    {
+        let capture_stdio = std::mem::replace(&mut self.capture_stdio, true);
+        let result = f(self);
+        self.capture_stdio = capture_stdio;
+        result
+    }
+
+    pub fn is_capturing_stdio(&self) -> bool {
+        self.capture_stdio
+    }
+
+    pub fn get_ref(&self, name: &str) -> Option<&Expression> {
+        match self.bindings.get(name) {
+            Some(expr) => Some(expr),
+            None => match &self.parent {
+                Some(parent) => parent.get_ref(name),
                 None => None,
             },
         }
@@ -63,13 +89,14 @@ impl Environment {
 
     pub fn define_builtin(
         &mut self,
-        name: impl ToString,
+        name: impl Into<String>,
         builtin: fn(Vec<Expression>, &mut Environment) -> Result<Expression, Error>,
-        help: impl ToString,
+        help: impl Into<String>,
     ) {
+        let name: String = name.into();
         self.define(
-            &name.to_string(),
-            Expression::builtin(name.to_string(), builtin, help.to_string()),
+            &name.clone(),
+            Expression::builtin(name, builtin, help.into()),
         )
     }
 

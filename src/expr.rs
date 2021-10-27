@@ -5,7 +5,7 @@ use std::{
     fmt,
     io::ErrorKind,
     ops::{Add, Div, Index, Mul, Rem, Sub},
-    process::Command,
+    process::{Command, Stdio},
 };
 
 use terminal_size::{terminal_size, Width};
@@ -151,6 +151,12 @@ impl fmt::Display for Builtin {
 impl PartialEq for Builtin {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
+    }
+}
+
+impl Default for Expression {
+    fn default() -> Self {
+        Expression::None
     }
 }
 
@@ -331,14 +337,14 @@ impl PartialOrd for Expression {
 
 impl Expression {
     pub fn builtin(
-        name: impl ToString,
+        name: impl Into<String>,
         body: fn(Vec<Self>, &mut Environment) -> Result<Self, Error>,
-        help: impl ToString,
+        help: impl Into<String>,
     ) -> Self {
         Self::Builtin(Builtin {
-            name: name.to_string(),
+            name: name.into(),
             body,
-            help: help.to_string(),
+            help: help.into(),
         })
     }
 
@@ -362,63 +368,68 @@ impl Expression {
         }
     }
 
-    fn get_used_symbols(&self) -> Vec<String> {
+    fn get_used_symbols(&self) -> Vec<&str> {
+        let mut result = vec![];
+        self.add_to_used_symbols(&mut result);
+        result
+    }
+
+    fn add_to_used_symbols<'a>(&'a self, buf: &mut Vec<&'a str>) {
         match self {
-            Self::Symbol(name) => vec![name.clone()],
+            Self::Symbol(name) => {
+                buf.push(name);
+            }
             Self::None
             | Self::Integer(_)
             | Self::Float(_)
             | Self::Bytes(_)
             | Self::String(_)
             | Self::Boolean(_)
-            | Self::Builtin(_) => vec![],
+            | Self::Builtin(_) => {}
 
             Self::For(_, list, body) => {
-                let mut result = vec![];
-                result.extend(list.get_used_symbols());
-                result.extend(body.get_used_symbols());
-                result
+                list.add_to_used_symbols(buf);
+                body.add_to_used_symbols(buf);
             }
 
             Self::Do(exprs) | Self::List(exprs) => {
-                let mut result = vec![];
                 for expr in exprs {
-                    result.extend(expr.get_used_symbols())
+                    expr.add_to_used_symbols(buf);
                 }
-                result
             }
             Self::Map(exprs) => {
-                let mut result = vec![];
                 for expr in exprs.values() {
-                    result.extend(expr.get_used_symbols())
+                    expr.add_to_used_symbols(buf);
                 }
-                result
             }
 
-            Self::Group(inner) | Self::Quote(inner) => inner.get_used_symbols(),
-            Self::Lambda(_, body, _) => body.get_used_symbols(),
-            Self::Macro(_, body) => body.get_used_symbols(),
+            Self::Group(inner) | Self::Quote(inner) => {
+                inner.add_to_used_symbols(buf);
+            }
+            Self::Lambda(_, body, _) => body.add_to_used_symbols(buf),
+            Self::Macro(_, body) => body.add_to_used_symbols(buf),
 
-            Self::Assign(_, expr) => expr.get_used_symbols(),
+            Self::Assign(_, expr) => expr.add_to_used_symbols(buf),
             Self::If(cond, t, e) => {
-                let mut result = vec![];
-                result.extend(cond.get_used_symbols());
-                result.extend(t.get_used_symbols());
-                result.extend(e.get_used_symbols());
-                result
+                cond.add_to_used_symbols(buf);
+                t.add_to_used_symbols(buf);
+                e.add_to_used_symbols(buf);
             }
             Self::Apply(g, args) => {
-                let mut result = g.get_used_symbols();
+                g.add_to_used_symbols(buf);
                 for expr in args {
-                    result.extend(expr.get_used_symbols())
+                    expr.add_to_used_symbols(buf);
                 }
-                result
             }
         }
     }
 
     pub fn eval(&self, env: &mut Environment) -> Result<Self, Error> {
         self.clone().eval_mut(env, 0)
+    }
+
+    pub fn eval_capturing(self, env: &mut Environment, depth: usize) -> Result<Self, Error> {
+        env.capture_stdio(|env| self.eval_mut(env, depth))
     }
 
     fn eval_mut(mut self, env: &mut Environment, mut depth: usize) -> Result<Self, Error> {
@@ -431,29 +442,31 @@ impl Expression {
 
             match self {
                 Self::Quote(inner) => return Ok(*inner),
-                Self::Group(inner) => return inner.eval_mut(env, depth + 1),
+                Self::Group(inner) => return inner.eval_capturing(env, depth + 1),
 
                 Self::Symbol(name) => {
                     return Ok(match env.get(&name) {
                         Some(expr) => expr,
-                        None => Self::Symbol(name.clone()),
+                        None => Self::Symbol(name),
                     })
                 }
 
                 Self::Assign(name, expr) => {
-                    let x = expr.eval_mut(env, depth + 1)?;
+                    let x = expr.eval_capturing(env, depth + 1)?;
                     env.define(&name, x);
                     return Ok(Self::None);
                 }
 
                 Self::For(name, list, body) => {
-                    if let Expression::List(items) = list.clone().eval_mut(env, depth + 1)? {
+                    if let Expression::List(items) =
+                        (*list).clone().eval_capturing(env, depth + 1)?
+                    {
                         return Ok(Self::List(
                             items
                                 .into_iter()
                                 .map(|item| {
                                     env.define(&name, item);
-                                    body.clone().eval_mut(env, depth + 1)
+                                    (*body).clone().eval_mut(env, depth + 1)
                                 })
                                 .collect::<Result<Vec<Self>, Error>>()?,
                         ));
@@ -463,7 +476,7 @@ impl Expression {
                 }
 
                 Self::If(cond, true_expr, false_expr) => {
-                    return if cond.eval_mut(env, depth + 1)?.is_truthy() {
+                    return if cond.eval_capturing(env, depth + 1)?.is_truthy() {
                         true_expr
                     } else {
                         false_expr
@@ -471,86 +484,102 @@ impl Expression {
                     .eval_mut(env, depth + 1)
                 }
 
-                Self::Apply(ref f, ref args) => match f.clone().eval_mut(env, depth + 1)? {
-                    Self::Symbol(name) | Self::String(name) => {
-                        let bindings = env
-                            .bindings
-                            .clone()
-                            .into_iter()
-                            .map(|(k, v)| (k, v.to_string()))
-                            // This is to prevent environment variables from getting too large.
-                            // This causes some strange bugs on Linux: mainly it becomes
-                            // impossible to execute any program because `the argument
-                            // list is too long`.
-                            .filter(|(_, s)| s.len() <= 1024)
-                            .collect::<BTreeMap<String, String>>();
+                Self::Apply(ref f, mut args) => {
+                    match (**f).clone().eval_mut(env, depth + 1)? {
+                        Self::Symbol(name) | Self::String(name) => {
+                            let bindings = env
+                                .bindings
+                                .iter()
+                                .map(|(k, v)| (k.clone(), v.to_string()))
+                                // This is to prevent environment variables from getting too large.
+                                // This causes some strange bugs on Linux: mainly it becomes
+                                // impossible to execute any program because `the argument
+                                // list is too long`.
+                                .filter(|(_, s)| s.len() <= 1024)
+                                .collect::<BTreeMap<String, String>>();
 
-                        match Command::new(&name)
-                            .current_dir(env.get_cwd())
-                            .args(
-                                args.iter()
-                                    .filter(|&x| x != &Self::None)
-                                    .map(|x| Ok(format!("{}", x.clone().eval_mut(env, depth + 1)?)))
-                                    .collect::<Result<Vec<String>, Error>>()?,
-                            )
-                            .envs(bindings)
-                            .status()
-                        {
-                            Ok(_) => return Ok(Self::None),
-                            Err(e) => {
-                                return Err(match e.kind() {
-                                    ErrorKind::NotFound => Error::CustomError(format!(
-                                        "program \"{}\" not found",
-                                        name
-                                    )),
-                                    ErrorKind::PermissionDenied => Error::CustomError(format!(
-                                        "permission to execute \"{}\" denied",
-                                        name
-                                    )),
-                                    _ => Error::CommandFailed(name, args.clone()),
-                                })
+                            let mut command = Command::new(&name);
+                            command
+                                .current_dir(env.get_cwd())
+                                .args(
+                                    args.iter()
+                                        .filter(|&x| x != &Self::None)
+                                        .map(|x| {
+                                            Ok(x.clone()
+                                                .eval_capturing(env, depth + 1)?
+                                                .to_string())
+                                        })
+                                        .collect::<Result<Vec<String>, Error>>()?,
+                                )
+                                .envs(bindings);
+
+                            let captured = env.is_capturing_stdio();
+                            if captured {
+                                command.stdout(Stdio::piped()).stderr(Stdio::inherit());
+                            } else {
+                                command.stdout(Stdio::inherit()).stderr(Stdio::inherit());
+                            }
+
+                            match command.output() {
+                                Ok(output) => {
+                                    if captured {
+                                        let stdout =
+                                            String::from_utf8_lossy(&output.stdout).to_string();
+                                        return Ok(stdout.into());
+                                    } else {
+                                        return Ok(Self::None);
+                                    }
+                                }
+                                Err(e) => {
+                                    return Err(match e.kind() {
+                                        ErrorKind::NotFound => Error::CustomError(format!(
+                                            "program \"{}\" not found",
+                                            name
+                                        )),
+                                        ErrorKind::PermissionDenied => Error::CustomError(format!(
+                                            "permission to execute \"{}\" denied",
+                                            name
+                                        )),
+                                        _ => Error::CommandFailed(name, args),
+                                    })
+                                }
                             }
                         }
-                    }
 
-                    Self::Lambda(param, body, old_env) if args.len() == 1 => {
-                        let mut new_env = old_env;
-                        new_env.set_cwd(env.get_cwd());
-                        new_env.define(&param, args[0].clone().eval_mut(env, depth + 1)?);
-                        return body.eval_mut(&mut new_env, depth + 1);
-                    }
+                        Self::Lambda(param, body, mut new_env) if !args.is_empty() => {
+                            let first = args.remove(0);
+                            new_env.set_cwd(env.get_cwd());
+                            new_env.define(&param, first.eval_capturing(env, depth + 1)?);
+                            let result = body.eval_mut(&mut new_env, depth + 1)?;
 
-                    Self::Lambda(param, body, old_env) if args.len() > 1 => {
-                        let mut new_env = old_env.clone();
-                        new_env.set_cwd(env.get_cwd());
-                        new_env.define(&param, args[0].clone().eval_mut(env, depth + 1)?);
-                        self = Self::Apply(
-                            Box::new(body.eval_mut(&mut new_env, depth + 1)?),
-                            args[1..].to_vec(),
-                        );
-                    }
+                            if !args.is_empty() {
+                                self = Self::Apply(Box::new(result), args);
+                            } else {
+                                return Ok(result);
+                            }
+                        }
 
-                    Self::Macro(param, body) if args.len() == 1 => {
-                        let x = args[0].clone().eval_mut(env, depth + 1)?;
-                        env.define(&param, x);
-                        self = *body;
-                    }
+                        Self::Macro(param, body) if !args.is_empty() => {
+                            let first = args.remove(0);
+                            let x = first.eval_mut(env, depth + 1)?;
+                            env.define(&param, x);
+                            self = if args.is_empty() {
+                                *body
+                            } else {
+                                Self::Apply(
+                                    Box::new(body.eval_mut(env, depth + 1)?),
+                                    args[1..].to_vec(),
+                                )
+                            };
+                        }
 
-                    Self::Macro(param, body) if args.len() > 1 => {
-                        let x = args[0].clone().eval_mut(env, depth + 1)?;
-                        env.define(&param, x);
-                        self = Self::Apply(
-                            Box::new(body.eval_mut(env, depth + 1)?),
-                            args[1..].to_vec(),
-                        );
-                    }
+                        Self::Builtin(Builtin { body, .. }) => {
+                            return body(args, env);
+                        }
 
-                    Self::Builtin(Builtin { body, .. }) => {
-                        return body(args.clone(), env);
+                        _ => return Err(Error::CannotApply(*f.clone(), args)),
                     }
-
-                    _ => return Err(Error::CannotApply(*f.clone(), args.clone())),
-                },
+                }
 
                 // // Apply a function or macro to an argument
                 Self::Lambda(param, body, captured) => {
@@ -558,13 +587,13 @@ impl Expression {
                     tmp_env.define(&param, Expression::None);
                     tmp_env.set_cwd(env.get_cwd());
                     for symbol in body.get_used_symbols() {
-                        if symbol != param && !captured.is_defined(&symbol) {
-                            if let Some(val) = env.get(&symbol) {
-                                tmp_env.define(&symbol, val)
+                        if symbol != param && !captured.is_defined(symbol) {
+                            if let Some(val) = env.get(symbol) {
+                                tmp_env.define(symbol, val)
                             }
                         }
                     }
-                    return Ok(Self::Lambda(param.clone(), body, tmp_env));
+                    return Ok(Self::Lambda(param, body, tmp_env));
                 }
 
                 Self::List(exprs) => {
@@ -583,7 +612,7 @@ impl Expression {
                             .collect::<Result<BTreeMap<String, Self>, Error>>()?,
                     ))
                 }
-                Self::Do(exprs) => {
+                Self::Do(mut exprs) => {
                     if exprs.is_empty() {
                         return Ok(Self::None);
                     }
@@ -591,7 +620,7 @@ impl Expression {
                     for expr in &exprs[..exprs.len() - 1] {
                         expr.clone().eval_mut(env, depth + 1)?;
                     }
-                    self = exprs[exprs.len() - 1].clone();
+                    self = exprs.pop().unwrap();
                 }
                 Self::None
                 | Self::Integer(_)
@@ -600,7 +629,7 @@ impl Expression {
                 | Self::Bytes(_)
                 | Self::String(_)
                 | Self::Macro(_, _)
-                | Self::Builtin(_) => return Ok(self.clone()),
+                | Self::Builtin(_) => return Ok(self),
             }
             depth += 1;
         }

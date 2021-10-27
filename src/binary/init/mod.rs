@@ -1,3 +1,5 @@
+use std::fmt::Write;
+
 use dune::{Builtin, Environment, Error, Expression, Int};
 
 #[cfg(feature = "chess-engine")]
@@ -31,8 +33,8 @@ pub fn init(env: &mut Environment) {
     env.define("parse", parse_module::get());
     operator_module::add_to(env);
 
-    env.define("exit", env.get("os").unwrap()["exit"].clone());
-    env.define("cd", env.get("os").unwrap()["cd"].clone());
+    env.define("exit", env.get_ref("os").unwrap()["exit"].clone());
+    env.define("cd", env.get_ref("os").unwrap()["cd"].clone());
     env.define("quit", env.get("exit").unwrap());
 
     env.define_builtin(
@@ -77,7 +79,7 @@ pub fn init(env: &mut Environment) {
         "print",
         |args, env| {
             for (i, arg) in args.iter().enumerate() {
-                let x = arg.clone().eval(env)?;
+                let x = arg.eval(env)?;
                 if i < args.len() - 1 {
                     print!("{} ", x)
                 } else {
@@ -94,7 +96,7 @@ pub fn init(env: &mut Environment) {
         "debug",
         |args, env| {
             for (i, arg) in args.iter().enumerate() {
-                let x = arg.clone().eval(env)?;
+                let x = arg.eval(env)?;
                 if i < args.len() - 1 {
                     print!("{:?} ", x)
                 } else {
@@ -111,7 +113,7 @@ pub fn init(env: &mut Environment) {
         "println",
         |args, env| {
             for (i, arg) in args.iter().enumerate() {
-                let x = arg.clone().eval(env)?;
+                let x = arg.eval(env)?;
                 if i < args.len() - 1 {
                     print!("{} ", x)
                 } else {
@@ -130,15 +132,15 @@ pub fn init(env: &mut Environment) {
         |args, env| {
             let mut prompt = String::new();
             for (i, arg) in args.iter().enumerate() {
-                let x = arg.clone().eval(env)?;
+                let x = arg.eval(env)?;
                 if i < args.len() - 1 {
-                    prompt += &format!("{} ", x)
+                    write!(prompt, "{} ", x).unwrap();
                 } else {
-                    prompt += &format!("{}", x)
+                    write!(prompt, "{}", x).unwrap();
                 }
             }
             let mut rl = crate::new_editor(env);
-            Ok(Expression::String(crate::readline(&prompt, &mut rl)))
+            Ok(Expression::String(crate::readline(prompt, &mut rl)))
         },
         "get user input",
     );
@@ -147,7 +149,7 @@ pub fn init(env: &mut Environment) {
         "to",
         |args, env| {
             if args.len() == 2 {
-                match (args[0].clone().eval(env)?, args[1].clone().eval(env)?) {
+                match (args[0].eval(env)?, args[1].eval(env)?) {
                     (Expression::Integer(m), Expression::Integer(n)) => Ok(Expression::List(
                         (m..n).map(Expression::Integer).collect::<Vec<Expression>>(),
                     )),
@@ -200,31 +202,31 @@ pub fn init(env: &mut Environment) {
             let mut arr = args[0].eval(env)?;
             let idx = args[1].eval(env)?;
             let val = args[2].eval(env)?;
-            match (&mut arr, &idx) {
+            match (&mut arr, idx) {
                 (Expression::Map(exprs), Expression::String(key)) => {
-                    exprs.insert(key.clone(), val);
+                    exprs.insert(key, val);
                 }
-                (Expression::List(exprs), Expression::Integer(i)) => {
+                (Expression::List(exprs), Expression::Integer(ref mut i)) => {
                     if *i as usize <= exprs.len() {
                         exprs.insert(*i as usize, val);
                     } else {
                         return Err(Error::CustomError(format!(
                             "index {} out of bounds for {:?}",
-                            idx, arr
+                            *i, arr
                         )));
                     }
                 }
-                (Expression::String(s), Expression::Integer(i)) => {
+                (Expression::String(s), Expression::Integer(ref mut i)) => {
                     if *i as usize <= s.len() {
                         s.insert_str(*i as usize, &val.to_string());
                     } else {
                         return Err(Error::CustomError(format!(
                             "index {} out of bounds for {:?}",
-                            idx, arr
+                            *i, arr
                         )));
                     }
                 }
-                _ => {
+                (_, idx) => {
                     return Err(Error::CustomError(format!(
                         "cannot insert {:?} into {:?} with index {:?}",
                         val, arr, idx
@@ -305,7 +307,7 @@ pub fn init(env: &mut Environment) {
             Expression::List(x) => Ok(if x.is_empty() {
                 Expression::None
             } else {
-                x[0].clone()
+                x.into_iter().next().unwrap()
             }),
             otherwise => Err(Error::CustomError(format!(
                 "cannot get the head of a non-list {}",
@@ -352,14 +354,14 @@ pub fn init(env: &mut Environment) {
         "eval",
         |args, env| {
             let mut new_env = env.clone();
-            args[0].clone().eval(env)?.eval(&mut new_env)
+            args[0].eval(env)?.eval(&mut new_env)
         },
         "evaluate an expression without changing the environment",
     );
 
     env.define_builtin(
         "exec",
-        |args, env| args[0].clone().eval(env)?.eval(env),
+        |args, env| args[0].eval(env)?.eval(env),
         "evaluate an expression in the current environment",
     );
 
@@ -402,7 +404,7 @@ pub fn init(env: &mut Environment) {
 }
 
 fn check_args_len(
-    name: impl ToString,
+    name: &str,
     args: &[Expression],
     expected_len: std::ops::RangeFrom<usize>,
 ) -> Result<(), Error> {
@@ -411,23 +413,20 @@ fn check_args_len(
     } else {
         Err(Error::CustomError(format!(
             "too few arguments to function {}",
-            name.to_string()
+            name
         )))
     }
 }
 
-fn check_exact_args_len(
-    name: impl ToString,
-    args: &[Expression],
-    expected_len: usize,
-) -> Result<(), Error> {
+fn check_exact_args_len(name: &str, args: &[Expression], expected_len: usize) -> Result<(), Error> {
     if args.len() == expected_len {
         Ok(())
     } else {
-        Err(Error::CustomError(if args.len() > expected_len {
-            format!("too many arguments to function {}", name.to_string())
+        let error_message = if args.len() > expected_len {
+            format!("too many arguments to function {}", name)
         } else {
-            format!("too few arguments to function {}", name.to_string())
-        }))
+            format!("too few arguments to function {}", name)
+        };
+        Err(Error::CustomError(error_message))
     }
 }
