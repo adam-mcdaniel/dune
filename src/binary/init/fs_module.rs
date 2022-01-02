@@ -1,4 +1,7 @@
-use std::{env::current_dir, path::{Path, PathBuf}};
+use std::{
+    env::current_dir,
+    path::{Path, PathBuf},
+};
 
 use common_macros::b_tree_map;
 use dune::{Environment, Error, Expression};
