@@ -37,7 +37,7 @@ Dune also attempts to be a usable scripting language, and even offers a few nich
 
 <p float="left">
   <img src="./assets/metaprogramming.png" width="45%"/>
-  <img src="./assets/operator-overloading.png" width="52%"/>
+  <img src="./assets/operator-overloading2.png" width="52.4%"/>
 </p>
 
 Overall, I wrote Dune to have a *complete* shell of my own: one that's fast, useful, and pretty.

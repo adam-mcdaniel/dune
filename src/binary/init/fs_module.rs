@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    env::current_dir,
+    path::{Path, PathBuf},
+};
 
 use common_macros::b_tree_map;
 use dune::{Environment, Error, Expression};
@@ -9,9 +12,12 @@ pub fn add_to(env: &mut Environment) {
     if let Some(home_dir) = dirs::home_dir() {
         let home_dir = home_dir.into_os_string().into_string().unwrap();
         env.set_cwd(&home_dir);
-
         dir_tree.insert("home".to_string(), Expression::from(home_dir.clone()));
         env.define("HOME", Expression::String(home_dir));
+    }
+
+    if let Ok(cwd) = current_dir() {
+        env.set_cwd(&cwd.into_os_string().into_string().unwrap());
     }
 
     if let Some(desk_dir) = dirs::desktop_dir() {
