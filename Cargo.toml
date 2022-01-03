@@ -1,6 +1,6 @@
 [package]
 name = "dune"
-version = "0.1.7"
+version = "0.1.8"
 authors = ["Adam McDaniel <adam.mcdaniel17@gmail.com>"]
 edition = "2021"
 license = "Apache-2.0"
@@ -16,7 +16,7 @@ name = "dunesh"
 path = "src/bin.rs"
 
 [dependencies]
-clap = {version="3.0", features=["cargo"]}
+clap = { version = "3.0", features = [ "cargo" ] }
 json = "0.12.4"
 terminal_size = "0.1.17"
 textwrap = "0.14"
