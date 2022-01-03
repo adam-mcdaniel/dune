@@ -4,7 +4,7 @@ mod binary;
 
 use dune::{parse_script, Diagnostic, Environment, Error, Expression, SyntaxError, TokenKind};
 
-use clap::{arg, App, crate_authors, crate_description};
+use clap::{arg, crate_authors, crate_description, App};
 
 use rustyline::completion::{Completer, FilenameCompleter, Pair as PairComplete};
 use rustyline::config::OutputStreamType;
@@ -532,16 +532,13 @@ fn run_text(text: &str, env: &mut Environment) -> Result<Expression, Error> {
 fn run_file(path: PathBuf, env: &mut Environment) -> Result<Expression, Error> {
     match std::fs::read_to_string(&path) {
         Ok(prelude) => run_text(&prelude, env),
-        Err(e) => Err(Error::CustomError(format!(
-            "Failed to read file: {}",
-            e
-        ))),
+        Err(e) => Err(Error::CustomError(format!("Failed to read file: {}", e))),
     }
 }
 
-
 fn main() -> Result<(), Error> {
-    let matches = App::new(r#"
+    let matches = App::new(
+        r#"
         888                            
         888                            
         888                            
@@ -550,16 +547,18 @@ fn main() -> Result<(), Error> {
    888  888 888  888 888  888 88888888 
    Y88b 888 Y88b 888 888  888 Y8b.     
     "Y88888  "Y88888 888  888  "Y8888  
-   "#)
-        .author(crate_authors!())
-        .about(crate_description!())
-        .args(&[
-            arg!([FILE] "execute a given input file"),
-            arg!(-i --interactive "Start an interactive REPL"),
-            arg!(-x --exec <INPUT> ... "Execute a given input string")
-                .multiple_values(true)
-                .required(false),
-        ]).get_matches();
+   "#,
+    )
+    .author(crate_authors!())
+    .about(crate_description!())
+    .args(&[
+        arg!([FILE] "execute a given input file"),
+        arg!(-i --interactive "Start an interactive REPL"),
+        arg!(-x --exec <INPUT> ... "Execute a given input string")
+            .multiple_values(true)
+            .required(false),
+    ])
+    .get_matches();
     let mut env = Environment::new();
 
     binary::init(&mut env);
@@ -596,30 +595,36 @@ fn main() -> Result<(), Error> {
             eprintln!("{}", e)
         }
 
-        if !matches.is_present("interactive") && !matches.is_present("exec"){
-            return Ok(())
+        if !matches.is_present("interactive") && !matches.is_present("exec") {
+            return Ok(());
         }
     }
 
     if matches.is_present("exec") {
-        match run_text(&matches.values_of("exec").unwrap()
-            .map(String::from)
-            .collect::<Vec<_>>()
-            .join(" "), &mut env) {
+        match run_text(
+            &matches
+                .values_of("exec")
+                .unwrap()
+                .map(String::from)
+                .collect::<Vec<_>>()
+                .join(" "),
+            &mut env,
+        ) {
             Ok(result) => {
                 Expression::Apply(
                     Box::new(Expression::Symbol("report".to_string())),
-                    vec![result]
-                ).eval(&mut env)?;
-            },
+                    vec![result],
+                )
+                .eval(&mut env)?;
+            }
             Err(e) => eprintln!("{}", e),
         }
 
         if !matches.is_present("interactive") {
-            return Ok(())
+            return Ok(());
         }
     }
-    
+
     if let Some(home_dir) = dirs::home_dir() {
         let prelude_path = home_dir.join(".dune-prelude");
         if let Err(e) = run_file(prelude_path, &mut env) {
