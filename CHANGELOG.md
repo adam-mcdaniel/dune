@@ -6,8 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+*No unreleased changes yet*
+
+## [0.1.8] - 2022-01-02
+
 ### Added
 - [#64](https://github.com/adam-mcdaniel/dune/pull/64): Add Changelog
+- [#65](https://github.com/adam-mcdaniel/dune/pull/65): Added keys and vals functions
+- [#76](https://github.com/adam-mcdaniel/dune/pull/76): Added command line argument parser
+
+### Changed
+- [#66](https://github.com/adam-mcdaniel/dune/pull/66): Report error when `cd` fails
+- [#75](https://github.com/adam-mcdaniel/dune/pull/75): CWD Init
+
+### Fixed
+- [#76](https://github.com/adam-mcdaniel/dune/pull/76): Fixed `fmt@white`
 
 ## [0.1.7] - 2021-10-18
 
@@ -48,7 +61,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.1] - 2021-09-27
 ## [0.1.0] - 2019-09-09
 
-[Unreleased]: https://github.com/adam-mcdaniel/dune/compare/v0.1.7...HEAD
+[Unreleased]: https://github.com/adam-mcdaniel/dune/compare/v0.1.8...HEAD
+[0.1.8]: https://crates.io/crates/dune/0.1.8
 [0.1.7]: https://crates.io/crates/dune/0.1.7
 [0.1.6]: https://crates.io/crates/dune/0.1.6
 [0.1.5]: https://crates.io/crates/dune/0.1.5
