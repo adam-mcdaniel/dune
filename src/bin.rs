@@ -4,6 +4,8 @@ mod binary;
 
 use dune::{parse_script, Diagnostic, Environment, Error, Expression, SyntaxError, TokenKind};
 
+use clap::{arg, crate_authors, crate_description, App};
+
 use rustyline::completion::{Completer, FilenameCompleter, Pair as PairComplete};
 use rustyline::config::OutputStreamType;
 use rustyline::highlight::Highlighter;
@@ -523,7 +525,40 @@ fn repl(
     }
 }
 
+fn run_text(text: &str, env: &mut Environment) -> Result<Expression, Error> {
+    parse(text)?.eval(env)
+}
+
+fn run_file(path: PathBuf, env: &mut Environment) -> Result<Expression, Error> {
+    match std::fs::read_to_string(&path) {
+        Ok(prelude) => run_text(&prelude, env),
+        Err(e) => Err(Error::CustomError(format!("Failed to read file: {}", e))),
+    }
+}
+
 fn main() -> Result<(), Error> {
+    let matches = App::new(
+        r#"
+        888                            
+        888                            
+        888                            
+    .d88888 888  888 88888b.   .d88b.  
+   d88" 888 888  888 888 "88b d8P  Y8b 
+   888  888 888  888 888  888 88888888 
+   Y88b 888 Y88b 888 888  888 Y8b.     
+    "Y88888  "Y88888 888  888  "Y8888  
+   "#,
+    )
+    .author(crate_authors!())
+    .about(crate_description!())
+    .args(&[
+        arg!([FILE] "Execute a given input file"),
+        arg!(-i --interactive "Start an interactive REPL"),
+        arg!(-x --exec <INPUT> ... "Execute a given input string")
+            .multiple_values(true)
+            .required(false),
+    ])
+    .get_matches();
     let mut env = Environment::new();
 
     binary::init(&mut env);
@@ -553,29 +588,50 @@ fn main() -> Result<(), Error> {
     )?
     .eval(&mut env)?;
 
+    if matches.is_present("FILE") {
+        let path = PathBuf::from(matches.value_of("FILE").unwrap());
+
+        if let Err(e) = run_file(path, &mut env) {
+            eprintln!("{}", e)
+        }
+
+        if !matches.is_present("interactive") && !matches.is_present("exec") {
+            return Ok(());
+        }
+    }
+
+    if matches.is_present("exec") {
+        match run_text(
+            &matches
+                .values_of("exec")
+                .unwrap()
+                .map(String::from)
+                .collect::<Vec<_>>()
+                .join(" "),
+            &mut env,
+        ) {
+            Ok(result) => {
+                Expression::Apply(
+                    Box::new(Expression::Symbol("report".to_string())),
+                    vec![result],
+                )
+                .eval(&mut env)?;
+            }
+            Err(e) => eprintln!("{}", e),
+        }
+
+        if !matches.is_present("interactive") {
+            return Ok(());
+        }
+    }
+
     if let Some(home_dir) = dirs::home_dir() {
         let prelude_path = home_dir.join(".dune-prelude");
-        match std::fs::read_to_string(&prelude_path) {
-            Ok(prelude) => match parse(&prelude) {
-                Ok(expr) => {
-                    if let Err(e) = expr.eval(&mut env) {
-                        eprintln!("error while running {:?}: {}", prelude_path, e)
-                    }
-                }
-                Err(e) => {
-                    eprintln!("error while running {:?}: {}", prelude_path, e)
-                }
-            },
-            Err(_) => match parse(DEFAULT_PRELUDE) {
-                Ok(expr) => {
-                    if let Err(e) = expr.eval(&mut env) {
-                        eprintln!("error while running default prelude: {}", e)
-                    }
-                }
-                Err(e) => {
-                    eprintln!("error while running default prelude: {}", e)
-                }
-            },
+        if let Err(e) = run_file(prelude_path, &mut env) {
+            eprintln!("error while running prelude: {}", e);
+            if let Err(e) = run_text(DEFAULT_PRELUDE, &mut env) {
+                eprintln!("error while running default prelude: {}", e);
+            }
         }
     }
 
@@ -595,6 +651,7 @@ fn main() -> Result<(), Error> {
         repl(editor_ref_copy.clone(), env_ref_copy.clone()).expect("Error in REPL");
     })
     .expect("Error setting Ctrl-C handler");
+
     repl(editor_ref, env_ref)?;
 
     Ok(())
