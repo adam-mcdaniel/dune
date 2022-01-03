@@ -4,10 +4,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [Released]
+
+## [0.1.8] - 2022-1-2
 
 ### Added
 - [#64](https://github.com/adam-mcdaniel/dune/pull/64): Add Changelog
+- [#65](https://github.com/adam-mcdaniel/dune/pull/65): Added keys and vals functions
+- [#65](https://github.com/adam-mcdaniel/dune/pull/65): Added command line argument parser and fixed builtin function
+
+### Changed
+- [#66](https://github.com/adam-mcdaniel/dune/pull/66): Report error when `cd` fails
+- [#75](https://github.com/adam-mcdaniel/dune/pull/75): CWD Init
+
+### Fixed
+- [#76](https://github.com/adam-mcdaniel/dune/pull/76): Fixed `fmt@white`
+
 
 ## [0.1.7] - 2021-10-18
 
