@@ -4,7 +4,7 @@ version = "0.1.7"
 authors = ["Adam McDaniel <adam.mcdaniel17@gmail.com>"]
 edition = "2021"
 license = "Apache-2.0"
-description = "A shell by the beach!"
+description = "A shell🐚 by the beach🏖️!!"
 readme = "README.md"
 documentation = "https://docs.rs/dune"
 homepage = "https://github.com/adam-mcdaniel/dune"
@@ -16,6 +16,7 @@ name = "dunesh"
 path = "src/bin.rs"
 
 [dependencies]
+clap = {version="3.0", features=["cargo"]}
 json = "0.12.4"
 terminal_size = "0.1.17"
 textwrap = "0.14"
@@ -25,9 +26,9 @@ rand = "0.8"
 ctrlc = "3.2"
 common_macros = "0.1"
 snailquote = "0.3"
-rustyline = "8.2"
-rustyline-derive = "0.5"
-dirs = "3.0"
+rustyline = "9.1"
+rustyline-derive = "0.6"
+dirs = "4.0"
 dunce = "1.0"
 chess-engine = { version = "0.1.2", optional = true }
 

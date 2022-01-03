@@ -71,7 +71,7 @@ pub fn get() -> Expression {
         }, "convert text to cyan on the console"),
 
         String::from("white") => Expression::builtin("white", |args, env| {
-            Ok(format!("\x1b[97m{}\x1b[m\x6b[0m", args[0].eval(env)?).into())
+            Ok(format!("\x1b[97m{}\x1b[m\x1b[0m", args[0].eval(env)?).into())
         }, "convert text to white on the console"),
 
         String::from("dark") => b_tree_map! {
