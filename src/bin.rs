@@ -552,7 +552,7 @@ fn main() -> Result<(), Error> {
     .author(crate_authors!())
     .about(crate_description!())
     .args(&[
-        arg!([FILE] "execute a given input file"),
+        arg!([FILE] "Execute a given input file"),
         arg!(-i --interactive "Start an interactive REPL"),
         arg!(-x --exec <INPUT> ... "Execute a given input string")
             .multiple_values(true)
