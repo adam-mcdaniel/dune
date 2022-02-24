@@ -61,8 +61,15 @@ fn filter(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Er
     if args.len() == 1 {
         Expression::Apply(
             Box::new(crate::parse(
-                "f -> list -> { let result = []; \
-                        for item in list { if (f item) { let result = result + item }} result}",
+                r#"f -> list -> {
+                    let result = [];
+                    for item in list {
+                        if (f item) {
+                            let result = result + [item];
+                        }
+                    }
+                    result
+                }"#,
             )?),
             args.clone(),
         )
