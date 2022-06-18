@@ -5,7 +5,7 @@ pub fn get() -> Expression {
     (b_tree_map! {
         String::from("strip") => Expression::builtin("strip", |args, env| {
             super::check_exact_args_len("strip", &args, 1)?;
-            Ok(crate::strip_ansi_escapes(args[0].eval(env)?).into())
+            Ok(crate::strip_ansi_escapes(&args[0].eval(env)?.to_string()).into())
         }, "strips all colors and styling from a string"),
 
         String::from("wrap") => Expression::builtin("wrap", wrap,

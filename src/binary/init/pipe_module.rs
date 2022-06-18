@@ -27,9 +27,6 @@ fn pipe_builtin(args: Vec<Expression>, env: &mut Environment) -> Result<Expressi
     // The buffer of the STDOUT of the last command.
     let mut buf = vec![];
 
-    // A dummy value to hold where `expr_to_command` stores its resulting command.
-    let mut x = Command::new("dummy");
-
     // For every command, pipe in the previous output buffer,
     // and get the result.
     for (i, expr) in args.iter().enumerate() {
@@ -41,23 +38,23 @@ fn pipe_builtin(args: Vec<Expression>, env: &mut Environment) -> Result<Expressi
         // If the expression can be interpreted as a command (a call to a program),
         // then execute it and get its standard output (using the last expression's
         // result as the standard input).
-        match expr_to_command(&mut x, expr, env)? {
+        match expr_to_command(expr, env)? {
             // If the expression is a command:
             Some(mut cmd) => {
                 if is_first {
                     // If this is the first command, we inherit the current STDIN.
-                    cmd = cmd.stdin(Stdio::inherit());
+                    cmd.stdin(Stdio::inherit());
                 } else {
                     // Otherwise, we use the piped STDOUT of the previous command.
-                    cmd = cmd.stdin(Stdio::piped());
+                    cmd.stdin(Stdio::piped());
                 }
 
                 if is_last {
                     // If this is the last command, we inherit the current STDOUT.
-                    cmd = cmd.stdout(Stdio::inherit());
+                    cmd.stdout(Stdio::inherit());
                 } else {
                     // Otherwise, we collect the stdout and pipe it to the next command.
-                    cmd = cmd.stdout(Stdio::piped());
+                    cmd.stdout(Stdio::piped());
                 }
 
                 // Try to execute the command.
@@ -169,11 +166,7 @@ fn pipe_builtin(args: Vec<Expression>, env: &mut Environment) -> Result<Expressi
 /// `Ok(Some(cmd))`.
 ///
 /// Otherwise, the program will return `Ok(None)`.
-fn expr_to_command<'a>(
-    cmd: &'a mut Command,
-    expr: &Expression,
-    env: &mut Environment,
-) -> Result<Option<&'a mut Command>, Error> {
+fn expr_to_command(expr: &Expression, env: &mut Environment) -> Result<Option<Command>, Error> {
     let bindings = env
         .bindings
         .clone()
@@ -187,44 +180,45 @@ fn expr_to_command<'a>(
 
     Ok(match expr {
         // If the command is quoted or in parentheses, try to get the inner command.
-        Expression::Group(expr) | Expression::Quote(expr) => expr_to_command(cmd, expr, env)?,
+        Expression::Group(expr) | Expression::Quote(expr) => expr_to_command(expr, env)?,
         // If the command is an undefined symbol with some arguments.
-        Expression::Apply(f, args) => match **f {
-            Expression::Symbol(ref name) => {
-                let cmd_name = match env.get(name) {
+        Expression::Apply(f, args) => match &**f {
+            Expression::Symbol(name) => {
+                let cmd_name: &str = match env.get_ref(name) {
                     // If the symbol is an alias, then execute the alias.
                     Some(Expression::Symbol(alias)) => alias,
                     // If the symbol is bound to something like `5`, this isn't a command.
                     Some(_) => return Ok(None),
                     // If the symbol is not bound, then it is a command.
-                    None => name.clone(),
+                    None => name,
                 };
-                *cmd = Command::new(cmd_name);
-                Some(
-                    cmd.current_dir(env.get_cwd()).envs(bindings).args(
-                        args.iter()
-                            .filter(|&x| x != &Expression::None)
-                            .map(|x| Ok(format!("{}", x.eval(env)?)))
-                            .collect::<Result<Vec<String>, Error>>()?,
-                    ),
-                )
+                let mut cmd = Command::new(cmd_name);
+                cmd.current_dir(env.get_cwd()).envs(bindings).args(
+                    args.iter()
+                        .filter(|&x| x != &Expression::None)
+                        .map(|x| Ok(x.eval(env)?.to_string()))
+                        .collect::<Result<Vec<String>, Error>>()?,
+                );
+                Some(cmd)
             }
             _ => None,
         },
 
         // If the command is an undefined symbol, or an alias.
-        Expression::Symbol(name) => match env.get(name) {
+        Expression::Symbol(name) => match env.get_ref(name) {
             // If the symbol is an alias, then execute the alias.
             Some(Expression::Symbol(name)) => {
-                *cmd = Command::new(name);
-                Some(cmd.current_dir(env.get_cwd()).envs(bindings))
+                let mut cmd = Command::new(name);
+                cmd.current_dir(env.get_cwd()).envs(bindings);
+                Some(cmd)
             }
             // If the symbol is bound to something like `5`, this isn't a command.
             Some(_) => None,
             // If the symbol is not defined, use the symbol as the program name.
             None => {
-                *cmd = Command::new(name);
-                Some(cmd.current_dir(env.get_cwd()).envs(bindings))
+                let mut cmd = Command::new(name);
+                cmd.current_dir(env.get_cwd()).envs(bindings);
+                Some(cmd)
             }
         },
 

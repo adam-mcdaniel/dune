@@ -58,9 +58,7 @@ fn new_editor(env: &Environment) -> Editor<DuneHelper> {
     rl
 }
 
-fn strip_ansi_escapes(text: impl ToString) -> String {
-    let text = text.to_string();
-
+fn strip_ansi_escapes(text: &str) -> String {
     let mut result = String::new();
     let mut is_in_escape = false;
     for ch in text.chars() {
@@ -79,15 +77,17 @@ fn strip_ansi_escapes(text: impl ToString) -> String {
     result
 }
 
-fn readline(prompt: impl ToString, rl: &mut Editor<DuneHelper>) -> String {
-    let prompt = prompt.to_string();
+fn readline(prompt: String, rl: &mut Editor<DuneHelper>) -> String {
     loop {
+        let prompt = prompt.clone();
+        let stripped = strip_ansi_escapes(&prompt);
+
         // This MUST be called to update the prompt.
         if let Some(helper) = rl.helper_mut() {
-            helper.set_prompt(&prompt);
+            helper.set_prompt(prompt);
         }
 
-        match rl.readline(&strip_ansi_escapes(&prompt)) {
+        match rl.readline(&stripped) {
             Ok(line) => return line,
             Err(ReadlineError::Interrupted) => {
                 return String::new();
@@ -113,8 +113,8 @@ impl DuneHelper {
     /// This method MUST be called to update the prompt.
     /// If this method is not called, the prompt will not
     /// update.
-    fn set_prompt(&mut self, prompt: impl ToString) {
-        self.colored_prompt = prompt.to_string();
+    fn set_prompt(&mut self, prompt: String) {
+        self.colored_prompt = prompt;
     }
 
     fn update_env(&mut self, env: &Environment) {
@@ -191,7 +191,7 @@ fn syntax_highlight(line: &str) -> String {
                 is_colored = true;
                 result.push_str(b);
             }
-            (TokenKind::Punctuation, o @ ("@" | "\'" | "=" | "|" | ">>" | "->" | "~>")) => {
+            (TokenKind::Punctuation, o @ ("\'" | "=" | "->" | "~>")) => {
                 result.push_str("\x1b[96m");
                 is_colored = true;
                 result.push_str(o);
@@ -447,7 +447,7 @@ fn repl(
     loop {
         let mut env = atomic_env.lock().unwrap();
         let mut rl = atomic_rl.lock().unwrap();
-        let cwd = env.get_cwd();
+        let cwd = env.get_cwd().to_string();
         // let prompt = format!("{}", Expression::Apply(Box::new(env.get("prompt").unwrap()), vec![env.get_cwd().into()]).eval(&mut env)?);
 
         let prompt = Expression::Apply(
@@ -459,11 +459,12 @@ fn repl(
                 }
                 .to_string(),
             )),
-            vec![cwd.clone().into()],
+            vec![cwd.to_string().into()],
         )
         .eval(&mut env)
         .unwrap_or_else(|_| format!("{}$ ", cwd).into())
         .to_string();
+
         rl.helper_mut()
             .expect("No helper")
             .set_prompt(prompt.clone());
@@ -483,10 +484,8 @@ fn repl(
                 let val = expr.eval(&mut env);
                 match val.clone() {
                     Ok(Expression::Symbol(name)) => {
-                        if let Err(e) =
-                            Expression::Apply(Box::new(Expression::Symbol(name)), vec![])
-                                .eval(&mut env)
-                        {
+                        let apply = Expression::Apply(Box::new(Expression::Symbol(name)), vec![]);
+                        if let Err(e) = apply.eval(&mut env) {
                             eprintln!("{}", e)
                         }
                     }
