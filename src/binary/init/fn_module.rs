@@ -1,8 +1,39 @@
 use common_macros::b_tree_map;
 use dune::{Environment, Error, Expression};
 
+fn curry(f: Expression, args: usize, env: &mut Environment) -> Result<Expression, Error> {
+    let mut result = Expression::Apply(
+        Box::new(f.clone()),
+        (0..args).map(|i| Expression::Symbol(format!("arg{}", i))).collect(),
+    );
+    for i in (0..args).rev() {
+        result = Expression::Lambda(
+            format!("arg{}", i),
+            Box::new(result),
+            Environment::default()
+        ).eval(env)?;
+    }
+    Ok(result)
+}
+
+fn curry_builtin(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Error> {
+    if args.len() < 2 {
+        return Err(Error::CustomError(
+            "curry requires at least two arguments".to_string()
+        ));
+    }
+    let f = args[0].eval(env)?;
+    if let Expression::Integer(arg_count) = args[1].eval(env)? {
+        curry(f, arg_count as usize, env)
+    } else {
+        Ok(f)
+    }
+}
+
 pub fn get() -> Expression {
     (b_tree_map! {
+        String::from("curry") => Expression::builtin("curry", curry_builtin,
+            "curry a function that takes multiple arguments"),
         String::from("map") => Expression::builtin("map", map,
             "map a function over a list of values"),
         String::from("filter") => Expression::builtin("filter", filter,

@@ -11,7 +11,6 @@ use std::{
 use terminal_size::{terminal_size, Width};
 
 use prettytable::{
-    cell,
     format::{LinePosition, LineSeparator},
     row, Table,
 };

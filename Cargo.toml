@@ -46,7 +46,7 @@ version = "3.0"
 default-features = false
 
 [dependencies.prettytable-rs]
-version = "0.8"
+version = "0.10"
 default-features = false
 features = ["win_crlf"]
 

@@ -1,5 +1,7 @@
 use dune::{Builtin, Environment, Error, Expression, Int};
 
+use common_macros::b_tree_map;
+
 #[cfg(feature = "chess-engine")]
 mod chess_module;
 mod console_module;
@@ -10,30 +12,39 @@ mod math_module;
 mod operator_module;
 mod os_module;
 mod parse_module;
-mod pipe_module;
 mod rand_module;
 mod shell_module;
 mod time_module;
 mod widget_module;
 
+
 pub fn init(env: &mut Environment) {
-    pipe_module::add_to(env);
-    env.define("math", math_module::get());
-    env.define("shell", shell_module::get());
-    env.define("os", os_module::get());
-    env.define("widget", widget_module::get());
-    env.define("time", time_module::get());
-    env.define("rand", rand_module::get());
-    fs_module::add_to(env);
-    env.define("fn", fn_module::get());
-    env.define("console", console_module::get());
-    env.define("fmt", fmt_module::get());
-    env.define("parse", parse_module::get());
-    operator_module::add_to(env);
+    let standard_module = b_tree_map! {
+        "math" => math_module::get(),
+        "shell" => shell_module::get(),
+        "os" => os_module::get(),
+        "widget" => widget_module::get(),
+        "time" => time_module::get(),
+        "rand" => rand_module::get(),
+        "fn" => fn_module::get(),
+        "console" => console_module::get(),
+        "fmt" => fmt_module::get(),
+        "parse" => parse_module::get(),
+        "fs" => fs_module::get(env),
+        "ops" => operator_module::get(env),
+    };
+
+    env.define_module("std", standard_module.clone());
+
+    for (name, module) in standard_module {
+        env.define(name, module);
+    }
+
 
     env.define("exit", env.get("os").unwrap()["exit"].clone());
     env.define("cd", env.get("os").unwrap()["cd"].clone());
     env.define("quit", env.get("exit").unwrap());
+
 
     env.define_builtin(
         "help",
@@ -347,6 +358,7 @@ pub fn init(env: &mut Environment) {
         },
         "get the list of lines in a string",
     );
+
 
     env.define_builtin(
         "eval",

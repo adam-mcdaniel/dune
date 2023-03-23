@@ -23,6 +23,14 @@ impl Environment {
         }
     }
 
+    pub fn define_module<A: ToString, B: ToString>(&mut self, name: A, module: impl Into<BTreeMap<B, Expression>>) {
+        let mut result = BTreeMap::new();
+        for (key, value) in module.into() {
+            result.insert(key.to_string(), value);
+        }
+        self.define(&name.to_string(), Expression::Map(result));
+    }
+
     pub fn get_cwd(&self) -> String {
         match self.get(CWD_ENV_VAR) {
             Some(Expression::String(path)) => path,

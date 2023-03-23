@@ -6,7 +6,7 @@ use std::{
 use common_macros::b_tree_map;
 use dune::{Environment, Error, Expression};
 
-pub fn add_to(env: &mut Environment) {
+pub fn get(env: &mut Environment) -> Expression {
     let mut dir_tree = b_tree_map! {};
 
     if let Some(home_dir) = dirs::home_dir() {
@@ -168,10 +168,10 @@ pub fn add_to(env: &mut Environment) {
                 Err(e) => Err(Error::CustomError(format!("could not write to file {}: {:?}", file, e)))
             }
         }, "write to a file with some contents"),
-    }
-    .into();
+    };
 
-    env.define("fs", fs_module);
+    env.define_module("fs", fs_module.clone());
+    Expression::Map(fs_module)
 }
 
 /// Copy one path to another path.
