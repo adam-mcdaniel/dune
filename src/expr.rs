@@ -345,6 +345,10 @@ impl Expression {
         x.into()
     }
 
+    pub fn apply(self, args: Vec<Self>) -> Self {
+        Self::Apply(Box::new(self), args)
+    }
+
     pub fn is_truthy(&self) -> bool {
         match self {
             Self::Integer(i) => *i != 0,
