@@ -237,7 +237,6 @@ pub fn get(env: &mut Environment) -> Expression {
     Expression::Map(tmp.bindings)
 }
 
-
 fn pipe_builtin(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Error> {
     if args.len() <= 1 {
         return Err(Error::CustomError(
