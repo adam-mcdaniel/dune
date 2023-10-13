@@ -14,9 +14,9 @@ mod os_module;
 mod parse_module;
 mod rand_module;
 mod shell_module;
+mod string_module;
 mod time_module;
 mod widget_module;
-
 
 pub fn init(env: &mut Environment) {
     let standard_module = b_tree_map! {
@@ -32,6 +32,7 @@ pub fn init(env: &mut Environment) {
         "parse" => parse_module::get(),
         "fs" => fs_module::get(env),
         "ops" => operator_module::get(env),
+        "string" => string_module::get(),
     };
 
     env.define_module("std", standard_module.clone());
@@ -40,11 +41,9 @@ pub fn init(env: &mut Environment) {
         env.define(name, module);
     }
 
-
     env.define("exit", env.get("os").unwrap()["exit"].clone());
     env.define("cd", env.get("os").unwrap()["cd"].clone());
     env.define("quit", env.get("exit").unwrap());
-
 
     env.define_builtin(
         "help",
@@ -358,7 +357,6 @@ pub fn init(env: &mut Environment) {
         },
         "get the list of lines in a string",
     );
-
 
     env.define_builtin(
         "eval",
