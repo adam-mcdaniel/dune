@@ -361,6 +361,22 @@ impl Expression {
         }
     }
 
+    pub fn flatten(args: Vec<Self>) -> Vec<Self> {
+        let mut result = vec![];
+        for arg in args {
+            match arg {
+                Self::List(exprs) => {
+                    result.extend(Self::flatten(exprs))
+                },
+                Self::Group(expr) => {
+                    result.extend(Self::flatten(vec![*expr]))
+                }
+                _ => result.push(arg),
+            }
+        }
+        result
+    }
+
     fn get_used_symbols(&self) -> Vec<String> {
         match self {
             Self::Symbol(name) => vec![name.clone()],
@@ -484,13 +500,25 @@ impl Expression {
                             .filter(|(_, s)| s.len() <= 1024)
                             .collect::<BTreeMap<String, String>>();
 
+                        let mut cmd_args = vec![];
+                        for arg in args {
+                            for flattened_arg in Self::flatten(vec![arg.clone().eval_mut(env, depth + 1)?]) {
+                                match flattened_arg {
+                                    Self::String(s) => cmd_args.push(s),
+                                    Self::Bytes(b) => cmd_args.push(String::from_utf8_lossy(&b).to_string()),
+                                    _ => cmd_args.push(format!("{}", flattened_arg)),
+                                }
+                            }
+                        }
+
                         match Command::new(&name)
                             .current_dir(env.get_cwd())
                             .args(
-                                args.iter()
-                                    .filter(|&x| x != &Self::None)
-                                    .map(|x| Ok(format!("{}", x.clone().eval_mut(env, depth + 1)?)))
-                                    .collect::<Result<Vec<String>, Error>>()?,
+                                cmd_args
+                                // Self::flatten(args.clone()).iter()
+                                //     .filter(|&x| x != &Self::None)
+                                //     // .map(|x| Ok(format!("{}", x.clone().eval_mut(env, depth + 1)?)))
+                                //     .collect::<Result<Vec<String>, Error>>()?,
                             )
                             .envs(bindings)
                             .status()
