@@ -510,6 +510,7 @@ impl Expression {
                                 match flattened_arg {
                                     Self::String(s) => cmd_args.push(s),
                                     Self::Bytes(b) => cmd_args.push(String::from_utf8_lossy(&b).to_string()),
+                                    Self::None => continue,
                                     _ => cmd_args.push(format!("{}", flattened_arg)),
                                 }
                             }
