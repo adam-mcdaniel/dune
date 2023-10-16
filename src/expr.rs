@@ -369,12 +369,8 @@ impl Expression {
         let mut result = vec![];
         for arg in args {
             match arg {
-                Self::List(exprs) => {
-                    result.extend(Self::flatten(exprs))
-                },
-                Self::Group(expr) => {
-                    result.extend(Self::flatten(vec![*expr]))
-                }
+                Self::List(exprs) => result.extend(Self::flatten(exprs)),
+                Self::Group(expr) => result.extend(Self::flatten(vec![*expr])),
                 _ => result.push(arg),
             }
         }
@@ -506,10 +502,14 @@ impl Expression {
 
                         let mut cmd_args = vec![];
                         for arg in args {
-                            for flattened_arg in Self::flatten(vec![arg.clone().eval_mut(env, depth + 1)?]) {
+                            for flattened_arg in
+                                Self::flatten(vec![arg.clone().eval_mut(env, depth + 1)?])
+                            {
                                 match flattened_arg {
                                     Self::String(s) => cmd_args.push(s),
-                                    Self::Bytes(b) => cmd_args.push(String::from_utf8_lossy(&b).to_string()),
+                                    Self::Bytes(b) => {
+                                        cmd_args.push(String::from_utf8_lossy(&b).to_string())
+                                    }
                                     Self::None => continue,
                                     _ => cmd_args.push(format!("{}", flattened_arg)),
                                 }
@@ -519,11 +519,10 @@ impl Expression {
                         match Command::new(&name)
                             .current_dir(env.get_cwd())
                             .args(
-                                cmd_args
-                                // Self::flatten(args.clone()).iter()
-                                //     .filter(|&x| x != &Self::None)
-                                //     // .map(|x| Ok(format!("{}", x.clone().eval_mut(env, depth + 1)?)))
-                                //     .collect::<Result<Vec<String>, Error>>()?,
+                                cmd_args, // Self::flatten(args.clone()).iter()
+                                         //     .filter(|&x| x != &Self::None)
+                                         //     // .map(|x| Ok(format!("{}", x.clone().eval_mut(env, depth + 1)?)))
+                                         //     .collect::<Result<Vec<String>, Error>>()?,
                             )
                             .envs(bindings)
                             .status()
