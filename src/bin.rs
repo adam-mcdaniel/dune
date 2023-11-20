@@ -519,6 +519,8 @@ fn repl(
                 if line.is_empty() {
                     eprintln!("{}", e);
                     lines = vec![];
+                } else {
+                    rl.add_history_entry(text.as_str());
                 }
             }
         }

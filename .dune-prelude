@@ -1,4 +1,3 @@
-#!/bin/dunesh
 #              _                                 
 #     /\      | |                                
 #    /  \   __| | __ _ _ __ ___                  
@@ -31,6 +30,330 @@
 #
 # Have fun, scripters!
 
+let $ = GLOB ~> ((fs@ls .) | (fn@filter (file -> (len (string@split GLOB file)) == 2)));
+
+let include = file ~> exec (parse@expr (fs@read file));
+let use = file ~> eval (parse@expr (fs@read file));
+let get = key -> table -> table@(key);
+let open = fs@read;
+let concat = x -> y -> (str y) + (str x);
+
+let ssh = addr -> user -> {
+	'ssh -X (str user) + "@" + (str addr);
+};
+
+let scp = addr -> user -> src -> dst -> {
+    # Call the actual overshadowed scp program
+    'scp -r src (str user) + "@" + (str addr) + ":" + (str dst)
+};
+
+let ~ = x -> HOME + "/" + (str x) | fs@canon;
+
+let OLD-EXIT = exit;
+let quit = _ ~> OLD-EXIT 0;
+let q = quit;
+let exit = quit;
+
+let WEATHER-EMOJIS = {
+    Unknown=             "✨",
+    Cloudy=              "☁️",
+    Fog=                 "🌫",
+    HeavyRain=           "🌧",
+    HeavyShowers=        "🌧",
+    HeavySnow=           "❄️",
+    HeavySnowShowers=    "❄️",
+    LightRain=           "🌦",
+    LightShowers=        "🌦",
+    LightSleet=          "🌧",
+    LightSleetShowers=   "🌧",
+    LightSnow=           "🌨",
+    LightSnowShowers=    "🌨",
+    PartlyCloudy=        "⛅️",
+    Sunny=               "☀️",
+    ThunderyHeavyRain=   "🌩",
+    ThunderyShowers=     "⛈",
+    ThunderySnowShowers= "⛈",
+    VeryCloudy= "☁️"
+};
+
+let MOON-PHASES = [
+    "🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘"
+];
+
+let WEATHER-ASCII = {
+    Unknown = "    .-.      
+     __)     
+    (        
+     `-’     
+      •",
+    Sunny = "    \\   /   
+     .-.     
+  ― (   ) ―  
+     `-’     
+    /   \\    ",
+    PartlyCloudy ="   \\  /
+ _ /\"\".-.
+   \\_(   ).
+   /(___(__)",
+    Cloudy = "
+     .--.
+  .-(    ).
+ (___.__)__)",
+    VeryCloudy = "
+     .--.
+  .-(    ).
+ (___.__)__)",
+    LightShowers=" _`/\"\".-.
+  ,\\_(   ).
+   /(___(__)
+     ‘ ‘ ‘ ‘
+    ‘ ‘ ‘ ‘",
+    HeavyShowers = " _`/\"\".-.
+  ,\\_(   ).
+   /(___(__)
+   ‚‘‚‘‚‘‚‘
+   ‚’‚’‚’‚’",
+   LightSnowShowers = " _`/\"\".-.
+  ,\\_(   ).
+   /(___(__)
+     *  *  *
+    *  *  *",
+    HeavySnowShowers = " _`/\"\".-.
+  ,\\_(   ).
+   /(___(__)
+    * * * *
+   * * * *",
+   LightSleetShowers = " _`/\"\".-.
+  ,\\_(   ).
+   /(___(__)
+     ‘ * ‘ *
+    * ‘ * ‘",
+    ThunderyShowers = " _`/\"\".-.
+  ,\\_(   ).
+   /(___(__)
+    ⚡‘ ‘⚡‘
+    ‘ ‘ ‘ ‘",
+    ThunderyHeavyRain = "     .-.
+    (   ).
+   (___(__)
+  ‚‘⚡‘‚⚡‚‘
+  ‚’‚’⚡’‚’",
+    ThunderySnowShowers = " _`/\"\".-.
+  ,\\_(   ).
+   /(___(__)
+     *⚡*⚡*
+    *  *  *",
+    LightRain = "     .-.
+    (   ).
+   (___(__)
+    ‘ ‘ ‘ ‘
+   ‘ ‘ ‘ ‘",
+    HeavyRain = "     .-.
+    (   ).
+   (___(__)
+  ‚‘‚‘‚‘‚‘
+  ‚’‚’‚’‚’",
+    LightSnow = "     .-.
+    (   ).
+   (___(__)
+    *  *  *
+   *  *  *",
+    HeavySnow = "     .-.
+    (   ).
+   (___(__)
+   * * * *
+  * * * *",
+    LightSleet = "     .-.
+    (   ).
+   (___(__)
+    ‘ * ‘ *
+   * ‘ * ‘",
+    Fog = " _ - _ - _ -
+  _ - _ - _
+ _ - _ - _ -"
+};
+
+let PLANTS = ["    _ _
+   (_\\_)
+  (__<_{}
+   (_/_)
+  |\\ |   
+   \\\\| /|
+    \\|//
+     |/
+,.,.,|.,.,.,
+^`^`^`^`^`^`",
+"    .--.
+  .'_\\/_'.
+  '. /\\ .'
+    \"||\"
+     || /\\
+  /\\ ||//\\)
+ (/\\\\||/
+____\\||/____
+^`^`^`^`^`^`^",
+"
+       __/)
+    .-(__(=:
+ |\\ |    \\)
+ \\ ||
+  \\||
+   \\|
+____|_______
+^`^`^`^`^`^`",
+"
+     _
+   .\\ /.
+  < ~O~ >
+   '/_\\'
+   \\ | /
+    \\|/
+,.,.,|.,.,.,
+^`^`^`^`^`^`"
+];
+
+let get-weather-ascii = desc -> {
+    ## DRIZZLE ASCII
+    if desc == "light intensity drizzle" || desc == "drizzle"
+        || desc == "heavy intensity drizzle" || desc == "light intensity drizzle rain"
+        || desc == "drizzle rain" || desc == "heavy intensity drizzle rain"
+        || desc == "shower rain and drizzle" || desc == "heavy shower rain and drizzle"
+        || desc == "shower drizzle"
+        WEATHER-ASCII@LightShowers
+
+    ## RAIN ASCII
+    else if desc == "shower rain" || desc == "ragged shower rain" || desc == "light intensity shower rain"
+        WEATHER-ASCII@LightShowers
+    else if desc == "light rain"
+        WEATHER-ASCII@LightRain
+    else if desc == "moderate rain" || desc == "heavy intensity shower rain"
+        WEATHER-ASCII@HeavyShowers
+    else if desc == "heavy intensity rain" || desc == "very heavy rain" || desc == "extreme rain"
+        WEATHER-ASCII@HeavyRain
+    else if desc == "freezing rain"
+        WEATHER-ASCII@LightSleet
+
+    ## SNOW ASCII
+    else if desc == "light snow" || desc == "Snow"
+        WEATHER-ASCII@LightSnow
+    else if desc == "Heavy snow"
+        WEATHER-ASCII@HeavySnow
+    else if desc == "Sleet"
+        WEATHER-ASCII@LightSleet
+    else if desc == "Light shower sleet"
+        WEATHER-ASCII@LightSleetShowers
+    else if desc == "Shower sleet" || desc == "Rain and snow"
+        WEATHER-ASCII@HeavySnowShowers
+    else if desc == "Light shower snow" || desc == "Light rain and snow"
+        WEATHER-ASCII@LightSnowShowers
+    else if desc == "Shower snow" || desc == "Heavy shower snow"
+        WEATHER-ASCII@HeavySnowShowers
+
+    ## THUNDER ASCII
+    else if desc == "thunderstorm with light rain" || desc == "thunderstorm with rain"
+            || desc == "ragged thunderstorm" || desc == "thunderstorm with light drizzle"
+            || desc == "light thunderstorm" || desc == "thunderstorm"
+            || desc == "thunderstorm with drizzle" || desc == "thunderstorm with heavy drizzle"
+        WEATHER-ASCII@ThunderyShowers
+    else if desc == "thunderstorm with heavy rain" || desc == "heavy thunderstorm"
+        WEATHER-ASCII@ThunderyHeavyRain
+
+    ## CLEAR ASCII
+    else if desc == "clear sky"
+        WEATHER-ASCII@Sunny
+    else if desc == "few clouds"
+        WEATHER-ASCII@PartlyCloudy
+    else if desc == "scattered clouds"
+        WEATHER-ASCII@Cloudy
+    else if desc == "broken clouds"
+        WEATHER-ASCII@Cloudy
+    else if desc == "overcast clouds"
+        WEATHER-ASCII@VeryCloudy
+
+    else if desc == "mist" || desc == "Smoke"
+        || desc == "Haze" || desc == "sand/ dust whirls" || desc == "fog"
+        || desc == "sand" || desc == "dust" || desc == "volcanic ash"
+        || desc == "squalls" || desc == "tornado"
+        WEATHER-ASCII@Fog
+
+    else WEATHER-ASCII@Unknown
+};
+
+let reload-weather-api = _ ~> {    
+    let weather-api = units -> city -> {
+	# Confirm that the API key is not None
+        if WEATHER-API-KEY == None {
+	    # If so, print error message
+            echo (fmt@italics (fmt@red "Please set your `openweathermap.org` API key with the `set-weather-api-key` macro!"))
+        } else {
+	    # If not, use the key, download the JSON with CURL, and parse it into a table!
+            let BASE_URL = "http://api.openweathermap.org/data/2.5/weather?q=";
+            let URL = BASE_URL + (str city) + "&units=" + (str units) + "&appid=" + (str WEATHER-API-KEY);
+	    # Download and parse JSON into table
+            curl --silent URL | parse@json
+        }
+    };
+
+    let weather = units -> city -> {
+	# Check for proper unit parameter
+        if (str units) == "imperial" || (str units) == "metric" {
+	    # Get the weather info from openweathermap.org
+            let weather-data = weather-api units city;
+	    # Check that it was successful
+            if weather-data != None {
+		# Get the correct units of temperature
+                let unit-symbol = if (str units) == "imperial" {
+                    "° F"
+                } else {
+                    "° C"
+                };
+		# Get the description of the weather from the weather API JSON
+                let weather-desc = weather-data@weather@0@description;
+		# Get the ascii art associated with it
+                let weather-ascii = get-weather-ascii weather-desc;
+
+		# Get the stats widget content as a string
+                let stats-text = join "\n" [
+                    "Temp now: " + (str weather-data@main@temp) + unit-symbol,
+                    "  ↳ high: " + (str weather-data@main@temp_max) + unit-symbol,
+                    "  ↳  low: " + (str weather-data@main@temp_min) + unit-symbol,
+                    "Humidity: " + (str weather-data@main@humidity) + "%",
+                    "Pressure: " + (str weather-data@main@pressure) + " hPa"
+                ];
+		# Get the header widget content
+                let header-text = "Weather in " + weather-data@name + ", at " + (time@now ())@time@str
+			+ ". Description: " + weather-data@weather@0@main;
+		# Return the widget!
+                widget@joiny
+                    (widget@create "Weather" header-text 36 4)
+                    (widget@joinx
+                        (widget@create "Stats" stats-text 21 7)
+                        (widget@create "Icon" weather-ascii 15 7))
+            } else {
+                echo (fmt@red "could not get weather data");
+                widget@joiny
+                    (widget@create "Weather" "?" 36 4)
+                    (widget@joinx
+                        (widget@create "Stats" "?" 21 7)
+                        (widget@create "Icon" WEATHER-ASCII@Unknown 15 7))
+    	    }
+        } else {
+            echo (fmt@red "`units` must be either `imperial` or `metric`");
+            widget@joiny
+                (widget@create "Weather" "?" 36 4)
+                (widget@joinx
+                    (widget@create "Stats" "?" 21 7)
+                    (widget@create "Icon" WEATHER-ASCII@Unknown 15 7))
+        }
+    };
+};
+
+let set-weather-api-key = WEATHER-API-KEY ~> {
+    # echo (fmt@green "Set weather API key to " + (str WEATHER-API-KEY) + "!");
+    reload-weather-api ();
+};
+
+set-weather-api-key None;
 
 if os@name == "windows" {
     let ls = dir ~> fs@ls dir | join "\n" | echo;
@@ -41,6 +364,13 @@ if os@name == "windows" {
     let rmdir = fs@rmdir;
 
     let cat = fs@read;
+} else {
+    if (fs@exists HOME + "/.cargo/bin/bat") {
+        let cat = 'bat;
+    }
+    if (fs@exists HOME + "/.cargo/bin/lsd") {
+        let ls = 'lsd;
+    }
 }
 
 console@title "Dune";
@@ -67,17 +397,17 @@ let donate = _ ~> {
 };
 
 let CATS = ["
-     _
-   |\\'/-..--.
-  / _ _   ,  ;
- `~=`Y'~_<._./
-  <`-....__.'",
+      _
+    |\\'/-..--.
+   / _ _   ,  ;
+  `~=`Y'~_<._./
+   <`-....__.'",
 "
 
- |\\__/,|   (`\\
- |_ _  |.--.) )
- ( T   )     /
-(((^_(((/(((_/",
+  |\\__/,|   (`\\
+  |_ _  |.--.) )
+  ( T   )     /
+ (((^_(((/(((_/",
 "
 
     \\    /\\
@@ -86,18 +416,18 @@ let CATS = ["
      \\(__)|",
 "
 
-      ^~^  ,
-     ('Y') )
-     /   \\/
-    (\\|||/)",
-"   .       .
-   \\`-\"'\"-'/
-    } 6 6 {
-   =.  Y  ,=
-     /^^^\\  .
-    /     \\  )
-   (  )-(  )/
-    \"\"   \"\"",
+       ^~^  ,
+      ('Y') )
+      /   \\/
+     (\\|||/)",
+"    .       .
+    \\`-\"'\"-'/
+     } 6 6 {
+    =.  Y  ,=
+      /^^^\\  .
+     /     \\  )
+    (  )-(  )/
+     \"\"   \"\"",
 "
 
          /\\_/\\
@@ -379,17 +709,35 @@ let cal = _ ~> {
     }) ();
 };
 
-
-
-let welcome = _ ~> {
+let dashboard = _ ~> {
+    reload-weather-api ();
+    let now = time@now ();
+    let weather-widget = weather imperial CITY;
     welcomebanner ();
-    (_ -> {
-        let now = time@now ();
-        echo (widget@joinx
+    echo (widget@joiny
+        (widget@joinx
             (make-calendar now@month now@day now@year)
-            (widget@create "Cat" (rand@choose CATS) 20 10));
-    }) ();
+            (widget@create "Cat" (rand@choose CATS) 20 10))
+        (widget@joinx
+            (widget@create "Flower" (rand@choose PLANTS) 14 11)
+            weather-widget))
 };
 
+let welcome = _ ~> {
+    dashboard ();
+};
+
+let DUNE_SECRETS_FILE = HOME + "/.dune-secrets";
+
 clear ();
+if (fs@exists DUNE_SECRETS_FILE) {
+    include DUNE_SECRETS_FILE;
+}
+
+let CITY = Knoxville;
 welcome ();
+
+
+if (!(fs@exists DUNE_SECRETS_FILE)) {
+    shrewsay "Create " + DUNE_SECRETS_FILE + " to store your secrets, tokens, and API keys!";
+}
