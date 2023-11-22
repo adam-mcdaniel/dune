@@ -5,7 +5,7 @@ use core::{cmp::max, fmt};
 
 use crate::Diagnostic;
 
-use super::{Int, Expression, SyntaxError};
+use super::{Expression, Int, SyntaxError};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {
@@ -46,7 +46,6 @@ impl Error {
         })
     }
 
-
     /// Convert the error into a code for an error handler to handle.
     pub fn code(&self) -> Int {
         match self {
@@ -70,11 +69,7 @@ impl fmt::Display for Error {
                 write!(f, "cannot apply `{:?}` to the arguments {:?}", expr, args)
             }
             Self::PermissionDenied(expr) => {
-                write!(
-                    f,
-                    "permission denied while evaluating {:?}",
-                    expr
-                )
+                write!(f, "permission denied while evaluating {:?}", expr)
             }
             Self::ProgramNotFound(name) => {
                 write!(f, "program \"{}\" not found", name)

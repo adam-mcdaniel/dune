@@ -531,7 +531,9 @@ impl Expression {
                             Err(e) => {
                                 return Err(match e.kind() {
                                     ErrorKind::NotFound => Error::ProgramNotFound(name),
-                                    ErrorKind::PermissionDenied => Error::PermissionDenied(self.clone()),
+                                    ErrorKind::PermissionDenied => {
+                                        Error::PermissionDenied(self.clone())
+                                    }
                                     _ => Error::CommandFailed(name, args.clone()),
                                 })
                             }

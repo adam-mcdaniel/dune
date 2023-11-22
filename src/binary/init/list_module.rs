@@ -1,8 +1,7 @@
 use super::fn_module::curry;
+use super::Int;
 use common_macros::b_tree_map;
 use dune::{Environment, Error, Expression};
-use super::Int;
-
 
 pub fn get() -> Expression {
     (b_tree_map! {
@@ -277,7 +276,9 @@ fn take(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Erro
     let list = args[1].eval(env)?;
     if let Expression::Integer(n) = n {
         if let Expression::List(list) = list {
-            Ok(Expression::List(list.into_iter().take(n as usize).collect()))
+            Ok(Expression::List(
+                list.into_iter().take(n as usize).collect(),
+            ))
         } else {
             Err(Error::CustomError(
                 "take requires a list as its second argument".to_string(),
@@ -300,7 +301,9 @@ fn drop(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Erro
     let list = args[1].eval(env)?;
     if let Expression::Integer(n) = n {
         if let Expression::List(list) = list {
-            Ok(Expression::List(list.into_iter().skip(n as usize).collect()))
+            Ok(Expression::List(
+                list.into_iter().skip(n as usize).collect(),
+            ))
         } else {
             Err(Error::CustomError(
                 "drop requires a list as its second argument".to_string(),
@@ -367,4 +370,3 @@ fn nth(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Error
         ))
     }
 }
-

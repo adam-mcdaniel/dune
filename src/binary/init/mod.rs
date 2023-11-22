@@ -5,9 +5,11 @@ use common_macros::b_tree_map;
 #[cfg(feature = "chess-engine")]
 mod chess_module;
 mod console_module;
+mod err_module;
 mod fmt_module;
 mod fn_module;
 mod fs_module;
+mod list_module;
 mod math_module;
 mod operator_module;
 mod os_module;
@@ -16,9 +18,7 @@ mod rand_module;
 mod shell_module;
 mod string_module;
 mod time_module;
-mod list_module;
 mod widget_module;
-mod err_module;
 
 pub fn init(env: &mut Environment) {
     let standard_module = b_tree_map! {
