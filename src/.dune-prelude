@@ -262,7 +262,7 @@ let welcomebanner = _ ~> {
             else if now@month == 12 (if now@day < 22 "🏹" else "🐐")
             else "⭐";
         echo "┌─────────────────Welcome to ...─────────────────┐";
-        for ch in (chars logo) {
+        for ch in (string@chars logo) {
             print (fmt@bold (if ch == "█" {
                fmt@faint (fmt@red ch)
             } else {

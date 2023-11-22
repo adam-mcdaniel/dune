@@ -548,7 +548,7 @@ fn parse_expression(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, Syntax
 
     let (input, head) = expr_parser(input)?;
 
-    let (input, list) = many0(pair(alt((text("|"), text(">>>"), text(">>"))), expr_parser))(input)?;
+    let (input, list) = many0(pair(alt((text("|"), text(">>>"), text(">>"), text("<<"))), expr_parser))(input)?;
 
     if list.is_empty() {
         return Ok((input, head));
@@ -556,7 +556,36 @@ fn parse_expression(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, Syntax
 
     let mut args = vec![head];
     for (op, item) in list {
-        args.push(match op.text(input) {
+        let text = op.text(input);
+        if text == "<<" {
+            // Pipe the argument into the function
+            // args.insert(0, Expression::Apply(Box::new(Expression::Symbol("<<".to_string())), vec![item.clone()]));
+            // Pop the last argument off the list
+            match args.pop() {
+                Some(arg) => {
+                    // args.push(
+                    //     // Expression::Apply(Box::new(
+                    //     //     Expression::Apply(Box::new(Expression::Symbol("<<".to_string())), vec![item])
+                    //     Expression::Group(Box::new(Expression::Apply(
+                    //         Box::new(Expression::Symbol("|".to_string())),
+                    //         vec![
+                    //             Expression::Apply(Box::new(Expression::Symbol("<<".to_string())), vec![item]),
+                    //             arg
+                    //         ],
+                    //     ))),
+                    // );
+                    args.push(Expression::Apply(Box::new(Expression::Symbol("<<".to_string())), vec![item]));
+                    args.push(arg);
+                }
+                None => {
+                    args.push(
+                        Expression::Apply(Box::new(Expression::Symbol("<<".to_string())), vec![item]),
+                    );
+                }
+            }
+            continue
+        }
+        args.push(match text {
             "|" => item,
             ">>" => Expression::Apply(Box::new(Expression::Symbol(">>".to_string())), vec![item]),
             ">>>" => Expression::Apply(Box::new(Expression::Symbol(">>>".to_string())), vec![item]),
@@ -564,6 +593,9 @@ fn parse_expression(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, Syntax
         })
     }
 
+    if args.len() == 1 {
+        return Ok((input, args.pop().unwrap()));
+    }
     Ok((
         input,
         Expression::Group(Box::new(Expression::Apply(

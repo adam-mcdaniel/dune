@@ -25,6 +25,8 @@ mod time_module;
 mod widget_module;
 
 pub fn init(env: &mut Environment) {
+    let fs = fs_module::get(env);
+    let ops = operator_module::get(env);
     let standard_module = b_tree_map! {
         "log" => log_module::get(),
         "math" => math_module::get(),
@@ -39,8 +41,8 @@ pub fn init(env: &mut Environment) {
         "console" => console_module::get(),
         "fmt" => fmt_module::get(),
         "parse" => parse_module::get(),
-        "fs" => fs_module::get(env),
-        "ops" => operator_module::get(env),
+        "fs" => fs,
+        "ops" => ops,
         "string" => string_module::get(),
         "list" => list_module::get(),
         "sys" => sys_module::get(),
@@ -304,54 +306,66 @@ pub fn init(env: &mut Environment) {
         "get the length of an expression",
     );
 
-    env.define_builtin(
-        "chars",
-        |args, env| match args[0].eval(env)? {
-            Expression::Symbol(x) | Expression::String(x) => Ok(Expression::List(
-                x.chars()
-                    .map(|ch| Expression::String(ch.to_string()))
-                    .collect::<Vec<Expression>>(),
-            )),
-            otherwise => Err(Error::CustomError(format!(
-                "cannot get characters of non-string {}",
-                otherwise
-            ))),
-        },
-        "get the list of characters for a string or symbol",
-    );
+    // env.define_builtin(
+    //     "chars",
+    //     |args, env| {
+    //         check_exact_args_len("chars", &args, 1)?;
 
-    env.define_builtin(
-        "head",
-        |args, env| match args[0].eval(env)? {
-            Expression::List(x) => Ok(if x.is_empty() {
-                Expression::None
-            } else {
-                x[0].clone()
-            }),
-            otherwise => Err(Error::CustomError(format!(
-                "cannot get the head of a non-list {}",
-                otherwise
-            ))),
-        },
-        "get the first item in a list",
-    );
+    //         match args[0].eval(env)? {
+    //             Expression::Symbol(x) | Expression::String(x) => Ok(Expression::List(
+    //                 x.chars()
+    //                     .map(|ch| Expression::String(ch.to_string()))
+    //                     .collect::<Vec<Expression>>(),
+    //             )),
+    //             otherwise => Err(Error::CustomError(format!(
+    //                 "cannot get characters of non-string {}",
+    //                 otherwise
+    //             ))),
+    //         }
+    //     },
+    //     "get the list of characters for a string or symbol",
+    // );
 
-    env.define_builtin(
-        "tail",
-        |args, env| match args[0].eval(env)? {
-            Expression::List(x) => Ok(if x.is_empty() {
-                vec![]
-            } else {
-                x[1..].to_vec()
-            }
-            .into()),
-            otherwise => Err(Error::CustomError(format!(
-                "cannot get the tail of a non-list {}",
-                otherwise
-            ))),
-        },
-        "get the last items in a list",
-    );
+    // env.define_builtin(
+    //     "head",
+    //     |args, env| {
+    //         check_exact_args_len("head", &args, 1)?;
+            
+    //         match args[0].eval(env)? {
+    //             Expression::List(x) => Ok(if x.is_empty() {
+    //                 Expression::None
+    //             } else {
+    //                 x[0].clone()
+    //             }),
+    //             otherwise => Err(Error::CustomError(format!(
+    //                 "cannot get the head of a non-list {}",
+    //                 otherwise
+    //             ))),
+    //         }
+    //     },
+    //     "get the first item in a list",
+    // );
+
+    // env.define_builtin(
+    //     "tail",
+    //     |args, env| {
+    //         check_exact_args_len("tail", &args, 1)?;
+
+    //         match args[0].eval(env)? {
+    //             Expression::List(x) => Ok(if x.is_empty() {
+    //                 vec![]
+    //             } else {
+    //                 x[1..].to_vec()
+    //             }
+    //             .into()),
+    //             otherwise => Err(Error::CustomError(format!(
+    //                 "cannot get the tail of a non-list {}",
+    //                 otherwise
+    //             ))),
+    //         }
+    //     },
+    //     "get the last items in a list",
+    // );
 
     env.define_builtin(
         "lines",
@@ -425,7 +439,7 @@ pub fn init(env: &mut Environment) {
 fn check_args_len(
     name: impl ToString,
     args: &[Expression],
-    expected_len: std::ops::RangeFrom<usize>,
+    expected_len: impl std::ops::RangeBounds<usize>,
 ) -> Result<(), Error> {
     if expected_len.contains(&args.len()) {
         Ok(())

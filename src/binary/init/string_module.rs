@@ -232,15 +232,26 @@ pub fn get() -> Expression {
 
         String::from("chars") => Expression::builtin("chars", |args, env| {
             super::check_exact_args_len("chars", &args, 1)?;
-            let expr = args[0].clone().eval(env)?;
-            Ok(match expr {
-                Expression::Symbol(x) | Expression::String(x) => Expression::List(
+            // Ok(match expr {
+            //     Expression::Symbol(x) | Expression::String(x) => Expression::List(
+            //         x.chars()
+            //             .map(|c| Expression::String(c.to_string()))
+            //             .collect(),
+            //     ),
+            //     _ => Expression::None,
+            // })
+
+            match args[0].eval(env)? {
+                Expression::Symbol(x) | Expression::String(x) => Ok(Expression::List(
                     x.chars()
-                        .map(|c| Expression::String(c.to_string()))
-                        .collect(),
-                ),
-                _ => Expression::None,
-            })
+                        .map(|ch| Expression::String(ch.to_string()))
+                        .collect::<Vec<Expression>>(),
+                )),
+                otherwise => Err(Error::CustomError(format!(
+                    "cannot get characters of non-string {}",
+                    otherwise
+                ))),
+            }
         }, "split a string into characters"),
 
         String::from("words") => Expression::builtin("words", |args, env| {

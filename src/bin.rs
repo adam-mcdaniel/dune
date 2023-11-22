@@ -191,7 +191,7 @@ fn syntax_highlight(line: &str) -> String {
                 is_colored = true;
                 result.push_str(b);
             }
-            (TokenKind::Punctuation, o @ ("@" | "\'" | "=" | "|" | ">>" | ">>>" | "->" | "~>")) => {
+            (TokenKind::Punctuation, o @ ("@" | "\'" | "=" | "|" | ">>" | "<<"  | ">>>" | "->" | "~>")) => {
                 result.push_str("\x1b[96m");
                 is_colored = true;
                 result.push_str(o);
@@ -568,15 +568,12 @@ fn main() -> Result<(), Error> {
     parse("let clear = _ ~> console@clear ()")?.eval(&mut env)?;
     parse("let pwd = _ ~> echo CWD")?.eval(&mut env)?;
     parse(
-        "let join = sep -> list -> {
+        "let join = sep -> l -> {
             let sep = str sep;
-            fn@reduce (x -> y -> x + sep + (str y)) (str list@0) (tail list)
+            fn@reduce (x -> y -> x + sep + (str y)) (str l@0) (list@tail l)
         }",
     )?
     .eval(&mut env)?;
-
-    parse("let >> = file -> contents -> fs@write file contents")?.eval(&mut env)?;
-    parse("let >>> = file -> contents -> fs@append file contents")?.eval(&mut env)?;
 
     parse(
         "let prompt = cwd -> \

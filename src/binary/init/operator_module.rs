@@ -230,7 +230,18 @@ pub fn get(env: &mut Environment) -> Expression {
         "index a dictionary or list",
     );
 
+    let mut new_tmp = env.clone();
     for (name, val) in &tmp.bindings {
+        new_tmp.define(name, val.clone());
+    }
+
+    tmp.define("<<", crate::parse("fs@read").unwrap().eval(&mut new_tmp).unwrap());
+    tmp.define(">>", crate::parse("file -> contents -> fs@write file contents").unwrap().eval(&mut new_tmp).unwrap());
+    tmp.define(">>>", crate::parse("file -> contents -> fs@append file contents").unwrap().eval(&mut new_tmp).unwrap());
+    
+    let bindings = tmp.bindings.clone();
+
+    for (name, val) in &bindings {
         env.define(name, val.clone());
     }
 
@@ -415,7 +426,7 @@ fn expr_to_command<'a>(
         Expression::Group(expr) | Expression::Quote(expr) => expr_to_command(cmd, expr, env)?,
         // If the command is an undefined symbol with some arguments.
         Expression::Apply(f, args) => match **f {
-            Expression::Symbol(ref name) => {
+            Expression::Symbol(ref name) | Expression::String(ref name) => {
                 let cmd_name = match env.get(name) {
                     // If the symbol is an alias, then execute the alias.
                     Some(Expression::Symbol(alias)) => alias,
@@ -433,6 +444,22 @@ fn expr_to_command<'a>(
                             .collect::<Result<Vec<String>, Error>>()?,
                     ),
                 )
+            }
+            Expression::Quote(ref program) => {
+                match *program.clone() {
+                    Expression::String(cmd_name) | Expression::Symbol(cmd_name) => {
+                        *cmd = Command::new(cmd_name);
+                        Some(
+                            cmd.current_dir(env.get_cwd()).envs(bindings).args(
+                                args.iter()
+                                    .filter(|&x| x != &Expression::None)
+                                    .map(|x| Ok(format!("{}", x.eval(env)?)))
+                                    .collect::<Result<Vec<String>, Error>>()?,
+                            ),
+                        )
+                    }
+                    _ => None
+                }
             }
             _ => None,
         },

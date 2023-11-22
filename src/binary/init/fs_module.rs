@@ -1,10 +1,37 @@
 use std::{
     env::current_dir,
-    path::{Path, PathBuf},
+    path::{Path, PathBuf}, collections::BTreeMap,
 };
 
 use common_macros::b_tree_map;
 use dune::{Environment, Error, Expression};
+use super::Int;
+
+fn get_dir_tree(cwd: &Path, max_depth: Option<Int>) -> BTreeMap<String, Expression> {
+    let mut dir_tree = b_tree_map! {};
+
+    dir_tree.insert(".".to_string(), Expression::from(cwd.clone().to_str().unwrap()));
+    dir_tree.insert("..".to_string(), Expression::from(cwd.parent().unwrap().to_str().unwrap()));
+
+    if let Ok(entries) = std::fs::read_dir(cwd) {
+        for entry in entries {
+            if let Ok(entry) = entry {
+                let path = entry.path();
+                let file_name_osstring = entry.file_name();
+                if let Ok(file_name) = file_name_osstring.into_string() {
+                    if path.is_dir() {
+                        dir_tree.insert(file_name, Expression::from(get_dir_tree(&path, max_depth.map(|d| d - 1))));
+                    } else {
+                        dir_tree.insert(file_name, Expression::from(path.into_os_string()
+                            .into_string().unwrap()));
+                    }
+                }
+            }
+        }
+    }
+
+    dir_tree
+}
 
 pub fn get(env: &mut Environment) -> Expression {
     let mut dir_tree = b_tree_map! {};
@@ -39,6 +66,41 @@ pub fn get(env: &mut Environment) -> Expression {
     }
 
     let fs_module = b_tree_map! {
+        String::from("tree") => Expression::builtin("tree", |args, env| {
+            super::check_args_len("joinx", &args, 1..=2)?;
+            // Return a nested map of the filesystem.
+            // Get current working directory
+            let mut cwd = PathBuf::from(env.get_cwd());
+            // If the first argument evaluates to an integer, use it as the max depth
+            // let max_depth = match args.get(0).unwrap_or(&Expression::None).eval(env)? {
+            //     Expression::Integer(n) => Some(n),
+            //     _ => None
+            // };
+            let mut max_depth = None;
+            match args.get(0).unwrap_or(&Expression::None).eval(env)? {
+                Expression::Integer(n) => {
+                    max_depth = Some(n);
+                    // If the second argument evaluates to a string, add it to the cwd
+                    match args.get(1).unwrap_or(&Expression::None).eval(env)? {
+                        Expression::String(path) => cwd = cwd.join(path),
+                        Expression::Symbol(path) => cwd = cwd.join(path),
+                        _ => ()
+                    }
+                },
+                Expression::String(path) => {
+                    cwd = cwd.join(path);
+                },
+                Expression::Symbol(path) => {
+                    cwd = cwd.join(path);
+                },
+                _ => ()
+            }
+
+            // Get the directory tree
+            let dir_tree = get_dir_tree(&cwd, max_depth);
+            // Return the directory tree
+            Ok(dir_tree.into())
+        }, "get the directory tree as a nested map, with a max depth and a path"),
         String::from("dirs") => dir_tree.into(),
 
         String::from("head") => Expression::builtin("head", |args, env| {
@@ -162,21 +224,21 @@ pub fn get(env: &mut Environment) -> Expression {
 
             list_directory(&dir)
         }, "get a directory's entries as a list of strings"),
-        String::from("exists") => Expression::builtin("exists", |args, env| {
+        String::from("exists?") => Expression::builtin("exists", |args, env| {
             super::check_exact_args_len("exists", &args, 1)?;
             let path = PathBuf::from(env.get_cwd());
 
             Ok(path.join(args[0].eval(env)?.to_string()).exists().into())
         }, "check if a given file path exists"),
 
-        String::from("isdir") => Expression::builtin("isdir", |args, env| {
+        String::from("is-dir?") => Expression::builtin("isdir", |args, env| {
             super::check_exact_args_len("isdir", &args, 1)?;
             let path = PathBuf::from(env.get_cwd());
 
             Ok(path.join(args[0].eval(env)?.to_string()).is_dir().into())
         }, "check if a given path is a directory"),
 
-        String::from("isfile") => Expression::builtin("isfile", |args, env| {
+        String::from("is-file?") => Expression::builtin("isfile", |args, env| {
             super::check_exact_args_len("isfile", &args, 1)?;
             let path = PathBuf::from(env.get_cwd());
 
