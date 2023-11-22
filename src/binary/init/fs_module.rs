@@ -40,6 +40,59 @@ pub fn get(env: &mut Environment) -> Expression {
 
     let fs_module = b_tree_map! {
         String::from("dirs") => dir_tree.into(),
+
+        String::from("head") => Expression::builtin("head", |args, env| {
+            super::check_exact_args_len("head", &args, 2)?;
+            let path = PathBuf::from(env.get_cwd());
+            let file = args[0].eval(env)?;
+            let path = path.join(file.to_string());
+            let n = match args[1].eval(env)? {
+                Expression::Integer(n) => n,
+                _ => return Err(Error::CustomError(format!("second argument to head must be an integer")))
+            };
+
+            if let Ok(contents) = std::fs::read_to_string(&path) {
+                let mut lines = contents.lines();
+                let mut result = String::new();
+                for _ in 0..n {
+                    if let Some(line) = lines.next() {
+                        result.push_str(line);
+                        result.push('\n');
+                    } else {
+                        break;
+                    }
+                }
+                Ok(result.into())
+            } else {
+                Err(Error::CustomError(format!("could not read file {}", file)))
+            }
+        }, "read a file and get the first N lines"),
+        String::from("tail") => Expression::builtin("tail", |args, env| {
+            super::check_exact_args_len("tail", &args, 2)?;
+            let path = PathBuf::from(env.get_cwd());
+            let file = args[0].eval(env)?;
+            let path = path.join(file.to_string());
+            let n = match args[1].eval(env)? {
+                Expression::Integer(n) => n,
+                _ => return Err(Error::CustomError(format!("second argument to tail must be an integer")))
+            };
+
+            if let Ok(contents) = std::fs::read_to_string(&path) {
+                let mut lines = contents.lines().rev();
+                let mut result = String::new();
+                for _ in 0..n {
+                    if let Some(line) = lines.next() {
+                        result.push_str(line);
+                        result.push('\n');
+                    } else {
+                        break;
+                    }
+                }
+                Ok(result.into())
+            } else {
+                Err(Error::CustomError(format!("could not read file {}", file)))
+            }
+        }, "read a file and get the last N lines"),
         String::from("canon") => Expression::builtin("canon", |args, env| {
             super::check_exact_args_len("canon", &args, 1)?;
             let cwd = PathBuf::from(env.get_cwd());

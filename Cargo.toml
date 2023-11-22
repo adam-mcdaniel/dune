@@ -32,6 +32,8 @@ dirs = "4.0"
 dunce = "1.0"
 chess-engine = { version = "0.1.2", optional = true }
 glob = "0.3"
+rpassword = "7.3"
+crossterm = "0.27"
 
 [dependencies.toml]
 version = "0.5.8"

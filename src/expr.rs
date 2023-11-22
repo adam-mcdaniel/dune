@@ -83,6 +83,17 @@ where
     }
 }
 
+impl From<Environment> for Expression {
+    fn from(env: Environment) -> Self {
+        Self::Map(
+            env.bindings
+                .into_iter()
+                .map(|(name, item)| (name, item))
+                .collect::<BTreeMap<String, Self>>(),
+        )
+    }
+}
+
 #[derive(Clone, PartialEq)]
 pub enum Expression {
     Group(Box<Self>),
@@ -268,7 +279,7 @@ impl fmt::Display for Expression {
                             t.add_row(row!(key, format!("{}", val)));
                         }
                         _ => {
-                            let formatted = format!("{}", val);
+                            let formatted = format!("{:?}", val);
                             t.add_row(row!(
                                 key,
                                 match width {

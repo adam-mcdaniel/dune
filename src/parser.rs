@@ -252,12 +252,7 @@ fn parse_symbol(input: Tokens<'_>) -> IResult<Tokens<'_>, String, SyntaxError> {
 fn parse_integer(input: Tokens<'_>) -> IResult<Tokens<'_>, Int, SyntaxError> {
     let (input, num) = kind(TokenKind::IntegerLiteral)(input)?;
     let num = num.to_str(input.str).parse::<Int>().map_err(|e| {
-        SyntaxError::unrecoverable(
-            num,
-            "integer",
-            Some(format!("error: {}", e)),
-            None,
-        )
+        SyntaxError::unrecoverable(num, "integer", Some(format!("error: {}", e)), None)
     })?;
     Ok((input, num))
 }

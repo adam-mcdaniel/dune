@@ -1,7 +1,7 @@
 use super::Int;
 use common_macros::b_tree_map;
 use dune::{Environment, Error, Expression};
-
+use super::curry;
 pub fn get() -> Expression {
     (b_tree_map! {
         String::from("list") => Expression::builtin("list", list,
@@ -28,10 +28,10 @@ pub fn get() -> Expression {
             "zip two lists together"),
         String::from("unzip") => Expression::builtin("unzip", unzip,
             "unzip a list of pairs into a pair of lists"),
-        String::from("take") => Expression::builtin("take", take,
-            "take the first n elements of a list"),
-        String::from("drop") => Expression::builtin("drop", drop,
-            "drop the first n elements of a list"),
+        String::from("take") => curry(Expression::builtin("take", take,
+            "take the first n elements of a list"), 2, &mut Environment::default()).unwrap(),
+        String::from("drop") => curry(Expression::builtin("drop", drop,
+            "drop the first n elements of a list"), 2, &mut Environment::default()).unwrap(),
         String::from("split-at") => Expression::builtin("split-at", split_at,
             "split a list at a given index"),
         String::from("nth") => Expression::builtin("nth", nth,
