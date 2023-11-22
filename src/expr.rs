@@ -265,8 +265,12 @@ impl fmt::Display for Expression {
                 for expr in exprs {
                     let formatted = format!("{}", expr);
                     // Get the length of the first line
-                    let first_line_len = formatted.lines().next().unwrap().len();
-                    total_len += first_line_len + 1;
+                    if formatted.contains('\n') {
+                        let first_line_len = formatted.lines().next().unwrap().len();
+                        total_len += first_line_len + 1;
+                    } else {
+                        total_len += formatted.len() + 1;
+                    }
                     row.push(formatted);
                 }
                 if total_len > specified_width {
