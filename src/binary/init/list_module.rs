@@ -1,4 +1,3 @@
-use super::fn_module::curry;
 use super::Int;
 use common_macros::b_tree_map;
 use dune::{Environment, Error, Expression};
@@ -87,7 +86,7 @@ fn cons(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Erro
             "cons requires exactly two arguments".to_string(),
         ));
     }
-    let mut list = args[1].eval(env)?;
+    let list = args[1].eval(env)?;
     if let Expression::List(mut list) = list {
         list.insert(0, args[0].eval(env)?);
         Ok(Expression::List(list))
@@ -104,7 +103,7 @@ fn append(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Er
             "append requires exactly two arguments".to_string(),
         ));
     }
-    let mut list = args[0].eval(env)?;
+    let list = args[0].eval(env)?;
     if let Expression::List(mut list) = list {
         list.push(args[1].eval(env)?);
         Ok(Expression::List(list))

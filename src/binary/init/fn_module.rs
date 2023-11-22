@@ -52,7 +52,7 @@ pub fn get() -> Expression {
             } else {
                 Err(Error::CustomError(format!(
                     "invalid arguments to apply: {}",
-                    Expression::from(args)
+                    args
                 )))
             }
         }, "apply a function to a list of arguments"),

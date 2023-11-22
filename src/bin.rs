@@ -532,7 +532,7 @@ fn run_text(text: &str, env: &mut Environment) -> Result<Expression, Error> {
 }
 
 fn run_file(path: PathBuf, env: &mut Environment) -> Result<Expression, Error> {
-    match std::fs::read_to_string(&path) {
+    match std::fs::read_to_string(path) {
         Ok(prelude) => run_text(&prelude, env),
         Err(e) => Err(Error::CustomError(format!("Failed to read file: {}", e))),
     }

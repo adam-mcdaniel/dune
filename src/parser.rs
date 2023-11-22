@@ -255,7 +255,7 @@ fn parse_integer(input: Tokens<'_>) -> IResult<Tokens<'_>, Int, SyntaxError> {
         SyntaxError::unrecoverable(
             num,
             "integer",
-            Some(format!("error: {}", e.to_string())),
+            Some(format!("error: {}", e)),
             None,
         )
     })?;
@@ -268,7 +268,7 @@ fn parse_float(input: Tokens<'_>) -> IResult<Tokens<'_>, f64, SyntaxError> {
         SyntaxError::unrecoverable(
             num,
             "float",
-            Some(format!("error: {}", e.to_string())),
+            Some(format!("error: {}", e)),
             Some("valid floats can be written like 1.0 or 5.23"),
         )
     })?;
