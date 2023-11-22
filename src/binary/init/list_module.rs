@@ -1,5 +1,5 @@
-use super::curry;
 use super::Int;
+use super::curry;
 use common_macros::b_tree_map;
 use dune::{Environment, Error, Expression};
 pub fn get() -> Expression {
@@ -29,9 +29,9 @@ pub fn get() -> Expression {
         String::from("unzip") => Expression::builtin("unzip", unzip,
             "unzip a list of pairs into a pair of lists"),
         String::from("take") => curry(Expression::builtin("take", take,
-            "take the first n elements of a list"), 2, &mut Environment::default()).unwrap(),
+            "take the first n elements of a list"), 2),
         String::from("drop") => curry(Expression::builtin("drop", drop,
-            "drop the first n elements of a list"), 2, &mut Environment::default()).unwrap(),
+            "drop the first n elements of a list"), 2),
         String::from("split-at") => Expression::builtin("split-at", split_at,
             "split a list at a given index"),
         String::from("nth") => Expression::builtin("nth", nth,
@@ -114,7 +114,7 @@ fn append(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Er
     }
 }
 
-fn len(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Error> {
+pub(super) fn len(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Error> {
     if args.len() != 1 {
         return Err(Error::CustomError(
             "len requires exactly one argument".to_string(),
@@ -132,7 +132,7 @@ fn len(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Error
     }
 }
 
-fn rev(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Error> {
+pub(super) fn rev(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Error> {
     if args.len() != 1 {
         return Err(Error::CustomError(
             "rev requires exactly one argument".to_string(),
@@ -142,6 +142,7 @@ fn rev(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Error
     match list {
         Expression::List(list) => Ok(Expression::List(list.into_iter().rev().collect())),
         Expression::String(string) => Ok(Expression::String(string.chars().rev().collect())),
+        Expression::Symbol(string) => Ok(Expression::Symbol(string.chars().rev().collect())),
         Expression::Bytes(bytes) => Ok(Expression::Bytes(bytes.into_iter().rev().collect())),
         _ => Err(Error::CustomError(
             "rev requires a list or string as its argument".to_string(),

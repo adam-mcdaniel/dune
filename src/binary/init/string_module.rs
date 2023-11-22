@@ -1,4 +1,4 @@
-use super::fn_module::curry;
+use super::fn_module::curry_env;
 use common_macros::b_tree_map;
 use dune::{Environment, Error, Expression};
 
@@ -29,6 +29,81 @@ fn split(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Err
 
 pub fn get() -> Expression {
     (b_tree_map! {
+        String::from("to-string") => Expression::builtin("to-string", |args, env| {
+            super::check_exact_args_len("to-string", &args, 1)?;
+            Ok(Expression::String(args[0].clone().eval(env)?.to_string()))
+        }, "convert a value to a string"),
+
+        String::from("caesar") => Expression::builtin("caesar-cipher", |args, env| {
+            super::check_args_len("caesar-cipher", &args, 1..=2)?;
+
+            let expr = args[0].clone().eval(env)?;
+            let shift = if args.len() > 1 {
+                args[1].clone().eval(env)?
+            } else {
+                Expression::Integer(13)
+            };
+            Ok(match (expr, shift) {
+                (Expression::Symbol(x) | Expression::String(x), Expression::Integer(i)) => {
+                    let mut result = String::new();
+                    for c in x.chars() {
+                        // If the character is a letter, shift it
+                        if c.is_ascii_alphabetic() {
+                            // Get the base character code
+                            let base = if c.is_ascii_lowercase() {
+                                'a' as u8
+                            } else {
+                                'A' as u8
+                            };
+                            // Get the offset from the base
+                            let offset = c as u8 - base;
+                            // Shift the offset
+                            let shifted_offset = (offset + (i as u8)) % 26;
+                            // Get the shifted character
+                            let shifted_char = (shifted_offset + base) as char;
+                            // Add the shifted character to the result
+                            result.push(shifted_char);
+                        } else {
+                            // If the character is not a letter, just add it to the result
+                            result.push(c);
+                        }
+                    }
+                    Expression::String(result)
+                }
+                _ => Expression::None,
+            })
+        }, "encrypt a string using a caesar cipher"),
+
+        String::from("len") => Expression::builtin("len", super::len, "get the length of a string"),
+
+        String::from("get-width") => Expression::builtin("get-width", |args, env| {
+            super::check_exact_args_len("get-width", &args, 1)?;
+            let expr = args[0].clone().eval(env)?;
+            Ok(Expression::Integer(match expr {
+                Expression::Symbol(x) | Expression::String(x) => {
+                    let mut width = 0;
+                    let mut max_width = 0;
+                    for c in x.chars() {
+                        if c == '\n' {
+                            if width > max_width {
+                                max_width = width;
+                            }
+                            width = 0;
+                        } else {
+                            width += 1;
+                        }
+                    }
+
+                    if width > max_width {
+                        width
+                    } else {
+                        max_width
+                    }
+                },
+                _ => 0
+            }))
+        }, "get the width of a string"),
+
         String::from("is-whitespace?") => Expression::builtin("is-whitespace?", |args, env| {
             match args[0].eval(env)? {
                 Expression::Symbol(x) | Expression::String(x) => {
@@ -78,7 +153,7 @@ pub fn get() -> Expression {
         }, "is this string numeric?"),
 
         String::from("split") => Expression::builtin("split", |args, env| {
-            curry(Expression::builtin("", split, ""), 2, env)?
+            curry_env(Expression::builtin("", split, ""), 2, env)?
                 .eval(env)?
                 .apply(args)
                 .eval(env)
@@ -182,21 +257,7 @@ pub fn get() -> Expression {
             }
         }, "is this string title case?"),
 
-        String::from("reverse") => Expression::builtin("reverse", |args, env| {
-            match args[0].eval(env)? {
-                Expression::Symbol(x) | Expression::String(x) => {
-                    let mut reversed = String::new();
-                    for c in x.chars().rev() {
-                        reversed.push(c);
-                    }
-                    Ok(Expression::String(reversed))
-                }
-                otherwise => Err(Error::CustomError(format!(
-                    "expected string, got value {}",
-                    otherwise
-                ))),
-            }
-        }, "reverse a string"),
+        String::from("rev") => Expression::builtin("rev", super::rev, "reverse a string"),
 
         String::from("join") => Expression::builtin("join", |args, env| {
             super::check_exact_args_len("join", &args, 2)?;
@@ -286,10 +347,10 @@ pub fn get() -> Expression {
             let index = args[1].clone().eval(env)?;
             Ok(match (expr, index) {
                 (Expression::Symbol(x) | Expression::String(x), Expression::Integer(i)) => {
-                    let mut split = Vec::new();
-                    split.push(Expression::String(x[..i as usize].to_string()));
-                    split.push(Expression::String(x[i as usize..].to_string()));
-                    Expression::List(split)
+                    Expression::List(vec![
+                        Expression::String(x[..i as usize].to_string()),
+                        Expression::String(x[i as usize..].to_string()),
+                    ])
                 }
                 _ => Expression::None,
             })

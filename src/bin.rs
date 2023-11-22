@@ -191,7 +191,10 @@ fn syntax_highlight(line: &str) -> String {
                 is_colored = true;
                 result.push_str(b);
             }
-            (TokenKind::Punctuation, o @ ("@" | "\'" | "=" | "|" | ">>" | "<<"  | ">>>" | "->" | "~>")) => {
+            (
+                TokenKind::Punctuation,
+                o @ ("@" | "\'" | "=" | "|" | ">>" | "<<" | ">>>" | "->" | "~>"),
+            ) => {
                 result.push_str("\x1b[96m");
                 is_colored = true;
                 result.push_str(o);

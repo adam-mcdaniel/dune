@@ -1,11 +1,80 @@
+use super::curry;
 use common_macros::b_tree_map;
-use dune::{Error, Expression, Int};
+use dune::{Error, Environment, Expression, Int};
 
-pub fn get() -> Expression {
+pub fn get(env: &mut Environment) -> Expression {
     (b_tree_map! {
         String::from("E")   => std::f64::consts::E.into(),
         String::from("PI")  => std::f64::consts::PI.into(),
         String::from("TAU") => std::f64::consts::TAU.into(),
+
+        String::from("max") => crate::parse("x -> y -> if (x > y) { x } else { y }").unwrap().eval(env).unwrap(),
+        String::from("min") => crate::parse("x -> y -> if (x < y) { x } else { y }").unwrap().eval(env).unwrap(),
+
+        String::from("l-rsh") => curry(Expression::builtin("l-rsh", |args, env| {
+            super::check_exact_args_len("l-rsh", &args, 2)?;
+
+            let a = match args[0].eval(env)? {
+                Expression::Integer(i) => i,
+                e => return Err(Error::CustomError(format!("invalid l-rsh argument {}", e)))
+            };
+
+            let b = match args[1].eval(env)? {
+                Expression::Integer(i) => i,
+                e => return Err(Error::CustomError(format!("invalid l-rsh argument {}", e)))
+            };
+
+            let a = a as u64;
+            let b = b as u64;
+
+            Ok(((a >> b) as Int).into())
+        }, "logical right shift"), 2),
+
+        String::from("a-rsh") => curry(Expression::builtin("a-rsh", |args, env| {
+            super::check_exact_args_len("a-rsh", &args, 2)?;
+
+            let a = match args[0].eval(env)? {
+                Expression::Integer(i) => i,
+                e => return Err(Error::CustomError(format!("invalid a-rsh argument {}", e)))
+            };
+            let b = match args[1].eval(env)? {
+                Expression::Integer(i) => i,
+                e => return Err(Error::CustomError(format!("invalid a-rsh argument {}", e)))
+            };
+
+            Ok((a >> b).into())
+        }, "arithmetic right shift"), 2),
+
+        String::from("rsh") => curry(Expression::builtin("a-rsh", |args, env| {
+            super::check_exact_args_len("a-rsh", &args, 2)?;
+
+            let a = match args[0].eval(env)? {
+                Expression::Integer(i) => i,
+                e => return Err(Error::CustomError(format!("invalid a-rsh argument {}", e)))
+            };
+            let b = match args[1].eval(env)? {
+                Expression::Integer(i) => i,
+                e => return Err(Error::CustomError(format!("invalid a-rsh argument {}", e)))
+            };
+
+            Ok((a >> b).into())
+        }, "arithmetic right shift"), 2),
+
+        String::from("lsh") => Expression::builtin("lsh", |args, env| {
+            super::check_exact_args_len("lsh", &args, 2)?;
+
+            let a = match args[0].eval(env)? {
+                Expression::Integer(i) => i,
+                e => return Err(Error::CustomError(format!("invalid lsh argument {}", e)))
+            };
+            let b = match args[1].eval(env)? {
+                Expression::Integer(i) => i,
+                e => return Err(Error::CustomError(format!("invalid lsh argument {}", e)))
+            };
+
+            Ok((a << b).into())
+        }, "left shift"),
+
 
         String::from("sum") => Expression::builtin("sum", |args, env| {
             let mut int_sum = 0;
@@ -67,7 +136,7 @@ pub fn get() -> Expression {
             match args[0].eval(env)? {
                 Expression::Integer(i) => {
                     if i < 0 {
-                        Err(Error::CustomError(format!("cannot take the factorial of a negative number")))
+                        Err(Error::CustomError("cannot take the factorial of a negative number".to_string()))
                     } else {
                         let mut result = 1;
                         for n in 1..=i {
@@ -78,7 +147,7 @@ pub fn get() -> Expression {
                 },
                 Expression::Float(f) => {
                     if f < 0.0 {
-                        Err(Error::CustomError(format!("cannot take the factorial of a negative number")))
+                        Err(Error::CustomError("cannot take the factorial of a negative number".to_string()))
                     } else {
                         Ok(f64::round(f64::exp(f64::ln(f) * f64::ln(f)) * f64::sqrt(2.0 * std::f64::consts::PI * f) * (1.0 + 1.0 / (12.0 * f) + 1.0 / (288.0 * f * f) - 139.0 / (51840.0 * f * f * f) - 571.0 / (2488320.0 * f * f * f * f))).into())
                     }
@@ -259,7 +328,7 @@ pub fn get() -> Expression {
         }, "get the natural log of a number"),
 
 
-        String::from("log") => Expression::builtin("log", |args, env| {
+        String::from("log") => curry(Expression::builtin("log", |args, env| {
             super::check_exact_args_len("log", &args, 2)?;
 
             let base = match args[0].eval(env)? {
@@ -275,7 +344,7 @@ pub fn get() -> Expression {
             };
 
             Ok(x.log(base).into())
-        }, "get the log of a number using a given base"),
+        }, "get the log of a number using a given base"), 2),
 
 
         String::from("log2") => Expression::builtin("log2", |args, env| {

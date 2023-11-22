@@ -44,7 +44,7 @@ pub fn get() -> Expression {
             super::check_exact_args_len("keys", &args, 1)?;
             let expr = args[0].clone().eval(env)?;
             Ok(match expr {
-                Expression::Map(map) => Expression::List(map.into_iter().map(|(k, _)| k.into()).collect()),
+                Expression::Map(map) => Expression::List(map.into_keys().map(|k| k.into()).collect()),
                 _ => Expression::None
             })
         }, "get the keys of a map"),
@@ -53,7 +53,7 @@ pub fn get() -> Expression {
             super::check_exact_args_len("values", &args, 1)?;
             let expr = args[0].clone().eval(env)?;
             Ok(match expr {
-                Expression::Map(map) => Expression::List(map.into_iter().map(|(_, v)| v).collect()),
+                Expression::Map(map) => Expression::List(map.into_values().collect()),
                 _ => Expression::None
             })
         }, "get the values of a map"),

@@ -20,7 +20,7 @@ pub fn get() -> Expression {
         String::from("suggestion") => {
             // Choose a random suggestion from the `help/suggestions.txt` file.
             let suggestions = include_str!("../help/suggestions.txt");
-            let suggestions = suggestions.split("\n").collect::<Vec<&str>>();
+            let suggestions = suggestions.split('\n').collect::<Vec<&str>>();
             let suggestion = suggestions.choose(&mut rand::thread_rng()).unwrap();
             Expression::String(suggestion.to_string())
         },

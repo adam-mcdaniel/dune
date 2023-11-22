@@ -548,7 +548,10 @@ fn parse_expression(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, Syntax
 
     let (input, head) = expr_parser(input)?;
 
-    let (input, list) = many0(pair(alt((text("|"), text(">>>"), text(">>"), text("<<"))), expr_parser))(input)?;
+    let (input, list) = many0(pair(
+        alt((text("|"), text(">>>"), text(">>"), text("<<"))),
+        expr_parser,
+    ))(input)?;
 
     if list.is_empty() {
         return Ok((input, head));
@@ -574,16 +577,20 @@ fn parse_expression(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, Syntax
                     //         ],
                     //     ))),
                     // );
-                    args.push(Expression::Apply(Box::new(Expression::Symbol("<<".to_string())), vec![item]));
+                    args.push(Expression::Apply(
+                        Box::new(Expression::Symbol("<<".to_string())),
+                        vec![item],
+                    ));
                     args.push(arg);
                 }
                 None => {
-                    args.push(
-                        Expression::Apply(Box::new(Expression::Symbol("<<".to_string())), vec![item]),
-                    );
+                    args.push(Expression::Apply(
+                        Box::new(Expression::Symbol("<<".to_string())),
+                        vec![item],
+                    ));
                 }
             }
-            continue
+            continue;
         }
         args.push(match text {
             "|" => item,

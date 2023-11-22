@@ -1,30 +1,40 @@
 use std::{
+    collections::BTreeMap,
     env::current_dir,
-    path::{Path, PathBuf}, collections::BTreeMap,
+    path::{Path, PathBuf},
 };
 
+use super::Int;
 use common_macros::b_tree_map;
 use dune::{Environment, Error, Expression};
-use super::Int;
 
 fn get_dir_tree(cwd: &Path, max_depth: Option<Int>) -> BTreeMap<String, Expression> {
     let mut dir_tree = b_tree_map! {};
 
-    dir_tree.insert(".".to_string(), Expression::from(cwd.clone().to_str().unwrap()));
-    dir_tree.insert("..".to_string(), Expression::from(cwd.parent().unwrap().to_str().unwrap()));
+    dir_tree.insert(
+        ".".to_string(),
+        Expression::from(cwd.clone().to_str().unwrap()),
+    );
+    dir_tree.insert(
+        "..".to_string(),
+        Expression::from(cwd.parent().unwrap().to_str().unwrap()),
+    );
 
     if let Ok(entries) = std::fs::read_dir(cwd) {
-        for entry in entries {
-            if let Ok(entry) = entry {
-                let path = entry.path();
-                let file_name_osstring = entry.file_name();
-                if let Ok(file_name) = file_name_osstring.into_string() {
-                    if path.is_dir() {
-                        dir_tree.insert(file_name, Expression::from(get_dir_tree(&path, max_depth.map(|d| d - 1))));
-                    } else {
-                        dir_tree.insert(file_name, Expression::from(path.into_os_string()
-                            .into_string().unwrap()));
-                    }
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let file_name_osstring = entry.file_name();
+            if let Ok(file_name) = file_name_osstring.into_string() {
+                if path.is_dir() {
+                    dir_tree.insert(
+                        file_name,
+                        Expression::from(get_dir_tree(&path, max_depth.map(|d| d - 1))),
+                    );
+                } else {
+                    dir_tree.insert(
+                        file_name,
+                        Expression::from(path.into_os_string().into_string().unwrap()),
+                    );
                 }
             }
         }
@@ -110,7 +120,7 @@ pub fn get(env: &mut Environment) -> Expression {
             let path = path.join(file.to_string());
             let n = match args[1].eval(env)? {
                 Expression::Integer(n) => n,
-                _ => return Err(Error::CustomError(format!("second argument to head must be an integer")))
+                _ => return Err(Error::CustomError("second argument to head must be an integer".to_string()))
             };
 
             if let Ok(contents) = std::fs::read_to_string(&path) {
@@ -136,7 +146,7 @@ pub fn get(env: &mut Environment) -> Expression {
             let path = path.join(file.to_string());
             let n = match args[1].eval(env)? {
                 Expression::Integer(n) => n,
-                _ => return Err(Error::CustomError(format!("second argument to tail must be an integer")))
+                _ => return Err(Error::CustomError("second argument to tail must be an integer".to_string()))
             };
 
             if let Ok(contents) = std::fs::read_to_string(&path) {

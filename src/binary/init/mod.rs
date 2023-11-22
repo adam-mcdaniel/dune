@@ -9,9 +9,10 @@ mod dict_module;
 mod err_module;
 mod fmt_module;
 mod fn_module;
-use fn_module::curry;
+use fn_module::{curry, reverse_curry};
 mod fs_module;
 mod list_module;
+use list_module::*;
 mod log_module;
 mod math_module;
 mod operator_module;
@@ -27,9 +28,10 @@ mod widget_module;
 pub fn init(env: &mut Environment) {
     let fs = fs_module::get(env);
     let ops = operator_module::get(env);
+    let math = math_module::get(env);
     let standard_module = b_tree_map! {
         "log" => log_module::get(),
-        "math" => math_module::get(),
+        "math" => math,
         "dict" => dict_module::get(),
         "shell" => shell_module::get(),
         "err" => err_module::get(),
@@ -330,7 +332,7 @@ pub fn init(env: &mut Environment) {
     //     "head",
     //     |args, env| {
     //         check_exact_args_len("head", &args, 1)?;
-            
+
     //         match args[0].eval(env)? {
     //             Expression::List(x) => Ok(if x.is_empty() {
     //                 Expression::None

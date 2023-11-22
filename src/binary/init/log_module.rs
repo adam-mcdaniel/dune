@@ -37,9 +37,9 @@ pub fn get() -> Expression {
             let level = args[0].clone().eval(_env)?;
             if let Expression::Integer(level) = level {
                 *LOG_LEVEL.write().unwrap() = level;
-                return Ok(Expression::None)
+                Ok(Expression::None)
             } else {
-                return Err(Error::CustomError(format!("expected an integer, found {}", level)))
+                Err(Error::CustomError(format!("expected an integer, found {}", level)))
             }
         }, "set the log level"),
 
@@ -51,16 +51,16 @@ pub fn get() -> Expression {
         String::from("disable") => Expression::builtin("disable", |args, _env| {
             super::check_exact_args_len("disable", &args, 0)?;
             *LOG_LEVEL.write().unwrap() = NONE;
-            return Ok(Expression::None)
+            Ok(Expression::None)
         }, "disable logging"),
 
         String::from("enabled?") => Expression::builtin("enabled?", |args, env| {
             super::check_exact_args_len("enabled?", &args, 1)?;
             let level = args[0].clone().eval(env)?;
             if let Expression::Integer(level) = level {
-                return Ok(Expression::Boolean(is_log_level_enabled(level)))
+                Ok(Expression::Boolean(is_log_level_enabled(level)))
             } else {
-                return Err(Error::CustomError(format!("expected an integer, found {}", level)))
+                Err(Error::CustomError(format!("expected an integer, found {}", level)))
             }
         }, "check if a log level is enabled"),
 
@@ -80,7 +80,7 @@ pub fn get() -> Expression {
                     for (i, line) in lines.iter().enumerate() {
                         if i < lines.len() - 1 {
                             println!("{}{}", prefix, line);
-                        } else if line.len() > 0 {
+                        } else if !line.is_empty() {
                             print!("{}{}", prefix, line);
                         }
                     }
@@ -117,7 +117,7 @@ pub fn get() -> Expression {
                     for (i, line) in lines.iter().enumerate() {
                         if i < lines.len() - 1 {
                             println!("{}{}", prefix, line);
-                        } else if line.len() > 0 {
+                        } else if !line.is_empty() {
                             print!("{}{}", prefix, line);
                         }
                     }
@@ -155,7 +155,7 @@ pub fn get() -> Expression {
                     for (i, line) in lines.iter().enumerate() {
                         if i < lines.len() - 1 {
                             println!("{}{}", prefix, line);
-                        } else if line.len() > 0 {
+                        } else if !line.is_empty() {
                             print!("{}{}", prefix, line);
                         }
                     }
@@ -192,7 +192,7 @@ pub fn get() -> Expression {
                     for (i, line) in lines.iter().enumerate() {
                         if i < lines.len() - 1 {
                             println!("{}{}", prefix, line);
-                        } else if line.len() > 0 {
+                        } else if !line.is_empty() {
                             print!("{}{}", prefix, line);
                         }
                     }
@@ -228,7 +228,7 @@ pub fn get() -> Expression {
                     for (i, line) in lines.iter().enumerate() {
                         if i < lines.len() - 1 {
                             println!("{}{}", prefix, line);
-                        } else if line.len() > 0 {
+                        } else if !line.is_empty() {
                             print!("{}{}", prefix, line);
                         }
                     }
