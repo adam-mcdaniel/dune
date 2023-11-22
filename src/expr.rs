@@ -263,7 +263,10 @@ impl fmt::Display for Expression {
                 let mut row = vec![];
                 let mut total_len = 1;
                 for expr in exprs {
-                    let formatted = format!("{}", expr);
+                    let formatted = match expr {
+                        Expression::String(s) => format!("{:?}", s),
+                        _ => format!("{}", expr),
+                    }
                     // Get the length of the first line
                     if formatted.contains('\n') {
                         let first_line_len = formatted.lines().next().unwrap().len();
