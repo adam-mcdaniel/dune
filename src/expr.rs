@@ -12,7 +12,7 @@ use terminal_size::{terminal_size, Width};
 
 use prettytable::{
     format::{LinePosition, LineSeparator},
-    row, Table, Row, Cell
+    row, Cell, Row, Table,
 };
 
 /// The maximum number of times that `eval` can recursively call itself
@@ -276,7 +276,7 @@ impl fmt::Display for Expression {
                 t.add_row(row);
 
                 write!(f, "{}", t)
-            },
+            }
             Self::Map(exprs) => {
                 let mut t = Table::new();
                 let fmt = t.get_format();
@@ -304,19 +304,13 @@ impl fmt::Display for Expression {
                         Self::List(_) => {
                             let w = specified_width - key.len() - 3;
                             let formatted = format!("{:w$}", val);
-                            t.add_row(row!(
-                                key,
-                                textwrap::fill(&formatted, w),
-                            ));
+                            t.add_row(row!(key, textwrap::fill(&formatted, w),));
                         }
                         _ => {
                             // Format the value to the width of the terminal / 5
                             let formatted = format!("{:?}", val);
                             let w = specified_width / 3;
-                            t.add_row(row!(
-                                key,
-                                textwrap::fill(&formatted, w),
-                            ));
+                            t.add_row(row!(key, textwrap::fill(&formatted, w),));
                         }
                     }
                 }

@@ -1,7 +1,7 @@
+use super::curry;
 use super::Int;
 use common_macros::b_tree_map;
 use dune::{Environment, Error, Expression};
-use super::curry;
 pub fn get() -> Expression {
     (b_tree_map! {
         String::from("list") => Expression::builtin("list", list,

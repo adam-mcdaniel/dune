@@ -1,8 +1,8 @@
+use super::Int;
 use common_macros::b_tree_map;
 use dune::{Error, Expression};
-use super::Int;
-use std::sync::RwLock;
 use lazy_static::lazy_static;
+use std::sync::RwLock;
 lazy_static! {
     static ref LOG_LEVEL: RwLock<Int> = RwLock::new(0);
 }
@@ -263,5 +263,4 @@ pub fn get() -> Expression {
             Ok(Expression::None)
         }, "print a message to the console with no formatting"),
     }).into()
-
 }

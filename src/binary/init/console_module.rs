@@ -1,7 +1,7 @@
 use common_macros::b_tree_map;
 use dune::{Environment, Error, Expression, Int};
-use terminal_size::{terminal_size, Height, Width};
 use std::io::Write;
+use terminal_size::{terminal_size, Height, Width};
 
 pub fn get() -> Expression {
     (b_tree_map! {
@@ -132,9 +132,7 @@ pub fn get() -> Expression {
                     crossterm::event::Event::Key(key) => key,
                     _ => return Ok(Expression::None)
                 };
-
                 let code = key.code;
-                
                 use crossterm::event::KeyCode::*;
                 Ok(match code {
                     Char(c) => Expression::String(c.to_string()),

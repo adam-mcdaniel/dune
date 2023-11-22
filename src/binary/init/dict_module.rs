@@ -10,15 +10,15 @@ pub(crate) fn flatten(expr: Expression) -> Vec<Expression> {
                 new_list.extend(flatten(item));
             }
             new_list
-        },
+        }
         Expression::Map(map) => {
             let mut new_list = Vec::new();
             for (_, item) in map {
                 new_list.extend(flatten(item));
             }
             new_list
-        },
-        expr => vec![expr]
+        }
+        expr => vec![expr],
     }
 }
 
