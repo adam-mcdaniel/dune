@@ -16,12 +16,15 @@ mod rand_module;
 mod shell_module;
 mod string_module;
 mod time_module;
+mod list_module;
 mod widget_module;
+mod err_module;
 
 pub fn init(env: &mut Environment) {
     let standard_module = b_tree_map! {
         "math" => math_module::get(),
         "shell" => shell_module::get(),
+        "err" => err_module::get(),
         "os" => os_module::get(),
         "widget" => widget_module::get(),
         "time" => time_module::get(),
@@ -33,6 +36,7 @@ pub fn init(env: &mut Environment) {
         "fs" => fs_module::get(env),
         "ops" => operator_module::get(env),
         "string" => string_module::get(),
+        "list" => list_module::get(),
     };
 
     env.define_module("std", standard_module.clone());

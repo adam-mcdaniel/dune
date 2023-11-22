@@ -530,14 +530,8 @@ impl Expression {
                             Ok(_) => return Ok(Self::None),
                             Err(e) => {
                                 return Err(match e.kind() {
-                                    ErrorKind::NotFound => Error::CustomError(format!(
-                                        "program \"{}\" not found",
-                                        name
-                                    )),
-                                    ErrorKind::PermissionDenied => Error::CustomError(format!(
-                                        "permission to execute \"{}\" denied",
-                                        name
-                                    )),
+                                    ErrorKind::NotFound => Error::ProgramNotFound(name),
+                                    ErrorKind::PermissionDenied => Error::PermissionDenied(self.clone()),
                                     _ => Error::CommandFailed(name, args.clone()),
                                 })
                             }

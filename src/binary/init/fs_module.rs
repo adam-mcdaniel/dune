@@ -168,6 +168,59 @@ pub fn get(env: &mut Environment) -> Expression {
                 Err(e) => Err(Error::CustomError(format!("could not write to file {}: {:?}", file, e)))
             }
         }, "write to a file with some contents"),
+
+        String::from("append") => Expression::builtin("append", |args, env| {
+            super::check_exact_args_len("append", &args, 2)?;
+            let mut path = PathBuf::from(env.get_cwd());
+            let filename = args[0].eval(env)?;
+
+            path = path.join(filename.to_string());
+            match std::fs::OpenOptions::new().append(true).open(&path) {
+                Ok(mut file) => {
+                    let contents = args[1].eval(env)?;
+                    use std::io::prelude::*;
+
+                    let result = if let Expression::Bytes(bytes) = contents {
+                        // std::fs::write(path, bytes)
+                        file.write_all(&bytes)
+                    } else {
+                        // Otherwise, convert the contents to a pretty string and write that.
+                        // std::fs::write(path, contents.to_string())
+                        file.write_all(contents.to_string().as_bytes())
+                    };
+
+                    match result {
+                        Ok(()) => Ok(Expression::None),
+                        Err(e) => Err(Error::CustomError(format!("could not append to file {}: {:?}", filename, e)))
+                    }
+                },
+                Err(e) => Err(Error::CustomError(format!("could not open file {}: {:?}", filename, e)))
+            }
+
+        }, "append to a file with some contents"),
+
+        String::from("glob") => Expression::builtin("glob", |args, env| {
+            super::check_exact_args_len("glob", &args, 1)?;
+            let cwd = PathBuf::from(env.get_cwd());
+            let pattern = args[0].eval(env)?.to_string();
+            let mut result = vec![];
+
+            for entry in glob::glob(&pattern).unwrap() {
+                match entry {
+                    Ok(path) => {
+                        // Strip prefix from path
+                        if let Ok(path) = path.strip_prefix(&cwd) {
+                            result.push(path.display().to_string());
+                        } else {
+                            result.push(path.display().to_string());
+                        }
+                    },
+                    Err(e) => return Err(Error::CustomError(format!("could not glob pattern {}: {:?}", pattern, e)))
+                }
+            }
+
+            Ok(result.into())
+        }, "glob a pattern into a list of paths"),
     };
 
     env.define_module("fs", fs_module.clone());

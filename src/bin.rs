@@ -191,7 +191,7 @@ fn syntax_highlight(line: &str) -> String {
                 is_colored = true;
                 result.push_str(b);
             }
-            (TokenKind::Punctuation, o @ ("@" | "\'" | "=" | "|" | ">>" | "->" | "~>")) => {
+            (TokenKind::Punctuation, o @ ("@" | "\'" | "=" | "|" | ">>"  | ">>>" | "->" | "~>")) => {
                 result.push_str("\x1b[96m");
                 is_colored = true;
                 result.push_str(o);
@@ -576,6 +576,7 @@ fn main() -> Result<(), Error> {
     .eval(&mut env)?;
 
     parse("let >> = file -> contents -> fs@write file contents")?.eval(&mut env)?;
+    parse("let >>> = file -> contents -> fs@append file contents")?.eval(&mut env)?;
 
     parse(
         "let prompt = cwd -> \
