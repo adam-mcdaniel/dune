@@ -347,6 +347,7 @@ dependencies = [
  "dunce",
  "glob",
  "json",
+ "lazy_static",
  "nom",
  "os_info",
  "prettytable-rs",

@@ -22,9 +22,11 @@ mod string_module;
 mod sys_module;
 mod time_module;
 mod widget_module;
+mod log_module;
 
 pub fn init(env: &mut Environment) {
     let standard_module = b_tree_map! {
+        "log" => log_module::get(),
         "math" => math_module::get(),
         "dict" => dict_module::get(),
         "shell" => shell_module::get(),
@@ -411,7 +413,7 @@ pub fn init(env: &mut Environment) {
                 Expression::Map(_) => println!("{}", val),
                 Expression::String(s) => println!("{}", s),
                 Expression::None => {}
-                otherwise => println!("{:?}", otherwise),
+                otherwise => println!("{}", otherwise),
             }
 
             Ok(Expression::None)

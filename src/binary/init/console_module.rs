@@ -1,6 +1,7 @@
 use common_macros::b_tree_map;
 use dune::{Environment, Error, Expression, Int};
 use terminal_size::{terminal_size, Height, Width};
+use std::io::Write;
 
 pub fn get() -> Expression {
     (b_tree_map! {
@@ -9,27 +10,10 @@ pub fn get() -> Expression {
         String::from("write") => Expression::builtin("write", write, "write text to a specific position in the console"),
         String::from("title") => Expression::builtin("title", title, "set the title of the console"),
         String::from("clear") => Expression::builtin("clear", clear, "clear the console"),
-        // String::from("move-cursor-to") => Expression::builtin("move-cursor-to", |args, env| {
-        //     super::check_exact_args_len("move-cursor-to", &args, 2)?;
-        //     let x = args[0].clone().eval(env)?;
-        //     let y = args[1].clone().eval(env)?;
-        //     if let (Expression::Integer(x), Expression::Integer(y)) = (x, y) {
-        //         print!("\x1b[{row};{column}f", column = x, row = y);
-        //     } else {
-        //         return Err(Error::CustomError(format!("expected first two arguments to be integers, but got: `{:?}`, `{:?}`", x, y)));
-        //     }
-        //     Ok(Expression::None)
-        // }, "move the cursor to a specific position in the console"),
-        // String::from("move-cursor-up") => Expression::builtin("move-cursor-up", |args, env| {
-        //     super::check_exact_args_len("move-cursor-up", &args, 1)?;
-        //     let y = args[0].clone().eval(env)?;
-        //     if let Expression::Integer(y) = y {
-        //         print!("\x1b[{y}A", y = y);
-        //     } else {
-        //         return Err(Error::CustomError(format!("expected first argument to be an integer, but got: `{:?}`", y)));
-        //     }
-        //     Ok(Expression::None)
-        // }, "move the cursor up a specific number of lines"),
+        String::from("flush") => Expression::builtin("flush", |_, _| {
+            std::io::stdout().flush().unwrap();
+            Ok(Expression::None)
+        }, "flush the console"),
         String::from("mode") => Expression::Map(b_tree_map! {
             String::from("raw") => Expression::builtin("raw", |_, _| {
                 match crossterm::terminal::enable_raw_mode() {

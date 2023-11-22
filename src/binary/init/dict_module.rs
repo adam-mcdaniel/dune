@@ -2,8 +2,34 @@ use super::Int;
 use common_macros::b_tree_map;
 use dune::Expression;
 
+pub(crate) fn flatten(expr: Expression) -> Vec<Expression> {
+    match expr {
+        Expression::List(list) => {
+            let mut new_list = Vec::new();
+            for item in list {
+                new_list.extend(flatten(item));
+            }
+            new_list
+        },
+        Expression::Map(map) => {
+            let mut new_list = Vec::new();
+            for (_, item) in map {
+                new_list.extend(flatten(item));
+            }
+            new_list
+        },
+        expr => vec![expr]
+    }
+}
+
 pub fn get() -> Expression {
     (b_tree_map! {
+        String::from("flatten") => Expression::builtin("flatten", |args, env| {
+            super::check_exact_args_len("flatten", &args, 1)?;
+            let expr = args[0].clone().eval(env)?;
+            Ok(Expression::List(flatten(expr)))
+        }, "flatten a list"),
+
         String::from("items") => Expression::builtin("items", |args, env| {
             super::check_exact_args_len("items", &args, 1)?;
             let expr = args[0].clone().eval(env)?;
