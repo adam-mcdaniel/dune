@@ -26,7 +26,10 @@ fn create(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Er
     } as usize
         - 2;
     let format_width = text_width * 2 / 3;
-    let text = textwrap::fill(&format!("{:format_width$}", args[1].eval(env)?.to_string()), text_width);
+    let text = textwrap::fill(
+        &format!("{:format_width$}", args[1].eval(env)?.to_string()),
+        text_width,
+    );
 
     let widget_height = match args[3].eval(env)? {
         Expression::Integer(n) if n >= 3 => n,

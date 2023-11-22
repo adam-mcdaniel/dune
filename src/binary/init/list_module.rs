@@ -1,5 +1,5 @@
-use super::Int;
 use super::curry;
+use super::Int;
 use common_macros::b_tree_map;
 use dune::{Environment, Error, Expression};
 pub fn get() -> Expression {

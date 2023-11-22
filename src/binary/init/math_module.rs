@@ -1,6 +1,6 @@
 use super::curry;
 use common_macros::b_tree_map;
-use dune::{Error, Environment, Expression, Int};
+use dune::{Environment, Error, Expression, Int};
 
 pub fn get(env: &mut Environment) -> Expression {
     (b_tree_map! {
