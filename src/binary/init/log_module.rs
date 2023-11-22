@@ -1,5 +1,5 @@
 use common_macros::b_tree_map;
-use dune::{Environment, Error, Expression};
+use dune::{Error, Expression};
 use super::Int;
 use std::sync::RwLock;
 use lazy_static::lazy_static;
