@@ -12,7 +12,7 @@ use terminal_size::{terminal_size, Width};
 
 use prettytable::{
     format::{LinePosition, LineSeparator},
-    row, Table,
+    row, Cell, Row, Table,
 };
 
 /// The maximum number of times that `eval` can recursively call itself
@@ -79,6 +79,17 @@ where
             list.into_iter()
                 .map(|item| item.into())
                 .collect::<Vec<Self>>(),
+        )
+    }
+}
+
+impl From<Environment> for Expression {
+    fn from(env: Environment) -> Self {
+        Self::Map(
+            env.bindings
+                .into_iter()
+                .map(|(name, item)| (name, item))
+                .collect::<BTreeMap<String, Self>>(),
         )
     }
 }
@@ -218,6 +229,16 @@ impl fmt::Debug for Expression {
 
 impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let specified_width = f.width().unwrap_or(
+            terminal_size()
+                .map(|(Width(w), _)| w as usize)
+                .unwrap_or(120),
+        );
+        // let width = match terminal_size() {
+        //     Some((Width(width), _)) => Some(width as usize),
+        //     _ => None,
+        // }
+
         match self {
             Self::Quote(inner) => write!(f, "'{:?}", inner),
             Self::Group(inner) => write!(f, "({:?})", inner),
@@ -227,19 +248,47 @@ impl fmt::Display for Expression {
             Self::Bytes(b) => write!(f, "b{:?}", b),
             Self::String(s) => write!(f, "{}", s),
             Self::Boolean(b) => write!(f, "{}", if *b { "True" } else { "False" }),
-            Self::List(exprs) => write!(
-                f,
-                "[{}]",
-                exprs
-                    .iter()
-                    .map(|e| format!("{:?}", e))
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            ),
+            Self::List(exprs) => {
+                // Create a table with one column
+                let mut t = Table::new();
+                let fmt = t.get_format();
+                fmt.padding(1, 1);
+                fmt.borders('┃');
+                fmt.column_separator('┃');
+                fmt.separator(LinePosition::Top, LineSeparator::new('━', '┳', '┏', '┓'));
+                fmt.separator(LinePosition::Title, LineSeparator::new('━', '╋', '┣', '┫'));
+                fmt.separator(LinePosition::Intern, LineSeparator::new('━', '╋', '┣', '┫'));
+                fmt.separator(LinePosition::Bottom, LineSeparator::new('━', '┻', '┗', '┛'));
+
+                let mut row = vec![];
+                let mut total_len = 1;
+                for expr in exprs {
+                    let formatted = match expr {
+                        Expression::String(s) => format!("{:?}", s),
+                        _ => format!("{}", expr),
+                    };
+                    // Get the length of the first line
+                    if formatted.contains('\n') {
+                        let first_line_len = formatted.lines().next().unwrap().len();
+                        total_len += first_line_len + 1;
+                    } else {
+                        total_len += formatted.len() + 1;
+                    }
+                    row.push(formatted);
+                }
+                if total_len > specified_width {
+                    return write!(f, "{:?}", self);
+                }
+                let row = Row::new(row.into_iter().map(|x| Cell::new(&x)).collect::<Vec<_>>());
+                t.add_row(row);
+
+                write!(f, "{}", t)
+            }
             Self::Map(exprs) => {
                 let mut t = Table::new();
                 let fmt = t.get_format();
                 fmt.padding(1, 1);
+                // Set width to be 2/3
                 fmt.borders('│');
                 fmt.column_separator('│');
                 fmt.separator(LinePosition::Top, LineSeparator::new('═', '╤', '╒', '╕'));
@@ -247,35 +296,28 @@ impl fmt::Display for Expression {
                 fmt.separator(LinePosition::Intern, LineSeparator::new('─', '┼', '├', '┤'));
                 fmt.separator(LinePosition::Bottom, LineSeparator::new('─', '┴', '└', '┘'));
 
-                let width = match terminal_size() {
-                    Some((Width(width), _)) => Some(width as usize),
-                    _ => None,
-                };
-
                 for (key, val) in exprs {
                     match &val {
                         Self::Builtin(Builtin { help, .. }) => {
                             t.add_row(row!(
                                 key,
                                 format!("{}", val),
-                                match width {
-                                    Some(w) => textwrap::fill(help, w / 6),
-                                    None => help.to_string(),
-                                }
+                                textwrap::fill(help, specified_width / 6)
                             ));
                         }
                         Self::Map(_) => {
-                            t.add_row(row!(key, format!("{}", val)));
+                            t.add_row(row!(key, format!("{:specified_width$}", val)));
+                        }
+                        Self::List(_) => {
+                            let w = specified_width - key.len() - 3;
+                            let formatted = format!("{:w$}", val);
+                            t.add_row(row!(key, textwrap::fill(&formatted, w),));
                         }
                         _ => {
-                            let formatted = format!("{}", val);
-                            t.add_row(row!(
-                                key,
-                                match width {
-                                    Some(w) => textwrap::fill(&formatted, w / 5),
-                                    None => formatted,
-                                }
-                            ));
+                            // Format the value to the width of the terminal / 5
+                            let formatted = format!("{:?}", val);
+                            let w = specified_width / 3;
+                            t.add_row(row!(key, textwrap::fill(&formatted, w),));
                         }
                     }
                 }
@@ -463,15 +505,21 @@ impl Expression {
 
                 Self::For(name, list, body) => {
                     if let Expression::List(items) = list.clone().eval_mut(env, depth + 1)? {
-                        return Ok(Self::List(
-                            items
-                                .into_iter()
-                                .map(|item| {
-                                    env.define(&name, item);
-                                    body.clone().eval_mut(env, depth + 1)
-                                })
-                                .collect::<Result<Vec<Self>, Error>>()?,
-                        ));
+                        let mut results = vec![];
+                        for item in items {
+                            env.define(&name, item);
+                            results.push(body.clone().eval_mut(env, depth + 1)?);
+                        }
+                        return Ok(Self::List(results));
+                        // return Ok(Self::List(
+                        //     items
+                        //         .into_iter()
+                        //         .map(|item| {
+                        //             env.define(&name, item);
+                        //             body.clone().eval_mut(env, depth + 1)
+                        //         })
+                        //         .collect::<Result<Vec<Self>, Error>>()?,
+                        // ));
                     } else {
                         return Err(Error::ForNonList(*list));
                     }
@@ -530,14 +578,10 @@ impl Expression {
                             Ok(_) => return Ok(Self::None),
                             Err(e) => {
                                 return Err(match e.kind() {
-                                    ErrorKind::NotFound => Error::CustomError(format!(
-                                        "program \"{}\" not found",
-                                        name
-                                    )),
-                                    ErrorKind::PermissionDenied => Error::CustomError(format!(
-                                        "permission to execute \"{}\" denied",
-                                        name
-                                    )),
+                                    ErrorKind::NotFound => Error::ProgramNotFound(name),
+                                    ErrorKind::PermissionDenied => {
+                                        Error::PermissionDenied(self.clone())
+                                    }
                                     _ => Error::CommandFailed(name, args.clone()),
                                 })
                             }

@@ -1,10 +1,11 @@
+use common_macros::b_tree_map;
 use detached_str::{Str, StrSlice};
 
 use core::{cmp::max, fmt};
 
 use crate::Diagnostic;
 
-use super::{Expression, SyntaxError};
+use super::{Expression, Int, SyntaxError};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {
@@ -13,8 +14,52 @@ pub enum Error {
     CommandFailed(String, Vec<Expression>),
     ForNonList(Expression),
     RecursionDepth(Expression),
-    CustomError(String),
+    PermissionDenied(Expression),
+    ProgramNotFound(String),
     SyntaxError(Str, SyntaxError),
+    CustomError(String),
+}
+
+impl Error {
+    /// Error code constant integers for error handlers to handle.
+    pub const ERROR_CODE_CANNOT_APPLY: Int = 1;
+    pub const ERROR_CODE_SYMBOL_NOT_DEFINED: Int = 2;
+    pub const ERROR_CODE_COMMAND_FAILED: Int = 3;
+    pub const ERROR_CODE_FOR_NON_LIST: Int = 4;
+    pub const ERROR_CODE_RECURSION_DEPTH: Int = 5;
+    pub const ERROR_CODE_PERMISSION_DENIED: Int = 6;
+    pub const ERROR_CODE_PROGRAM_NOT_FOUND: Int = 7;
+    pub const ERROR_CODE_SYNTAX_ERROR: Int = 8;
+    pub const ERROR_CODE_CUSTOM_ERROR: Int = 9;
+
+    pub fn codes() -> Expression {
+        Expression::Map(b_tree_map! {
+            String::from("cannot-apply") => Expression::Integer(Self::ERROR_CODE_CANNOT_APPLY),
+            String::from("symbol-not-defined") => Expression::Integer(Self::ERROR_CODE_SYMBOL_NOT_DEFINED),
+            String::from("command-failed") => Expression::Integer(Self::ERROR_CODE_COMMAND_FAILED),
+            String::from("for-non-list") => Expression::Integer(Self::ERROR_CODE_FOR_NON_LIST),
+            String::from("recursion-depth") => Expression::Integer(Self::ERROR_CODE_RECURSION_DEPTH),
+            String::from("permission-denied") => Expression::Integer(Self::ERROR_CODE_PERMISSION_DENIED),
+            String::from("program-not-found") => Expression::Integer(Self::ERROR_CODE_PROGRAM_NOT_FOUND),
+            String::from("syntax-error") => Expression::Integer(Self::ERROR_CODE_SYNTAX_ERROR),
+            String::from("custom-error") => Expression::Integer(Self::ERROR_CODE_CUSTOM_ERROR),
+        })
+    }
+
+    /// Convert the error into a code for an error handler to handle.
+    pub fn code(&self) -> Int {
+        match self {
+            Self::CannotApply(..) => Self::ERROR_CODE_CANNOT_APPLY,
+            Self::SymbolNotDefined(..) => Self::ERROR_CODE_SYMBOL_NOT_DEFINED,
+            Self::CommandFailed(..) => Self::ERROR_CODE_COMMAND_FAILED,
+            Self::ForNonList(..) => Self::ERROR_CODE_FOR_NON_LIST,
+            Self::RecursionDepth(..) => Self::ERROR_CODE_RECURSION_DEPTH,
+            Self::CustomError(..) => Self::ERROR_CODE_CUSTOM_ERROR,
+            Self::PermissionDenied(..) => Self::ERROR_CODE_CUSTOM_ERROR,
+            Self::ProgramNotFound(..) => Self::ERROR_CODE_CUSTOM_ERROR,
+            Self::SyntaxError(..) => Self::ERROR_CODE_CUSTOM_ERROR,
+        }
+    }
 }
 
 impl fmt::Display for Error {
@@ -22,6 +67,12 @@ impl fmt::Display for Error {
         match self {
             Self::CannotApply(expr, args) => {
                 write!(f, "cannot apply `{:?}` to the arguments {:?}", expr, args)
+            }
+            Self::PermissionDenied(expr) => {
+                write!(f, "permission denied while evaluating {:?}", expr)
+            }
+            Self::ProgramNotFound(name) => {
+                write!(f, "program \"{}\" not found", name)
             }
             Self::SymbolNotDefined(name) => {
                 write!(f, "symbol \"{}\" not defined", name)

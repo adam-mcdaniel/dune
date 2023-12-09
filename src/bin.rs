@@ -191,7 +191,10 @@ fn syntax_highlight(line: &str) -> String {
                 is_colored = true;
                 result.push_str(b);
             }
-            (TokenKind::Punctuation, o @ ("@" | "\'" | "=" | "|" | ">>" | "->" | "~>")) => {
+            (
+                TokenKind::Punctuation,
+                o @ ("@" | "\'" | "=" | "|" | ">>" | "<<" | ">>>" | "->" | "~>"),
+            ) => {
                 result.push_str("\x1b[96m");
                 is_colored = true;
                 result.push_str(o);
@@ -532,7 +535,7 @@ fn run_text(text: &str, env: &mut Environment) -> Result<Expression, Error> {
 }
 
 fn run_file(path: PathBuf, env: &mut Environment) -> Result<Expression, Error> {
-    match std::fs::read_to_string(&path) {
+    match std::fs::read_to_string(path) {
         Ok(prelude) => run_text(&prelude, env),
         Err(e) => Err(Error::CustomError(format!("Failed to read file: {}", e))),
     }
@@ -568,14 +571,12 @@ fn main() -> Result<(), Error> {
     parse("let clear = _ ~> console@clear ()")?.eval(&mut env)?;
     parse("let pwd = _ ~> echo CWD")?.eval(&mut env)?;
     parse(
-        "let join = sep -> list -> {
+        "let join = sep -> l -> {
             let sep = str sep;
-            fn@reduce (x -> y -> x + sep + (str y)) (str list@0) (tail list)
+            fn@reduce (x -> y -> x + sep + (str y)) (str l@0) (list@tail l)
         }",
     )?
     .eval(&mut env)?;
-
-    parse("let >> = file -> contents -> fs@write file contents")?.eval(&mut env)?;
 
     parse(
         "let prompt = cwd -> \

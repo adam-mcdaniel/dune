@@ -1,0 +1,6 @@
+`std` contains all the standard library builtins!
+Use `>>` and `>>>` to write and append to files!
+Use the `fs` module to interact with files and perform glob operations!
+Use `os` to interact with and manipulate the operating system!
+Use the `err` module to handle errors and read error messages!
+Create a `.dune-secrets` file for your tokens and keys so you can share your `.dune-prelude` file with others!

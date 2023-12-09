@@ -1,8 +1,36 @@
+use super::{curry, reverse_curry};
 use dune::{Environment, Error, Expression};
 use std::{
     io::Write,
     process::{Command, Stdio},
 };
+
+fn add_builtin(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Error> {
+    let mut result = args[0].clone().eval(env)?;
+    if args.len() == 1 {
+        return Expression::Apply(
+            Box::new(reverse_curry(
+                Expression::builtin("+", add_builtin, "add two expressions"),
+                2,
+            )),
+            vec![result],
+        )
+        .eval(env);
+    }
+
+    for arg in &args[1..] {
+        let old_result = result.clone();
+        result = result.eval(env)? + arg.clone().eval(env)?;
+
+        if let Expression::None = result {
+            return Err(Error::CustomError(format!(
+                "cannot add {:?} and {:?}",
+                old_result, arg
+            )));
+        }
+    }
+    Ok(result)
+}
 
 pub fn get(env: &mut Environment) -> Expression {
     let mut tmp = Environment::new();
@@ -12,25 +40,7 @@ pub fn get(env: &mut Environment) -> Expression {
     // It pipes the result of each command to the next one.
     tmp.define_builtin("|", pipe_builtin, "pipe input through a list of commands");
 
-    tmp.define_builtin(
-        "+",
-        |args, env| {
-            let mut result = args[0].clone().eval(env)?;
-            for arg in &args[1..] {
-                let old_result = result.clone();
-                result = result.eval(env)? + arg.clone().eval(env)?;
-
-                if let Expression::None = result {
-                    return Err(Error::CustomError(format!(
-                        "cannot add {:?} and {:?}",
-                        old_result, arg
-                    )));
-                }
-            }
-            Ok(result)
-        },
-        "add two expressions",
-    );
+    tmp.define_builtin("+", add_builtin, "add two expressions");
 
     tmp.define_builtin(
         "-",
@@ -52,64 +62,82 @@ pub fn get(env: &mut Environment) -> Expression {
         "subtract two expressions",
     );
 
-    tmp.define_builtin(
+    tmp.define(
         "*",
-        |args, env| {
-            let mut result = args[0].clone().eval(env)?;
-            for arg in &args[1..] {
-                let old_result = result.clone();
-                result = result.eval(env)? * arg.clone().eval(env)?;
+        curry(
+            Expression::builtin(
+                "*",
+                |args, env| {
+                    let mut result = args[0].clone().eval(env)?;
+                    for arg in &args[1..] {
+                        let old_result = result.clone();
+                        result = result.eval(env)? * arg.clone().eval(env)?;
 
-                if let Expression::None = result {
-                    return Err(Error::CustomError(format!(
-                        "cannot multiply {:?} and {:?}",
-                        old_result, arg
-                    )));
-                }
-            }
-            Ok(result)
-        },
-        "multiply two expressions",
+                        if let Expression::None = result {
+                            return Err(Error::CustomError(format!(
+                                "cannot multiply {:?} and {:?}",
+                                old_result, arg
+                            )));
+                        }
+                    }
+                    Ok(result)
+                },
+                "multiply two expressions",
+            ),
+            2,
+        ),
     );
 
-    tmp.define_builtin(
+    tmp.define(
         "//",
-        |args, env| {
-            let mut result = args[0].clone().eval(env)?;
-            for arg in &args[1..] {
-                let old_result = result.clone();
-                result = result.eval(env)? / arg.clone().eval(env)?;
+        curry(
+            Expression::builtin(
+                "//",
+                |args, env| {
+                    let mut result = args[0].clone().eval(env)?;
+                    for arg in &args[1..] {
+                        let old_result = result.clone();
+                        result = result.eval(env)? / arg.clone().eval(env)?;
 
-                if let Expression::None = result {
-                    return Err(Error::CustomError(format!(
-                        "cannot divide {:?} and {:?}",
-                        old_result, arg
-                    )));
-                }
-            }
-            Ok(result)
-        },
-        "divide two expressions",
+                        if let Expression::None = result {
+                            return Err(Error::CustomError(format!(
+                                "cannot divide {:?} and {:?}",
+                                old_result, arg
+                            )));
+                        }
+                    }
+                    Ok(result)
+                },
+                "divide two expressions",
+            ),
+            2,
+        ),
     );
 
-    tmp.define_builtin(
+    tmp.define(
         "%",
-        |args, env| {
-            let mut result = args[0].clone().eval(env)?;
-            for arg in &args[1..] {
-                let old_result = result.clone();
-                result = result.eval(env)? % arg.clone().eval(env)?;
+        curry(
+            Expression::builtin(
+                "%",
+                |args, env| {
+                    let mut result = args[0].clone().eval(env)?;
+                    for arg in &args[1..] {
+                        let old_result = result.clone();
+                        result = result.eval(env)? % arg.clone().eval(env)?;
 
-                if let Expression::None = result {
-                    return Err(Error::CustomError(format!(
-                        "cannot remainder {:?} and {:?}",
-                        old_result, arg
-                    )));
-                }
-            }
-            Ok(result)
-        },
-        "get the remainder of two expressions",
+                        if let Expression::None = result {
+                            return Err(Error::CustomError(format!(
+                                "cannot remainder {:?} and {:?}",
+                                old_result, arg
+                            )));
+                        }
+                    }
+                    Ok(result)
+                },
+                "get the remainder of two expressions",
+            ),
+            2,
+        ),
     );
 
     tmp.define_builtin(
@@ -230,7 +258,33 @@ pub fn get(env: &mut Environment) -> Expression {
         "index a dictionary or list",
     );
 
+    let mut new_tmp = env.clone();
     for (name, val) in &tmp.bindings {
+        new_tmp.define(name, val.clone());
+    }
+
+    tmp.define(
+        "<<",
+        crate::parse("fs@read").unwrap().eval(&mut new_tmp).unwrap(),
+    );
+    tmp.define(
+        ">>",
+        crate::parse("file -> contents -> fs@write file contents")
+            .unwrap()
+            .eval(&mut new_tmp)
+            .unwrap(),
+    );
+    tmp.define(
+        ">>>",
+        crate::parse("file -> contents -> fs@append file contents")
+            .unwrap()
+            .eval(&mut new_tmp)
+            .unwrap(),
+    );
+
+    let bindings = tmp.bindings.clone();
+
+    for (name, val) in &bindings {
         env.define(name, val.clone());
     }
 
@@ -415,7 +469,7 @@ fn expr_to_command<'a>(
         Expression::Group(expr) | Expression::Quote(expr) => expr_to_command(cmd, expr, env)?,
         // If the command is an undefined symbol with some arguments.
         Expression::Apply(f, args) => match **f {
-            Expression::Symbol(ref name) => {
+            Expression::Symbol(ref name) | Expression::String(ref name) => {
                 let cmd_name = match env.get(name) {
                     // If the symbol is an alias, then execute the alias.
                     Some(Expression::Symbol(alias)) => alias,
@@ -434,6 +488,20 @@ fn expr_to_command<'a>(
                     ),
                 )
             }
+            Expression::Quote(ref program) => match *program.clone() {
+                Expression::String(cmd_name) | Expression::Symbol(cmd_name) => {
+                    *cmd = Command::new(cmd_name);
+                    Some(
+                        cmd.current_dir(env.get_cwd()).envs(bindings).args(
+                            args.iter()
+                                .filter(|&x| x != &Expression::None)
+                                .map(|x| Ok(format!("{}", x.eval(env)?)))
+                                .collect::<Result<Vec<String>, Error>>()?,
+                        ),
+                    )
+                }
+                _ => None,
+            },
             _ => None,
         },
 

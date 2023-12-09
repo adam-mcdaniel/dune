@@ -365,10 +365,10 @@ if os@name == "windows" {
 
     let cat = fs@read;
 } else {
-    if (fs@exists HOME + "/.cargo/bin/bat") {
+    if (fs@exists? HOME + "/.cargo/bin/bat") {
         let cat = 'bat;
     }
-    if (fs@exists HOME + "/.cargo/bin/lsd") {
+    if (fs@exists? HOME + "/.cargo/bin/lsd") {
         let ls = 'lsd;
     }
 }
@@ -462,8 +462,8 @@ let turnedshrew = _ ~> {
 let shrewsay = text -> {
     let title = "Wild Dune Shrew";
 
-
-    let cols = 22;
+    let text = (std@string@to-string text);
+    let cols = math@min (math@max ((console@width ()) // 2) (string@get-width text)) (console@width ());
     let text = fmt@wrap text cols;
     let text-lines = lines text;
     if (len text-lines) == 1 {
@@ -471,6 +471,7 @@ let shrewsay = text -> {
             let cols = len text;
         }
     }
+    let cols = math@max cols (len title);
     let rows = len text-lines;
     let spacing = 25;
 
@@ -487,8 +488,10 @@ let shrewsay = text -> {
 
 let turnedshrewsay = text -> {
     let title = "Wild Dune Shrew";
+    let text = (std@string@to-string text);
 
-    let cols = 27;
+    let text = (std@string@to-string text);
+    let cols = math@min (math@max ((console@width ()) // 2) (string@get-width text)) (console@width ());
     let text = fmt@wrap text cols;
     let text-lines = lines text;
     if (len text-lines) == 1 {
@@ -496,6 +499,7 @@ let turnedshrewsay = text -> {
             let cols = len text;
         }
     }
+    let cols = math@max cols (len title);
     let rows = len text-lines;
     let spacing = 20;
 
@@ -608,7 +612,7 @@ let welcomebanner = _ ~> {
             else if now@month == 12 (if now@day < 22 "🏹" else "🐐")
             else "⭐";
         echo "┌─────────────────Welcome to ...─────────────────┐";
-        for ch in (chars logo) {
+        for ch in (string@chars logo) {
             print (fmt@bold (if ch == "█" {
                fmt@faint (fmt@red ch)
             } else {
@@ -730,7 +734,7 @@ let welcome = _ ~> {
 let DUNE_SECRETS_FILE = HOME + "/.dune-secrets";
 
 clear ();
-if (fs@exists DUNE_SECRETS_FILE) {
+if (fs@exists? DUNE_SECRETS_FILE) {
     include DUNE_SECRETS_FILE;
 }
 
@@ -738,6 +742,6 @@ let CITY = Knoxville;
 welcome ();
 
 
-if (!(fs@exists DUNE_SECRETS_FILE)) {
+if (!(fs@exists? DUNE_SECRETS_FILE)) {
     shrewsay "Create " + DUNE_SECRETS_FILE + " to store your secrets, tokens, and API keys!";
 }
