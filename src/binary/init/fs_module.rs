@@ -11,10 +11,7 @@ use dune::{Environment, Error, Expression};
 fn get_dir_tree(cwd: &Path, max_depth: Option<Int>) -> BTreeMap<String, Expression> {
     let mut dir_tree = b_tree_map! {};
 
-    dir_tree.insert(
-        ".".to_string(),
-        Expression::from(cwd.to_str().unwrap()),
-    );
+    dir_tree.insert(".".to_string(), Expression::from(cwd.to_str().unwrap()));
     dir_tree.insert(
         "..".to_string(),
         Expression::from(cwd.parent().unwrap().to_str().unwrap()),

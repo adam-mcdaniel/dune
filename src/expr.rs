@@ -85,11 +85,7 @@ where
 
 impl From<Environment> for Expression {
     fn from(env: Environment) -> Self {
-        Self::Map(
-            env.bindings
-                .into_iter()
-                .collect::<BTreeMap<String, Self>>(),
-        )
+        Self::Map(env.bindings.into_iter().collect::<BTreeMap<String, Self>>())
     }
 }
 
