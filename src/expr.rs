@@ -88,7 +88,6 @@ impl From<Environment> for Expression {
         Self::Map(
             env.bindings
                 .into_iter()
-                .map(|(name, item)| (name, item))
                 .collect::<BTreeMap<String, Self>>(),
         )
     }

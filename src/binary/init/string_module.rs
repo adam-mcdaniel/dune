@@ -51,9 +51,9 @@ pub fn get() -> Expression {
                         if c.is_ascii_alphabetic() {
                             // Get the base character code
                             let base = if c.is_ascii_lowercase() {
-                                'a' as u8
+                                b'a'
                             } else {
-                                'A' as u8
+                                b'A'
                             };
                             // Get the offset from the base
                             let offset = c as u8 - base;

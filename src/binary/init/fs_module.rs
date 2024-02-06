@@ -13,7 +13,7 @@ fn get_dir_tree(cwd: &Path, max_depth: Option<Int>) -> BTreeMap<String, Expressi
 
     dir_tree.insert(
         ".".to_string(),
-        Expression::from(cwd.clone().to_str().unwrap()),
+        Expression::from(cwd.to_str().unwrap()),
     );
     dir_tree.insert(
         "..".to_string(),
@@ -87,7 +87,7 @@ pub fn get(env: &mut Environment) -> Expression {
             //     _ => None
             // };
             let mut max_depth = None;
-            match args.get(0).unwrap_or(&Expression::None).eval(env)? {
+            match args.first().unwrap_or(&Expression::None).eval(env)? {
                 Expression::Integer(n) => {
                     max_depth = Some(n);
                     // If the second argument evaluates to a string, add it to the cwd
@@ -123,7 +123,7 @@ pub fn get(env: &mut Environment) -> Expression {
                 _ => return Err(Error::CustomError("second argument to head must be an integer".to_string()))
             };
 
-            if let Ok(contents) = std::fs::read_to_string(&path) {
+            if let Ok(contents) = std::fs::read_to_string(path) {
                 let mut lines = contents.lines();
                 let mut result = String::new();
                 for _ in 0..n {
@@ -149,7 +149,7 @@ pub fn get(env: &mut Environment) -> Expression {
                 _ => return Err(Error::CustomError("second argument to tail must be an integer".to_string()))
             };
 
-            if let Ok(contents) = std::fs::read_to_string(&path) {
+            if let Ok(contents) = std::fs::read_to_string(path) {
                 let mut lines = contents.lines().rev();
                 let mut result = String::new();
                 for _ in 0..n {

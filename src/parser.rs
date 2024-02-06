@@ -70,7 +70,7 @@ impl ParseError<Tokens<'_>> for SyntaxError {
     fn from_error_kind(input: Tokens<'_>, kind: ErrorKind) -> Self {
         Self::NomError {
             kind,
-            at: input.get(0).map(|t| t.range),
+            at: input.first().map(|t| t.range),
             cause: None,
         }
     }
@@ -78,7 +78,7 @@ impl ParseError<Tokens<'_>> for SyntaxError {
     fn append(input: Tokens<'_>, kind: ErrorKind, other: Self) -> Self {
         Self::NomError {
             kind,
-            at: input.get(0).map(|t| t.range),
+            at: input.first().map(|t| t.range),
             cause: Some(Box::new(other)),
         }
     }
@@ -86,7 +86,7 @@ impl ParseError<Tokens<'_>> for SyntaxError {
     fn from_char(input: Tokens<'_>, expected: char) -> Self {
         Self::ExpectedChar {
             expected,
-            at: input.get(0).map(|t| t.range),
+            at: input.first().map(|t| t.range),
         }
     }
 
@@ -808,7 +808,7 @@ fn parse_expression_prec_two(input: Tokens<'_>) -> IResult<Tokens<'_>, Expressio
     }
 
     let mut result = vec![head];
-    result.extend(args.into_iter());
+    result.extend(args);
 
     Ok((
         input,
