@@ -45,19 +45,25 @@ pub fn get(env: &mut Environment) -> Expression {
     tmp.define_builtin(
         "-",
         |args, env| {
+            // If there are two expressions or more, subtract them
             let mut result = args[0].clone().eval(env)?;
-            for arg in &args[1..] {
-                let old_result = result.clone();
-                result = result.eval(env)? - arg.clone().eval(env)?;
 
-                if let Expression::None = result {
-                    return Err(Error::CustomError(format!(
-                        "cannot subtract {:?} and {:?}",
-                        old_result, arg
-                    )));
+            if args.len() > 1 {
+                for arg in &args[1..] {
+                    let old_result = result.clone();
+                    result = result.eval(env)? - arg.clone().eval(env)?;
+                    if let Expression::None = result {
+                        return Err(Error::CustomError(format!(
+                            "cannot subtract {:?} and {:?}",
+                            old_result, arg
+                        )));
+                    }
                 }
+                Ok(result)
+            } else {
+                // Return the negated original
+                Ok(-result)
             }
-            Ok(result)
         },
         "subtract two expressions",
     );

@@ -27,7 +27,9 @@ use std::{
 };
 
 #[rustfmt::skip]
-const DEFAULT_PRELUDE: &str = include_str!(".dune-prelude");
+const INTRO_PRELUDE: &str = include_str!(".intro-dune-prelude");
+#[rustfmt::skip]
+const DEFAULT_PRELUDE: &str = include_str!(".default-dune-prelude");
 
 /// Get the path to the stored history of dune commands.
 fn get_history_path() -> Option<PathBuf> {
@@ -94,7 +96,7 @@ fn readline(prompt: impl ToString, rl: &mut Editor<DuneHelper>) -> String {
             }
             Err(ReadlineError::Eof) => exit(0),
             Err(err) => {
-                eprintln!("error: {:?}", err);
+                eprintln!("Error: {:?}", err);
             }
         }
     }
@@ -630,10 +632,30 @@ fn main() -> Result<(), Error> {
 
     if let Some(home_dir) = dirs::home_dir() {
         let prelude_path = home_dir.join(".dune-prelude");
-        if let Err(e) = run_file(prelude_path, &mut env) {
-            eprintln!("error while running prelude: {}", e);
-            if let Err(e) = run_text(DEFAULT_PRELUDE, &mut env) {
-                eprintln!("error while running default prelude: {}", e);
+        // If file doesn't exist
+        if !prelude_path.exists() {
+            let prompt = format!("Could not find prelude file at: {}\nWould you like me to write the default prelude to this location? (y/n)\n>>> ", prelude_path.display());
+            let mut rl = new_editor(&env);
+            let response = readline(prompt, &mut rl);
+
+            if response.to_lowercase().trim() == "y" {
+                if let Err(e) = std::fs::write(&prelude_path, DEFAULT_PRELUDE) {
+                    eprintln!("Error while writing prelude: {}", e);
+                }
+            }
+
+            if let Err(e) = run_text(INTRO_PRELUDE, &mut env) {
+                eprintln!("Error while running introduction prelude: {}", e);
+            }
+        } else if let Err(e) = run_file(prelude_path, &mut env) {
+            let prompt = format!("Error while running custom prelude: {e}\nWould you like me to write the default prelude to this location? (y/n)\n>>> ");
+            let mut rl = new_editor(&env);
+            let response = readline(prompt, &mut rl);
+
+            if response.to_lowercase().trim() == "y" {
+                if let Err(e) = run_text(INTRO_PRELUDE, &mut env) {
+                    eprintln!("Error while running introduction prelude: {}", e);
+                }
             }
         }
     }

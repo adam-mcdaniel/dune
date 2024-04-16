@@ -4,7 +4,7 @@ use std::{
     collections::BTreeMap,
     fmt,
     io::ErrorKind,
-    ops::{Add, Div, Index, Mul, Rem, Sub},
+    ops::{Add, Div, Index, Mul, Rem, Sub, Neg},
     process::Command,
 };
 
@@ -719,6 +719,18 @@ impl Sub for Expression {
             },
             (Self::List(mut m), Self::Integer(n)) if m.len() > n as usize => m.remove(n as usize),
             _ => Self::None,
+        }
+    }
+}
+
+impl Neg for Expression {
+    type Output = Expression;
+    fn neg(self) -> Self::Output {
+        match self {
+            Self::Integer(n) => Self::Integer(-n),
+            Self::Boolean(b) => Self::Boolean(!b),
+            Self::Float(n) => Self::Float(-n),
+            _ => Self::None
         }
     }
 }

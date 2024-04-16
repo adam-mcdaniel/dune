@@ -206,7 +206,7 @@ And more!"
     30 28)
 
             (widget@joiny
-                (widget@create "About the Author" "I'm a sophomore at\nthe University of\nTennessee🏴󠁵󠁳󠁴󠁮󠁿\nstudying Computer💻\nScience🧪.\n\nI'm extremely \ninterested in\nlanguage design\n& compiler design.\nCheck out my other\nprojects on GitHub:\n\nadam-mcdaniel" 20 18)
+                (widget@create "About the Author" "I'm a grad student at the University\nof Tennessee🏴󠁵󠁳󠁴󠁮󠁿\nstudying\nComp💻 Sci🧪.\n\nI'm extremely \ninterested in\nlanguage design\n& compiler design.\nCheck out my other\nprojects on GitHub:\n\nadam-mcdaniel" 20 18)
                 (widget@create "Cat" (rand@choose CATS) 20 10)
     )))
 };

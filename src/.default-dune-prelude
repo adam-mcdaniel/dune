@@ -1,0 +1,758 @@
+#  _____                   _         
+# |  __ \                 ( )        
+# | |  | |_   _ _ __   ___|/ ___     
+# | |  | | | | | '_ \ / _ \ / __|    
+# | |__| | |_| | | | |  __/ \__ \    
+# |_____/ \__,_|_| |_|\___| |___/    
+# |  __ \      / _|          | | |   
+# | |  | | ___| |_ __ _ _   _| | |_  
+# | |  | |/ _ \  _/ _` | | | | | __| 
+# | |__| |  __/ || (_| | |_| | | |_  
+# |_____/ \___|_| \__,_|\__,_|_|\__| 
+# |  __ \        | |         | |     
+# | |__) | __ ___| |_   _  __| | ___ 
+# |  ___/ '__/ _ \ | | | |/ _` |/ _ \
+# | |   | | |  __/ | |_| | (_| |  __/
+# |_|   |_|  \___|_|\__,_|\__,_|\___|
+#
+# Overview:
+#   Splash screen:
+#     welcome  # Prints splash screen
+#     about    # Prints info about the shell
+#     donate   # Prints donation message
+#
+#   Calendar widget:
+#     cal      # Print a calendar
+#
+#   Shrew:
+#     shrewsay "Message to print"        # Makes a wild dune shrew appear!
+#     turnedshrewsay "Message to print"  # Makes a left-facing wild dune shrew appear!
+#
+# Have fun, scripters!
+
+let $ = GLOB ~> ((fs@ls .) | (fn@filter (file -> (len (string@split GLOB file)) == 2)));
+
+let include = file ~> exec (parse@expr (fs@read file));
+let use = file ~> eval (parse@expr (fs@read file));
+let get = key -> table -> table@(key);
+let open = fs@read;
+let concat = x -> y -> (str y) + (str x);
+
+let ssh = addr -> user -> {
+	'ssh -X (str user) + "@" + (str addr);
+};
+
+let scp = addr -> user -> src -> dst -> {
+    # Call the actual overshadowed scp program
+    'scp -r src (str user) + "@" + (str addr) + ":" + (str dst)
+};
+
+let ~ = x -> HOME + "/" + (str x) | fs@canon;
+
+let OLD-EXIT = exit;
+let quit = _ ~> OLD-EXIT 0;
+let q = quit;
+let exit = quit;
+
+let WEATHER-EMOJIS = {
+    Unknown=             "✨",
+    Cloudy=              "☁️",
+    Fog=                 "🌫",
+    HeavyRain=           "🌧",
+    HeavyShowers=        "🌧",
+    HeavySnow=           "❄️",
+    HeavySnowShowers=    "❄️",
+    LightRain=           "🌦",
+    LightShowers=        "🌦",
+    LightSleet=          "🌧",
+    LightSleetShowers=   "🌧",
+    LightSnow=           "🌨",
+    LightSnowShowers=    "🌨",
+    PartlyCloudy=        "⛅️",
+    Sunny=               "☀️",
+    ThunderyHeavyRain=   "🌩",
+    ThunderyShowers=     "⛈",
+    ThunderySnowShowers= "⛈",
+    VeryCloudy= "☁️"
+};
+
+let MOON-PHASES = [
+    "🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘"
+];
+
+let WEATHER-ASCII = {
+    Unknown = "    .-.      
+     __)     
+    (        
+     `-’     
+      •",
+    Sunny = "    \\   /   
+     .-.     
+  ― (   ) ―  
+     `-’     
+    /   \\    ",
+    PartlyCloudy ="   \\  /
+ _ /\"\".-.
+   \\_(   ).
+   /(___(__)",
+    Cloudy = "
+     .--.
+  .-(    ).
+ (___.__)__)",
+    VeryCloudy = "
+     .--.
+  .-(    ).
+ (___.__)__)",
+    LightShowers=" _`/\"\".-.
+  ,\\_(   ).
+   /(___(__)
+     ‘ ‘ ‘ ‘
+    ‘ ‘ ‘ ‘",
+    HeavyShowers = " _`/\"\".-.
+  ,\\_(   ).
+   /(___(__)
+   ‚‘‚‘‚‘‚‘
+   ‚’‚’‚’‚’",
+   LightSnowShowers = " _`/\"\".-.
+  ,\\_(   ).
+   /(___(__)
+     *  *  *
+    *  *  *",
+    HeavySnowShowers = " _`/\"\".-.
+  ,\\_(   ).
+   /(___(__)
+    * * * *
+   * * * *",
+   LightSleetShowers = " _`/\"\".-.
+  ,\\_(   ).
+   /(___(__)
+     ‘ * ‘ *
+    * ‘ * ‘",
+    ThunderyShowers = " _`/\"\".-.
+  ,\\_(   ).
+   /(___(__)
+    ⚡‘ ‘⚡‘
+    ‘ ‘ ‘ ‘",
+    ThunderyHeavyRain = "     .-.
+    (   ).
+   (___(__)
+  ‚‘⚡‘‚⚡‚‘
+  ‚’‚’⚡’‚’",
+    ThunderySnowShowers = " _`/\"\".-.
+  ,\\_(   ).
+   /(___(__)
+     *⚡*⚡*
+    *  *  *",
+    LightRain = "     .-.
+    (   ).
+   (___(__)
+    ‘ ‘ ‘ ‘
+   ‘ ‘ ‘ ‘",
+    HeavyRain = "     .-.
+    (   ).
+   (___(__)
+  ‚‘‚‘‚‘‚‘
+  ‚’‚’‚’‚’",
+    LightSnow = "     .-.
+    (   ).
+   (___(__)
+    *  *  *
+   *  *  *",
+    HeavySnow = "     .-.
+    (   ).
+   (___(__)
+   * * * *
+  * * * *",
+    LightSleet = "     .-.
+    (   ).
+   (___(__)
+    ‘ * ‘ *
+   * ‘ * ‘",
+    Fog = " _ - _ - _ -
+  _ - _ - _
+ _ - _ - _ -"
+};
+
+let PLANTS = ["    _ _
+   (_\\_)
+  (__<_{}
+   (_/_)
+  |\\ |   
+   \\\\| /|
+    \\|//
+     |/
+,.,.,|.,.,.,
+^`^`^`^`^`^`",
+"    .--.
+  .'_\\/_'.
+  '. /\\ .'
+    \"||\"
+     || /\\
+  /\\ ||//\\)
+ (/\\\\||/
+____\\||/____
+^`^`^`^`^`^`^",
+"
+       __/)
+    .-(__(=:
+ |\\ |    \\)
+ \\ ||
+  \\||
+   \\|
+____|_______
+^`^`^`^`^`^`",
+"
+     _
+   .\\ /.
+  < ~O~ >
+   '/_\\'
+   \\ | /
+    \\|/
+,.,.,|.,.,.,
+^`^`^`^`^`^`"
+];
+
+let get-weather-ascii = desc -> {
+    ## DRIZZLE ASCII
+    if desc == "light intensity drizzle" || desc == "drizzle"
+        || desc == "heavy intensity drizzle" || desc == "light intensity drizzle rain"
+        || desc == "drizzle rain" || desc == "heavy intensity drizzle rain"
+        || desc == "shower rain and drizzle" || desc == "heavy shower rain and drizzle"
+        || desc == "shower drizzle"
+        WEATHER-ASCII@LightShowers
+
+    ## RAIN ASCII
+    else if desc == "shower rain" || desc == "ragged shower rain" || desc == "light intensity shower rain"
+        WEATHER-ASCII@LightShowers
+    else if desc == "light rain"
+        WEATHER-ASCII@LightRain
+    else if desc == "moderate rain" || desc == "heavy intensity shower rain"
+        WEATHER-ASCII@HeavyShowers
+    else if desc == "heavy intensity rain" || desc == "very heavy rain" || desc == "extreme rain"
+        WEATHER-ASCII@HeavyRain
+    else if desc == "freezing rain"
+        WEATHER-ASCII@LightSleet
+
+    ## SNOW ASCII
+    else if desc == "light snow" || desc == "Snow"
+        WEATHER-ASCII@LightSnow
+    else if desc == "Heavy snow"
+        WEATHER-ASCII@HeavySnow
+    else if desc == "Sleet"
+        WEATHER-ASCII@LightSleet
+    else if desc == "Light shower sleet"
+        WEATHER-ASCII@LightSleetShowers
+    else if desc == "Shower sleet" || desc == "Rain and snow"
+        WEATHER-ASCII@HeavySnowShowers
+    else if desc == "Light shower snow" || desc == "Light rain and snow"
+        WEATHER-ASCII@LightSnowShowers
+    else if desc == "Shower snow" || desc == "Heavy shower snow"
+        WEATHER-ASCII@HeavySnowShowers
+
+    ## THUNDER ASCII
+    else if desc == "thunderstorm with light rain" || desc == "thunderstorm with rain"
+            || desc == "ragged thunderstorm" || desc == "thunderstorm with light drizzle"
+            || desc == "light thunderstorm" || desc == "thunderstorm"
+            || desc == "thunderstorm with drizzle" || desc == "thunderstorm with heavy drizzle"
+        WEATHER-ASCII@ThunderyShowers
+    else if desc == "thunderstorm with heavy rain" || desc == "heavy thunderstorm"
+        WEATHER-ASCII@ThunderyHeavyRain
+
+    ## CLEAR ASCII
+    else if desc == "clear sky"
+        WEATHER-ASCII@Sunny
+    else if desc == "few clouds"
+        WEATHER-ASCII@PartlyCloudy
+    else if desc == "scattered clouds"
+        WEATHER-ASCII@Cloudy
+    else if desc == "broken clouds"
+        WEATHER-ASCII@Cloudy
+    else if desc == "overcast clouds"
+        WEATHER-ASCII@VeryCloudy
+
+    else if desc == "mist" || desc == "Smoke"
+        || desc == "Haze" || desc == "sand/ dust whirls" || desc == "fog"
+        || desc == "sand" || desc == "dust" || desc == "volcanic ash"
+        || desc == "squalls" || desc == "tornado"
+        WEATHER-ASCII@Fog
+
+    else WEATHER-ASCII@Unknown
+};
+
+let reload-weather-api = _ ~> {    
+    let weather-api = units -> city -> {
+	# Confirm that the API key is not None
+        if WEATHER-API-KEY == None {
+	    # If so, print error message
+            echo (fmt@italics (fmt@red "Please set your `openweathermap.org` API key with the `set-weather-api-key` macro!"))
+        } else {
+	    # If not, use the key, download the JSON with CURL, and parse it into a table!
+            let BASE_URL = "http://api.openweathermap.org/data/2.5/weather?q=";
+            let URL = BASE_URL + (str city) + "&units=" + (str units) + "&appid=" + (str WEATHER-API-KEY);
+	    # Download and parse JSON into table
+            curl --silent URL | parse@json
+        }
+    };
+
+    let weather = units -> city -> {
+	# Check for proper unit parameter
+        if (str units) == "imperial" || (str units) == "metric" {
+	    # Get the weather info from openweathermap.org
+            let weather-data = weather-api units city;
+	    # Check that it was successful
+            if weather-data != None {
+		# Get the correct units of temperature
+                let unit-symbol = if (str units) == "imperial" {
+                    "° F"
+                } else {
+                    "° C"
+                };
+		# Get the description of the weather from the weather API JSON
+                let weather-desc = weather-data@weather@0@description;
+		# Get the ascii art associated with it
+                let weather-ascii = get-weather-ascii weather-desc;
+
+		# Get the stats widget content as a string
+                let stats-text = join "\n" [
+                    "Temp now: " + (str weather-data@main@temp) + unit-symbol,
+                    "  ↳ high: " + (str weather-data@main@temp_max) + unit-symbol,
+                    "  ↳  low: " + (str weather-data@main@temp_min) + unit-symbol,
+                    "Humidity: " + (str weather-data@main@humidity) + "%",
+                    "Pressure: " + (str weather-data@main@pressure) + " hPa"
+                ];
+		# Get the header widget content
+                let header-text = "Weather in " + weather-data@name + ", at " + (time@now ())@time@str
+			+ ". Description: " + weather-data@weather@0@main;
+		# Return the widget!
+                widget@joiny
+                    (widget@create "Weather" header-text 36 4)
+                    (widget@joinx
+                        (widget@create "Stats" stats-text 21 7)
+                        (widget@create "Icon" weather-ascii 15 7))
+            } else {
+                echo (fmt@red "could not get weather data");
+                widget@joiny
+                    (widget@create "Weather" "?" 36 4)
+                    (widget@joinx
+                        (widget@create "Stats" "?" 21 7)
+                        (widget@create "Icon" WEATHER-ASCII@Unknown 15 7))
+    	    }
+        } else {
+            echo (fmt@red "`units` must be either `imperial` or `metric`");
+            widget@joiny
+                (widget@create "Weather" "?" 36 4)
+                (widget@joinx
+                    (widget@create "Stats" "?" 21 7)
+                    (widget@create "Icon" WEATHER-ASCII@Unknown 15 7))
+        }
+    };
+};
+
+let set-weather-api-key = WEATHER-API-KEY ~> CITY ~> {
+    # echo (fmt@green "Set weather API key to " + (str WEATHER-API-KEY) + "!");
+    reload-weather-api ();
+};
+
+set-weather-api-key None;
+
+if os@name == "windows" {
+    let ls = dir ~> fs@ls dir | join "\n" | echo;
+    let rm = fs@rm;
+    let cp = fs@cp;
+    let mv = fs@mv;
+    let mkdir = fs@mkdir;
+    let rmdir = fs@rmdir;
+
+    let cat = fs@read;
+} else {
+    if (fs@exists? HOME + "/.cargo/bin/bat") {
+        let cat = 'bat;
+    }
+    if (fs@exists? HOME + "/.cargo/bin/lsd") {
+        let ls = 'lsd;
+    }
+}
+
+console@title "Dune";
+
+let donate = _ ~> {
+        echo "                     ┌──────Wild Dune Shrew──────┐
+                      Hello, how is Dune working
+                      for you so far? If you like
+                      it, consider starring our
+                      GitHub page and donating!";
+        echo "                     " (fmt@italics "(To remove this message,\n                      write your own prelude)\n");
+        echo "                     " (fmt@href "https://github.com/adam-mcdaniel/dune" "Thank You❤️");
+
+        echo "                     └───────────────────────────┘
+                     ╱
+                    ╱
+
+          _,____ c--.
+        /`  \\   ` _^_\\
+    `~~~\\  _/---'\\\\  ^
+         `~~~     ~~
+    ─────────────────────
+"
+};
+
+let CATS = ["
+      _
+    |\\'/-..--.
+   / _ _   ,  ;
+  `~=`Y'~_<._./
+   <`-....__.'",
+"
+
+  |\\__/,|   (`\\
+  |_ _  |.--.) )
+  ( T   )     /
+ (((^_(((/(((_/",
+"
+
+    \\    /\\
+     )  ( ')
+    (  /  )
+     \\(__)|",
+"
+
+       ^~^  ,
+      ('Y') )
+      /   \\/
+     (\\|||/)",
+"    .       .
+    \\`-\"'\"-'/
+     } 6 6 {
+    =.  Y  ,=
+      /^^^\\  .
+     /     \\  )
+    (  )-(  )/
+     \"\"   \"\"",
+"
+
+         /\\_/\\
+    ____/ o o \\
+  /~____  =Y= /
+ (______)__m_m)"
+];
+
+let prompt = cwd -> fmt@bold ((fmt@dark@blue "(dune) ") + (fmt@bold (fmt@dark@green cwd)) + (fmt@bold (fmt@dark@blue "$ ")));
+let incomplete_prompt = cwd -> ((len cwd) + (len "(dune) ")) * " " + (fmt@bold (fmt@dark@yellow "> "));
+
+let shrew = _ ~> {
+"
+          _,____ c--.
+        /`  \\   ` _^_\\
+    `~~~\\  _/---'\\\\  ^
+         `~~~     ~~
+    ─────────────────────
+"
+};
+
+let turnedshrew = _ ~> {
+"
+      .--p_____,_
+     /_^_ `   /  `\\
+     ^  //'---\\_  /~~~
+       ~~     ~~~`
+     ──────────────────
+"
+};
+
+let shrewsay = text -> {
+    let title = "Wild Dune Shrew";
+
+    let text = (std@string@to-string text);
+    let cols = math@min (math@max ((console@width ()) // 2) (string@get-width text)) (console@width ());
+    let text = fmt@wrap text cols;
+    let text-lines = lines text;
+    if (len text-lines) == 1 {
+        if (len text) < cols {
+            let cols = len text;
+        }
+    }
+    let cols = math@max cols (len title);
+    let rows = len text-lines;
+    let spacing = 25;
+
+    for line in (lines (widget@create title text cols + 2 rows + 2)) {
+        echo " " * spacing line;
+    }
+
+    for i in 0 to 2 {
+        echo " " * (spacing - i) "╱";
+    }
+
+    echo (shrew ());
+};
+
+let turnedshrewsay = text -> {
+    let title = "Wild Dune Shrew";
+    let text = (std@string@to-string text);
+
+    let text = (std@string@to-string text);
+    let cols = math@min (math@max ((console@width ()) // 2) (string@get-width text)) (console@width ());
+    let text = fmt@wrap text cols;
+    let text-lines = lines text;
+    if (len text-lines) == 1 {
+        if (len text) < cols {
+            let cols = len text;
+        }
+    }
+    let cols = math@max cols (len title);
+    let rows = len text-lines;
+    let spacing = 20;
+
+    for line in (lines (widget@create title text cols + 2 rows + 2)) {
+        echo " " * spacing line;
+    }
+
+    for i in 0 to 2 {
+        echo " " * (spacing - i) "╱";
+    }
+
+    echo (turnedshrew ());
+};
+
+
+let about = _ ~> {
+    echo (
+    widget@joiny
+        (widget@create "About"
+"          Hello, welcome to " + (fmt@yellow "Dune Shell!") + "
+      Written by: http://adam-mcdaniel.net\n\nI wrote Dune to be a nice environment for devs while they work! It's a very cozy shell with high customizability, so you can make it how you'd like." 50 10)
+
+            (widget@joinx
+            (widget@create "Features"
+"Dune has a wide set of
+features, it's basically a
+full blown language!
+
+It supports several uncommon
+features in a shell, such as:
+operator overloading,
+lambdas, macros, quoted
+expressions like Lisp, and
+more!
+
+Dune's libraries are very
+extensive. There are
+libraries for:
+
+☞ A simple widget system🪟
+☞ OS information        💽
+☞ Randomness            🔀
+☞ Basic math, trig, etc.🧮
+☞ File system operations📂
+☞ Text color and styling📝
+☞ Functional programming🔗
+☞ Date and time         🕒
+
+And more!"
+    30 28)
+
+            (widget@joiny
+                (widget@create "About the Author" "I'm a grad student at the University\nof Tennessee🏴󠁵󠁳󠁴󠁮󠁿\nstudying\nComp💻 Sci🧪.\n\nI'm extremely \ninterested in\nlanguage design\n& compiler design.\nCheck out my other\nprojects on GitHub:\n\nadam-mcdaniel" 20 18)
+                (widget@create "Cat" (rand@choose CATS) 20 10)
+    )))
+};
+
+let welcomebanner = _ ~> {
+
+
+    let logo = "
+        ██████╗ ██╗   ██╗███╗   ██╗███████╗
+        ██╔══██╗██║   ██║████╗  ██║██╔════╝
+        ██║  ██║██║   ██║██╔██╗ ██║█████╗
+        ██║  ██║██║   ██║██║╚██╗██║██╔══╝
+        ██████╔╝╚██████╔╝██║ ╚████║███████╗
+        ╚═════╝  ╚═════╝ ╚═╝  ╚═══╝╚══════╝
+                                     ";
+
+    let logo = "
+
+        ██████╗░██╗░░░██╗███╗░░██╗███████╗
+        ██╔══██╗██║░░░██║████╗░██║██╔════╝
+        ██║░░██║██║░░░██║██╔██╗██║█████╗░░
+        ██║░░██║██║░░░██║██║╚████║██╔══╝░░
+        ██████╔╝╚██████╔╝██║░╚███║███████╗
+        ╚═════╝░░╚═════╝░╚═╝░░╚══╝╚══════╝
+";
+
+    (_ -> {
+        let now = time@now ();
+        let time-emoji = if now@hour <= 6 "🌃"
+            else if now@hour <= 10 "🌅"
+            else if now@hour <= 18 "🌤️ "
+            else "🌃";
+        let date-emoji = if now@month == 1 "⛄"
+            else if now@month == 2 "💖"
+            else if now@month == 3 "🍀"
+            else if now@month == 4 "🌂"
+            else if now@month == 5 "🌻"
+            else if now@month == 6 "🌞"
+            else if now@month == 7 "🌊"
+            else if now@month == 8 "📝"
+            else if now@month == 9 "🍎"
+            else if now@month == 10 "🎃"
+            else if now@month == 11 "🍂"
+            else if now@month == 12 "🌨️"
+            else "📅";
+        let zodiac-emoji = if now@month == 1 (if now@day < 20 "🐐" else "🏺")
+            else if now@month == 2 (if now@day < 19 "🏺" else "🐟")
+            else if now@month == 3 (if now@day < 21 "🐟" else "🐏")
+            else if now@month == 4 (if now@day < 20 "🐏" else "🐂")
+            else if now@month == 5 (if now@day < 21 "🐂" else "👬")
+            else if now@month == 6 (if now@day < 21 "👬" else "🦀")
+            else if now@month == 7 (if now@day < 23 "🦀" else "🦁")
+            else if now@month == 8 (if now@day < 23 "🦁" else "👩")
+            else if now@month == 9 (if now@day < 23 "👩" else "⚖️")
+            else if now@month == 10 (if now@day < 23 "⚖️" else "🦂")
+            else if now@month == 11 (if now@day < 22 "🦂" else "🏹")
+            else if now@month == 12 (if now@day < 22 "🏹" else "🐐")
+            else "⭐";
+        echo "┌─────────────────Welcome to ...─────────────────┐";
+        for ch in (string@chars logo) {
+            print (fmt@bold (if ch == "█" {
+               fmt@faint (fmt@red ch)
+            } else {
+               fmt@faint (fmt@dark@blue ch)
+            }));
+        }
+        echo "";
+        echo "        The time is " + (fmt@magenta now@time@str) + " " + time-emoji + " on " + (fmt@cyan now@date@str);
+        echo "└────────────────────────────────────────────────┘";
+    }) ();
+
+};
+
+
+let is-leapyear = year -> {
+    if year % 4 == 0 && year % 100 != 0 {
+        True
+    } else if year % 100 == 0 && year % 400 == 0 {
+        True
+    } else {
+        False
+    }
+};
+
+let days-in-month = month -> year -> {
+    if month == 2 {
+        28 + (if (is-leapyear year) 1 else 0)
+    } else {
+        31 - (((month - 1) % 7) % 2)
+    }
+};
+
+let day-of-week = m -> d -> y -> {
+    let t = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4];
+
+    if m < 3 {
+        let y = y - 1
+    }
+
+    (((y + (int(y // 4.0))) - (int(y // 100.0))) + (int(y // 400.0)) + t@(m - 1) + d) % 7
+};
+
+let WEEKDAYS = [
+	"Sunday",
+	"Monday",
+	"Tuesday",
+	"Wednesday",
+	"Thursday",
+	"Friday",
+	"Saturday"
+];
+
+let MONTHS = [
+	"January",
+	"February",
+	"March",
+	"April",
+	"May",
+	"June",
+	"July",
+	"August",
+	"September",
+	"October",
+	"November",
+	"December"
+];
+
+let make-calendar = m -> d -> y -> {
+    let now = {month=m, day=d, year=y};
+    let result = MONTHS@(now@month - 1) + " " + (str now@day) + ", " + (str now@year) + "\n";
+	let result = " " * ((28 - (len result)) // 2 + 1) + result;
+    let result = result + " Su  Mo  Tu  We  Th  Fr  Sa\n";
+
+    let dof = day-of-week now@month 1 now@year;
+    let dim = days-in-month now@month now@year;
+
+    for i in 0 to dof {
+        let result = result + "    ";
+    }
+
+    for i in 1 to dim + 1 {
+        let num = str i;
+        if (len num) < 2 {
+            let num = (if now@day == i " *" else "  ") + num
+        } else {
+            let num = (if now@day == i "*" else " ") + num
+        }
+
+        let result = result + num + (if (i + dof) % 7 == 0 "\n" else " ")
+    }
+    widget@create "Calendar" result 30 10
+};
+
+let cal = _ ~> {
+    (_ -> {
+        let now = time@now ();
+        make-calendar now@month now@day now@year
+    }) ();
+};
+
+let dashboard = _ ~> {
+    let now = time@now ();
+    welcomebanner ();
+    let default-widgets = (widget@joinx
+            (make-calendar now@month now@day now@year)
+            (widget@create "Cat" (rand@choose CATS) 20 10));
+    if WEATHER-API-KEY != None {
+        reload-weather-api ();
+        let weather-widget = weather imperial CITY;
+        echo (widget@joiny
+            default-widgets
+            (widget@joinx
+                (widget@create "Flower" (rand@choose PLANTS) 14 11)
+                weather-widget))
+    } else {
+        echo default-widgets
+    }
+};
+
+let welcome = _ ~> {
+    dashboard ();
+};
+
+let DUNE_SECRETS_FILE = HOME + "/.dune-secrets";
+
+clear ();
+if (fs@exists? DUNE_SECRETS_FILE) {
+    include DUNE_SECRETS_FILE;
+}
+
+let CITY = Knoxville;
+welcome ();
+
+if (!(fs@exists? DUNE_SECRETS_FILE)) {
+    shrewsay "Create " + DUNE_SECRETS_FILE + " to store\nyour secrets, tokens, and API keys!";
+}
+
+if WEATHER-API-KEY == None {
+    # If so, print error message
+    echo (fmt@italics (fmt@red "Please set your `openweathermap.org` API key and your city with the `set-weather-api-key` macro in your .dune-prelude or .dune-secrets file!"));
+
+    echo (fmt@green "You can remove these messages by editing your .dune-prelude!")
+}

@@ -15,6 +15,9 @@ pub fn get() -> Expression {
 fn parse_expr(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Error> {
     super::check_exact_args_len("json", &args, 1)?;
     let script = args[0].eval(env)?.to_string();
+    if script.is_empty() {
+        return Ok(Expression::None);
+    }
     match parse_script(&script) {
         Ok(val) => Ok(val),
         Err(nom::Err::Error(e)) | Err(nom::Err::Failure(e)) => {
@@ -30,6 +33,10 @@ fn parse_expr(args: Vec<Expression>, env: &mut Environment) -> Result<Expression
 fn parse_json(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Error> {
     super::check_exact_args_len("json", &args, 1)?;
     let text = args[0].eval(env)?.to_string();
+    if text.is_empty() {
+        return Ok(Expression::None);
+    }
+
     if let Ok(val) = json::parse(&text) {
         Ok(json_to_expr(val))
     } else {
