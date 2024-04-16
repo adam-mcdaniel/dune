@@ -4,7 +4,7 @@ use std::{
     collections::BTreeMap,
     fmt,
     io::ErrorKind,
-    ops::{Add, Div, Index, Mul, Rem, Sub, Neg},
+    ops::{Add, Div, Index, Mul, Neg, Rem, Sub},
     process::Command,
 };
 
@@ -730,7 +730,7 @@ impl Neg for Expression {
             Self::Integer(n) => Self::Integer(-n),
             Self::Boolean(b) => Self::Boolean(!b),
             Self::Float(n) => Self::Float(-n),
-            _ => Self::None
+            _ => Self::None,
         }
     }
 }
