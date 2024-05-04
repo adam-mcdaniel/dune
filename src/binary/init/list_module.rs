@@ -10,6 +10,8 @@ pub fn get() -> Expression {
             "get the tail of a list"),
         String::from("head") => Expression::builtin("head", head,
             "get the head of a list"),
+        String::from("chunk") => Expression::builtin("chunk", chunk,
+            "chunk a list into lists of n elements"),
         String::from("cons") => Expression::builtin("cons", cons,
             "prepend an element to a list"),
         String::from("append") => Expression::builtin("append", append,
@@ -36,6 +38,7 @@ pub fn get() -> Expression {
             "split a list at a given index"),
         String::from("nth") => Expression::builtin("nth", nth,
             "get the nth element of a list"),
+        
     })
     .into()
 }
@@ -76,6 +79,41 @@ fn head(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Erro
     } else {
         Err(Error::CustomError(
             "head requires a list as its argument".to_string(),
+        ))
+    }
+}
+
+fn chunk(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Error> {
+    if args.len() != 2 {
+        return Err(Error::CustomError(
+            "chunk requires exactly two arguments".to_string(),
+        ));
+    }
+    let n = args[0].eval(env)?;
+    let list = args[1].eval(env)?;
+    if let Expression::Integer(n) = n {
+        if let Expression::List(list) = list {
+            let mut result = vec![];
+            let mut chunk = vec![];
+            for item in list {
+                chunk.push(item);
+                if chunk.len() == n as usize {
+                    result.push(Expression::List(chunk));
+                    chunk = vec![];
+                }
+            }
+            if !chunk.is_empty() {
+                result.push(Expression::List(chunk));
+            }
+            Ok(Expression::List(result))
+        } else {
+            Err(Error::CustomError(
+                "chunk requires a list as its second argument".to_string(),
+            ))
+        }
+    } else {
+        Err(Error::CustomError(
+            "chunk requires an integer as its first argument".to_string(),
         ))
     }
 }
