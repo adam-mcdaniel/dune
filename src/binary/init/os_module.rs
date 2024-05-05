@@ -71,9 +71,12 @@ fn cd(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, dune::
             env.set_cwd(new_cwd.into_os_string().into_string().unwrap());
             Ok(Expression::None)
         }
-        _ => Err(Error::CustomError(format!(
-            "expected string or symbol, got {:?}",
-            args[0]
-        ))),
+        
+
+        other => {
+            // Try to convert the argument to a string
+            let path = other.to_string();
+            cd(vec![Expression::String(path)], env)
+        }
     }
 }
