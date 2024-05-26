@@ -38,7 +38,7 @@ pub fn get() -> Expression {
             "split a list at a given index"),
         String::from("nth") => Expression::builtin("nth", nth,
             "get the nth element of a list"),
-        
+
     })
     .into()
 }
