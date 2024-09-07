@@ -227,9 +227,10 @@ pub fn get(env: &mut Environment) -> Expression {
         String::from("ls") => Expression::builtin("ls", |args, env| {
             super::check_exact_args_len("ls", &args, 1)?;
             let cwd = PathBuf::from(env.get_cwd());
-            let dir = cwd.join(args[0].eval(env)?.to_string());
+            let path = args[0].eval(env)?.to_string();
+            let dir = cwd.join(&path);
 
-            list_directory(&dir)
+            list_directory(&dir, &Path::new(&path))
         }, "get a directory's entries as a list of strings"),
         String::from("exists?") => Expression::builtin("exists", |args, env| {
             super::check_exact_args_len("exists", &args, 1)?;
@@ -456,7 +457,7 @@ fn remove_path(path: &Path) -> Result<(), Error> {
 }
 
 /// Returns the paths of entries in a directory as a list of strings.
-fn list_directory(dir: &Path) -> Result<Expression, Error> {
+fn list_directory(dir: &Path, short: &Path) -> Result<Expression, Error> {
     if dir.is_dir() {
         // The list of paths (as strings) in the directory we will return.
         let mut result = vec![];
@@ -469,7 +470,7 @@ fn list_directory(dir: &Path) -> Result<Expression, Error> {
                 if let Ok(entry) = entry {
                     let file_name_osstring = entry.file_name();
                     result.push(match file_name_osstring.into_string() {
-                        Ok(file_name) => file_name,
+                        Ok(file_name) => short.join(file_name).to_string_lossy().to_string(),
                         // If we cannot directly convert the filename to a string,
                         // it's probably an invalid UTF-8 string.
                         // In this case, we remove the invalid bytes and try again.
