@@ -1,3 +1,4 @@
 /target
 history.txt
 *.cast
+/target*

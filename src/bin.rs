@@ -273,6 +273,12 @@ fn syntax_highlight(line: &str) -> String {
             (TokenKind::Whitespace, w) => {
                 result.push_str(w);
             }
+            (TokenKind::LineBreak, w) => {
+                result.push_str(w);
+            }
+            // (TokenKind::LineContinuation, w) => {
+            //     result.push_str(w);
+            // }
             (TokenKind::Comment, w) => {
                 result.push_str("\x1b[38;5;247m");
                 is_colored = true;
@@ -546,14 +552,14 @@ fn run_file(path: PathBuf, env: &mut Environment) -> Result<Expression, Error> {
 fn main() -> Result<(), Error> {
     let matches = App::new(
         r#"
-        888                            
-        888                            
-        888                            
-    .d88888 888  888 88888b.   .d88b.  
-   d88" 888 888  888 888 "88b d8P  Y8b 
-   888  888 888  888 888  888 88888888 
-   Y88b 888 Y88b 888 888  888 Y8b.     
-    "Y88888  "Y88888 888  888  "Y8888  
+        888
+        888
+        888
+    .d88888 888  888 88888b.   .d88b.
+   d88" 888 888  888 888 "88b d8P  Y8b
+   888  888 888  888 888  888 88888888
+   Y88b 888 Y88b 888 888  888 Y8b.
+    "Y88888  "Y88888 888  888  "Y8888
    "#,
     )
     .author(crate_authors!())

@@ -1,8 +1,7 @@
 # Changelog
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+### [0.2.0-lineclip] - 2025-3-29
+- use `\n` or `;` to split statement. which means you don't have to type `;` to every lineend.
+- use `\\n` to continue a line.
 
 ## [Unreleased]
 

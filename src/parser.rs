@@ -183,38 +183,62 @@ fn is_symbol_like(kind: TokenKind) -> bool {
 }
 
 fn parse_statement(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
+    // let (input, _) = opt(kind(TokenKind::LineBreak))(input)?;
     let (input, expr) = parse_expression(input)?;
-    match (&expr, text(";")(input)) {
-        (Expression::For(_, _, _), Ok((input, _))) => Ok((input, expr)),
-        (Expression::For(_, _, _), Err(_)) => Ok((input, expr)),
-        (Expression::If(_, _, _), Ok((input, _))) => Ok((input, expr)),
-        (Expression::If(_, _, _), Err(_)) => Ok((input, expr)),
+    // dbg!("---[got expression]---", &expr, input.get_str_slice());
 
-        (_, Ok((input, _))) => Ok((input, expr)),
-        (_, Err(_)) => Err(SyntaxError::expected(
-            input.get_str_slice(),
-            ";",
-            None,
-            Some("try adding a semicolon"),
-        )),
-    }
+    // 尝试消费终止符（分号或换行符）
+    match &expr {
+        // 控制结构不需要显式终止符
+        Expression::For(_, _, _) | Expression::If(_, _, _) => {
+            // opt(kind(TokenKind::NewLine))(input)?; //消费换行符
+            return Ok((input, expr));
+        }
+        // 普通表达式需要终止符
+        _ => {
+            // 尝试匹配分号或换行符
+            // (input, _) = lineterminator(input)?;
+            // 检查是否存在其他终止符（如分号）
+            // 允许行继续符出现在语句结尾
+            // let (input, _) = alt((
+            //     map(kind(TokenKind::LineContinuation), |_| ()),
+            //     map(kind(TokenKind::LineBreak), |_| ()),
+            // ))(input)?;
+            let (input, _) = kind(TokenKind::LineBreak)(input)?;
+            // let (input, _) = opt(kind(TokenKind::LineBreak))(input)?;
+            // let (input, _) = opt(text(";"))(input)?;
+
+            // dbg!("---[got expression lineEnd]---");
+            return Ok((input, expr));
+        }
+    };
 }
 
 fn parse_script_tokens(
     input: Tokens<'_>,
     require_eof: bool,
 ) -> IResult<Tokens<'_>, Expression, SyntaxError> {
-    // println!("hmm {}", input);
+    // print!("passing scripot tokens")
+    // dbg!("parse script tokens ------>", input);
     let (input, mut exprs) = many0(parse_statement)(input)?;
+    // dbg!("parse_statement-->", input.get_str_slice(), &exprs);
 
-    let (mut input, last) = opt(terminated(parse_expression, opt(text(";"))))(input)?;
+    // 解析最后一行，可选的;作为终止
+    let (input, last) = opt(terminated(
+        parse_expression,
+        opt(kind(TokenKind::LineBreak)),
+    ))(input)?;
+    // dbg!("after terminated-->", input.get_str_slice(), &last);
 
     if let Some(expr) = last {
         exprs.push(expr);
     }
+    // 新增：清理所有末尾换行符
+    let (input, _) = many0(kind(TokenKind::LineBreak))(input)?;
 
     if require_eof {
-        input = eof(input)
+        // input.is_empty()
+        eof(input)
             .map_err(|_: nom::Err<SyntaxError>| {
                 SyntaxError::expected(input.get_str_slice(), "end of input", None, None)
             })?
@@ -451,7 +475,8 @@ fn parse_for_loop(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxEr
 
 fn parse_if(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
     let (input, _) = text("if")(input)?;
-
+    //
+    // dbg!(input);
     let (input, cond) = parse_expression_prec_six(input).map_err(|_| {
         SyntaxError::unrecoverable(
             input.get_str_slice(),
@@ -543,10 +568,19 @@ fn parse_apply_operator(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, Sy
 
 fn parse_expression(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
     no_terminating_punctuation(input)?;
+    // 过滤行继续符和后续换行符
+    let (input, _) = opt(kind(TokenKind::LineBreak))(input)?; // 消费行继续符
+
+    // let (input, _) = many0(alt((
+    //     // 匹配0次或多次
+    //     kind(TokenKind::LineContinuation), // 消费行继续符
+    //     kind(TokenKind::LineBreak), // 消费换行符
+    // )))(input)?;
 
     let expr_parser = parse_expression_prec_seven;
 
     let (input, head) = expr_parser(input)?;
+    // let (input, _) = opt(kind(TokenKind::LineContinuation))(input)?; // 消费行继续符
 
     let (input, list) = many0(pair(
         alt((text("|"), text(">>>"), text(">>"), text("<<"))),
