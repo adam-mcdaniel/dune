@@ -110,6 +110,8 @@ pub enum Expression {
     Map(BTreeMap<String, Self>),
     None,
 
+    Del(String), // 新增删除操作
+    Declare(String, Box<Self>),
     // Assign an expression to a variable
     Assign(String, Box<Self>),
 
@@ -204,7 +206,9 @@ impl fmt::Debug for Expression {
                     .join("; ")
             ),
 
-            Self::Assign(name, expr) => write!(f, "let {} = {:?}", name, expr),
+            Self::Del(name) => write!(f, "del {}", name),
+            Self::Declare(name, expr) => write!(f, "let {} = {:?}", name, expr),
+            Self::Assign(name, expr) => write!(f, "{} = {:?}", name, expr),
             Self::If(cond, true_expr, false_expr) => {
                 write!(f, "if {:?} {:?} else {:?}", cond, true_expr, false_expr)
             }
@@ -333,7 +337,9 @@ impl fmt::Display for Expression {
                     .join("; ")
             ),
 
-            Self::Assign(name, expr) => write!(f, "let {} = {:?}", name, expr),
+            Self::Del(name) => write!(f, "del {}", name),
+            Self::Declare(name, expr) => write!(f, "let {} = {:?}", name, expr),
+            Self::Assign(name, expr) => write!(f, "{} = {:?}", name, expr),
             Self::If(cond, true_expr, false_expr) => {
                 write!(f, "if {:?} {:?} else {:?}", cond, true_expr, false_expr)
             }
@@ -423,7 +429,8 @@ impl Expression {
             | Self::Bytes(_)
             | Self::String(_)
             | Self::Boolean(_)
-            | Self::Builtin(_) => vec![],
+            | Self::Builtin(_)
+            | Self::Del(_) => vec![],
 
             Self::For(_, list, body) => {
                 let mut result = vec![];
@@ -451,6 +458,7 @@ impl Expression {
             Self::Lambda(_, body, _) => body.get_used_symbols(),
             Self::Macro(_, body) => body.get_used_symbols(),
 
+            Self::Declare(_, expr) => expr.get_used_symbols(),
             Self::Assign(_, expr) => expr.get_used_symbols(),
             Self::If(cond, t, e) => {
                 let mut result = vec![];
@@ -491,8 +499,25 @@ impl Expression {
                         None => Self::Symbol(name.clone()),
                     })
                 }
-
+                Self::Del(name) => {
+                    env.undefine(&name);
+                    return Ok(Self::None);
+                }
+                // 处理变量声明（仅允许未定义变量）
+                Self::Declare(name, expr) => {
+                    // TODO: redefine is rejected. but why never report err?
+                    if env.is_defined(&name) {
+                        return Err(Error::Redeclaration(name));
+                    }
+                    let value = expr.eval_mut(env, depth + 1)?;
+                    env.define(&name, value); // 新增 declare 方法
+                    return Ok(Self::None);
+                }
                 Self::Assign(name, expr) => {
+                    // TODO: enable check while in strict mode.
+                    // if !env.is_defined(&name) {
+                    //     return Err(Error::UndeclaredVariable(name));
+                    // }
                     let x = expr.eval_mut(env, depth + 1)?;
                     env.define(&name, x);
                     return Ok(Self::None);

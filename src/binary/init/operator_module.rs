@@ -95,10 +95,10 @@ pub fn get(env: &mut Environment) -> Expression {
     );
 
     tmp.define(
-        "//",
+        "/",
         curry(
             Expression::builtin(
-                "//",
+                "/",
                 |args, env| {
                     let mut result = args[0].clone().eval(env)?;
                     for arg in &args[1..] {

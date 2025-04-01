@@ -70,6 +70,21 @@ impl<'a> Input<'a> {
             None
         }
     }
+    // 新增方法：获取当前 offset 的前一个字符
+    pub fn previous_char(&self) -> Option<char> {
+        if self.offset == 0 {
+            return None; // 已经是字符串开头
+        }
+
+        let s = &self.str[..self.offset];
+        let mut iter = s.char_indices().rev();
+
+        // 找到前一个字符的起始位置
+        match iter.next() {
+            Some((idx, _)) => s[idx..].chars().next(),
+            None => None,
+        }
+    }
 }
 
 impl nom::InputLength for Input<'_> {
@@ -100,6 +115,7 @@ pub enum TokenKind {
     Operator,
     Keyword,
     StringLiteral,
+    StringRaw,
     IntegerLiteral,
     FloatLiteral,
     BooleanLiteral,

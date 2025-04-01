@@ -175,7 +175,7 @@ fn is_symbol_like(kind: TokenKind) -> bool {
         kind,
         TokenKind::Symbol
             | TokenKind::Keyword
-            | TokenKind::Operator
+            // | TokenKind::Operator  //to allow ++ -- to be overload
             | TokenKind::BooleanLiteral
             | TokenKind::FloatLiteral
             | TokenKind::IntegerLiteral
@@ -292,13 +292,13 @@ fn parse_none(input: Tokens<'_>) -> IResult<Tokens<'_>, (), SyntaxError> {
     }
 }
 
-fn parse_quote(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
-    let (input, _) = text("'")(input)?;
-
-    map(parse_expression_prec_two, |x| {
-        Expression::Quote(Box::new(x))
-    })(input)
-}
+// fn parse_quote(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
+//     let (input, _) = text("'")(input)?;
+//     map(parse_expression_prec_two, |x| {
+//         dbg!(x.clone());
+//         Expression::Quote(Box::new(x))
+//     })(input)
+// }
 
 fn parse_not(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
     let (input, _) = text("!")(input)?;
@@ -309,6 +309,28 @@ fn parse_not(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> 
 }
 
 #[inline]
+fn parse_string_raw(input: Tokens<'_>) -> IResult<Tokens<'_>, String, SyntaxError> {
+    let (input, expr) = kind(TokenKind::StringRaw)(input)?;
+    let raw_str = expr.to_str(input.str);
+
+    // 检查首尾单引号
+    if raw_str.len() >= 2 {
+        // 通过StrSlice直接计算子范围
+        let start = expr.start() + 1;
+        let end = expr.end() - 1;
+        let content = input.str.get(start..end); // 截取中间部分
+        Ok((input, content.to_str(input.str).to_string()))
+    } else {
+        Err(SyntaxError::unrecoverable(
+            expr,
+            "raw string enclosed in single quotes",
+            Some(raw_str.to_string()),
+            Some("raw strings must surround with '"),
+        ))
+    }
+}
+
+#[inline]
 fn parse_string(input: Tokens<'_>) -> IResult<Tokens<'_>, String, SyntaxError> {
     let (input, string) = kind(TokenKind::StringLiteral)(input)?;
     Ok((
@@ -316,28 +338,91 @@ fn parse_string(input: Tokens<'_>) -> IResult<Tokens<'_>, String, SyntaxError> {
         snailquote::unescape(string.to_str(input.str)).unwrap(),
     ))
 }
-
-fn parse_assign(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
+// 新增延迟赋值解析逻辑
+fn parse_lazy_assign(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
+    let (input, _) = text("let")(input)?;
+    let (input, symbol) = parse_symbol(input)?;
+    let (input, _) = text(":=")(input)?; // 使用:=作为延迟赋值符号
+    let (input, expr) = parse_expression(input)?;
+    dbg!(&expr);
+    Ok((
+        input,
+        Expression::Assign(symbol, Box::new(Expression::Quote(Box::new(expr)))),
+    ))
+}
+// 新增 parse_assignment 函数
+fn parse_assignment(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
+    let (input, symbol) = parse_symbol(input)?;
+    let (input, _) = text("=")(input)?;
+    let (input, expr) = parse_expression(input)?;
+    Ok((input, Expression::Assign(symbol, Box::new(expr))))
+}
+// allow muti vars declare
+fn parse_declare(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
     let (input, _) = text("let")(input)?;
 
-    let (input, symbol) = alt((parse_symbol, parse_operator))(input).map_err(|_| {
+    // 解析逗号分隔的多个符号
+    let (input, symbols) = separated_list0(text(","), alt((parse_symbol, parse_operator)))(input)
+        .map_err(|_| {
+        SyntaxError::unrecoverable(
+            input.get_str_slice(),
+            "symbol list",
+            None,
+            Some("try: `let x, y = 1, 2`"),
+        )
+    })?;
+
+    // 解析等号和多表达式
+    let (input, exprs) = opt(preceded(
+        text("="),
+        separated_list0(text(","), parse_expression),
+    ))(input)?;
+
+    // 构建右侧表达式
+    let assignments = match exprs {
+        Some(e) if e.len() == symbols.len() => (0..symbols.len())
+            .map(|i| Expression::Declare(symbols[i].clone(), Box::new(e[i].clone())))
+            .collect(),
+        Some(e) if e.len() == 1 => (0..symbols.len())
+            .map(|i| Expression::Declare(symbols[i].clone(), Box::new(e[0].clone())))
+            .collect(),
+        Some(e) => {
+            return Err(SyntaxError::unrecoverable(
+                input.get_str_slice(),
+                "matching values count",
+                Some(format!(
+                    "got {} variables but {} values",
+                    symbols.len(),
+                    e.len()
+                )),
+                Some("ensure each variable has a corresponding value"),
+            ))
+        }
+        None => vec![], // Expression::None, // 单变量允许无初始值
+                        //TODO: must has initialization in strict mode.
+                        // None =>
+                        //     return Err(SyntaxError::unrecoverable(
+                        //         input.get_str_slice(),
+                        //         "initialization value",
+                        //         None,
+                        //         Some("multi-variable declaration requires initialization")
+                        //     ))
+    };
+    Ok((input, Expression::Do(assignments)))
+
+    // Ok((input, Expression::Declare(symbols, Box::new(expr))))
+}
+fn parse_del(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
+    let (input, _) = text("del")(input)?;
+    let (input, symbol) = parse_symbol(input).map_err(|_| {
         SyntaxError::unrecoverable(
             input.get_str_slice(),
             "symbol",
-            None,
-            Some("try using a valid symbol such as `x` in `let x = 5`"),
+            Some("no symbol".into()),
+            Some("you can only del symbol"),
         )
     })?;
-    let (input, _) = text("=")(input).map_err(|_| {
-        SyntaxError::unrecoverable(
-            input.get_str_slice(),
-            "`=`",
-            None,
-            Some("let expressions must use an `=` sign"),
-        )
-    })?;
-    let (input, expr) = parse_expression(input)?;
-    Ok((input, Expression::Assign(symbol, Box::new(expr))))
+    Ok((input, Expression::Del(symbol)))
 }
 
 fn parse_group(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
@@ -377,7 +462,7 @@ fn parse_map(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> 
         text(","),
         separated_pair(
             alt((parse_symbol, parse_operator)),
-            text("="),
+            alt((text("="), text(":"))), //allow :
             parse_expression,
         ),
     )(input)?;
@@ -615,9 +700,12 @@ fn parse_expression(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, Syntax
 fn parse_expression_prec_seven(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
     no_terminating_punctuation(input)?;
     alt((
+        parse_del,
         parse_for_loop,
         parse_if,
-        parse_assign,
+        parse_lazy_assign,
+        parse_declare,
+        parse_assignment,
         parse_callable,
         parse_apply,
         parse_apply_operator,
@@ -774,7 +862,7 @@ fn parse_expression_prec_three(input: Tokens<'_>) -> IResult<Tokens<'_>, Express
     let (input, mut head) = expr_parser(input)?;
 
     let (input, mut list) =
-        many0(pair(alt((text("*"), text("//"), text("%"))), expr_parser))(input)?;
+        many0(pair(alt((text("*"), text("/"), text("%"))), expr_parser))(input)?;
 
     if list.is_empty() {
         return Ok((input, head));
@@ -819,7 +907,7 @@ fn parse_expression_prec_two(input: Tokens<'_>) -> IResult<Tokens<'_>, Expressio
 fn parse_expression_prec_one(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
     alt((
         parse_group,
-        parse_quote,
+        // parse_quote,
         parse_map,
         parse_block,
         parse_list,
@@ -827,6 +915,7 @@ fn parse_expression_prec_one(input: Tokens<'_>) -> IResult<Tokens<'_>, Expressio
         map(parse_none, |_| Expression::None),
         map(parse_float, Expression::Float),
         map(parse_integer, Expression::Integer),
+        map(parse_string_raw, Expression::String),
         map(parse_string, Expression::String),
         map(parse_symbol, Expression::Symbol),
     ))(input)

@@ -1,8 +1,27 @@
 # Changelog
-All notable changes to this project will be documented in this file.
+## [0.2.0-symbol]
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+this branch fix symbols:
+
+- allow nonspace operators.
+such as `let a=2+3;` `a>3` `let add=x->x+1`
+
+but space is needed when you need to differ negtive numbers with operator:
+such as `let a=2+ -3`
+
+- allow args in command.
+such as `ls -l --color=auto /tmp`
+  + short args: `-c`
+  + long args: `--chars`
+  + paths: `./dir` or `/dir` or `..`
+
+  but unfortunlately, single `/` is not added currently, as this may be used as operator someday.
+
+  single `.` was ignored and default to cwd.
+
+- allow `:` to define dict.
+`let dict={x:1,y:2}` as well as the old one :
+`let dict={x=1,y=2}`
 
 ## [Unreleased]
 
