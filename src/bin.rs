@@ -218,6 +218,11 @@ fn syntax_highlight(line: &str) -> String {
                 is_colored = true;
                 result.push_str(k);
             }
+            (TokenKind::StringRaw, s) => {
+                result.push_str("\x1b[38;5;203m");
+                is_colored = true;
+                result.push_str(s);
+            }
             (TokenKind::StringLiteral, s) => {
                 result.push_str("\x1b[38;5;208m");
                 is_colored = true;
@@ -546,27 +551,40 @@ fn run_file(path: PathBuf, env: &mut Environment) -> Result<Expression, Error> {
 fn main() -> Result<(), Error> {
     let matches = App::new(
         r#"
-        888                            
-        888                            
-        888                            
-    .d88888 888  888 88888b.   .d88b.  
-   d88" 888 888  888 888 "88b d8P  Y8b 
-   888  888 888  888 888  888 88888888 
-   Y88b 888 Y88b 888 888  888 Y8b.     
-    "Y88888  "Y88888 888  888  "Y8888  
+        888
+        888
+        888
+    .d88888 888  888 88888b.   .d88b.
+   d88" 888 888  888 888 "88b d8P  Y8b
+   888  888 888  888 888  888 88888888
+   Y88b 888 Y88b 888 888  888 Y8b.
+    "Y88888  "Y88888 888  888  "Y8888
    "#,
     )
     .author(crate_authors!())
     .about(crate_description!())
     .args(&[
-        arg!([FILE] "Execute a given input file"),
-        arg!(-i --interactive "Start an interactive REPL"),
-        arg!(-x --exec <INPUT> ... "Execute a given input string")
+        arg!(-i --interactive "Start an interactive REPL").conflicts_with("FILE"),
+        arg!(-c --cmd <INPUT> ... "Execute a given input string")
+            .conflicts_with("FILE")
             .multiple_values(true)
+            .required(false),
+        arg!([FILE] "Execute a given input file"),
+        arg!([ARGS] ... "Arguments passed to script")
+            .multiple_values(true)
+            .last(true)
             .required(false),
     ])
     .get_matches();
     let mut env = Environment::new();
+    // 统一初始化环境（即使无参数也包含空列表）
+
+    let args = matches
+        .values_of("ARGS")
+        .unwrap_or_default()
+        .map(|s| Expression::String(s.to_string()))
+        .collect();
+    env.define("args", Expression::List(args));
 
     binary::init(&mut env);
 
@@ -600,15 +618,15 @@ fn main() -> Result<(), Error> {
             eprintln!("{}", e)
         }
 
-        if !matches.is_present("interactive") && !matches.is_present("exec") {
+        if !matches.is_present("interactive") && !matches.is_present("cmd") {
             return Ok(());
         }
     }
 
-    if matches.is_present("exec") {
+    if matches.is_present("cmd") {
         match run_text(
             &matches
-                .values_of("exec")
+                .values_of("cmd")
                 .unwrap()
                 .map(String::from)
                 .collect::<Vec<_>>()

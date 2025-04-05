@@ -18,6 +18,9 @@ pub enum Error {
     ProgramNotFound(String),
     SyntaxError(Str, SyntaxError),
     CustomError(String),
+    Redeclaration(String),
+    UndeclaredVariable(String),
+    NoMatchingBranch(String),
 }
 
 impl Error {
@@ -58,6 +61,9 @@ impl Error {
             Self::PermissionDenied(..) => Self::ERROR_CODE_CUSTOM_ERROR,
             Self::ProgramNotFound(..) => Self::ERROR_CODE_CUSTOM_ERROR,
             Self::SyntaxError(..) => Self::ERROR_CODE_CUSTOM_ERROR,
+            Self::Redeclaration(..) => Self::ERROR_CODE_CUSTOM_ERROR,
+            Self::UndeclaredVariable(..) => Self::ERROR_CODE_CUSTOM_ERROR,
+            Self::NoMatchingBranch(..) => Self::ERROR_CODE_CUSTOM_ERROR,
         }
     }
 }
@@ -65,6 +71,12 @@ impl Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            Self::Redeclaration(name) => {
+                write!(f, "redeclaration of {:?}", name)
+            }
+            Self::UndeclaredVariable(name) => {
+                write!(f, "undeclared var: {:?}", name)
+            }
             Self::CannotApply(expr, args) => {
                 write!(f, "cannot apply `{:?}` to the arguments {:?}", expr, args)
             }
@@ -79,6 +91,9 @@ impl fmt::Display for Error {
             }
             Self::RecursionDepth(expr) => {
                 write!(f, "recursion depth exceeded while evaluating {:?}", expr)
+            }
+            Self::NoMatchingBranch(expr) => {
+                write!(f, "no matching branch while evaluating {:?}", expr)
             }
             Self::CommandFailed(name, args) => {
                 write!(

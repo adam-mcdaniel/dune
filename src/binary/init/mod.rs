@@ -19,6 +19,7 @@ mod operator_module;
 mod os_module;
 mod parse_module;
 mod rand_module;
+mod regex_module;
 mod shell_module;
 mod string_module;
 mod sys_module;
@@ -46,6 +47,7 @@ pub fn init(env: &mut Environment) {
         "fs" => fs,
         "ops" => ops,
         "string" => string_module::get(),
+        "regex" => regex_module::get(),
         "list" => list_module::get(),
         "sys" => sys_module::get(),
     };

@@ -1,10 +1,10 @@
 use super::{curry, reverse_curry};
 use dune::{Environment, Error, Expression};
+use regex_lite::Regex;
 use std::{
     io::Write,
     process::{Command, Stdio},
 };
-
 fn add_builtin(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Error> {
     let mut result = args[0].clone().eval(env)?;
     if args.len() == 1 {
@@ -95,10 +95,10 @@ pub fn get(env: &mut Environment) -> Expression {
     );
 
     tmp.define(
-        "//",
+        "/",
         curry(
             Expression::builtin(
-                "//",
+                "/",
                 |args, env| {
                     let mut result = args[0].clone().eval(env)?;
                     for arg in &args[1..] {
@@ -248,6 +248,35 @@ pub fn get(env: &mut Environment) -> Expression {
         "determine the order of two values",
     );
 
+    tmp.define_builtin(
+        "~=",
+        |args, env| {
+            if args.len() != 2 {
+                return Err(Error::CustomError(
+                    "~ requires exactly two arguments".to_string(),
+                ));
+            }
+            let text = args[0].eval(env)?.to_string();
+            let pattern = args[1].eval(env)?.to_string();
+            let regex = Regex::new(&pattern).map_err(|e| Error::CustomError(e.to_string()))?;
+            Ok(Expression::Boolean(regex.is_match(&text)))
+        },
+        "regex match: text ~ pattern",
+    );
+    tmp.define_builtin(
+        "~~",
+        |args, env| {
+            if args.len() != 2 {
+                return Err(Error::CustomError(
+                    "~~ requires exactly two arguments".to_string(),
+                ));
+            }
+            let text = args[0].eval(env)?.to_string();
+            let substring = args[1].eval(env)?.to_string();
+            Ok(Expression::Boolean(text.contains(&substring)))
+        },
+        "string contains: text ~~ substring",
+    );
     tmp.define_builtin(
         "@",
         |args, env| {

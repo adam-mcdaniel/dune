@@ -1,3 +1,5 @@
-/target
+/target*
 history.txt
 *.cast
+*.lock
+.*
