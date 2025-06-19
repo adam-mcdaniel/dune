@@ -51,7 +51,7 @@ pub fn get(env: &mut Environment) -> Expression {
     }
 
     if let Ok(cwd) = current_dir() {
-        env.set_cwd(&cwd.into_os_string().into_string().unwrap());
+        env.set_cwd(cwd.into_os_string().into_string().unwrap());
     }
 
     if let Some(desk_dir) = dirs::desktop_dir() {
@@ -230,7 +230,7 @@ pub fn get(env: &mut Environment) -> Expression {
             let path = args[0].eval(env)?.to_string();
             let dir = cwd.join(&path);
 
-            list_directory(&dir, &Path::new(&path))
+            list_directory(&dir, Path::new(&path))
         }, "get a directory's entries as a list of strings"),
         String::from("exists?") => Expression::builtin("exists", |args, env| {
             super::check_exact_args_len("exists", &args, 1)?;

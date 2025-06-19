@@ -35,6 +35,38 @@ impl Environment {
         self.define(&name.to_string(), Expression::Map(result));
     }
 
+    pub fn fix_cwd(&mut self) {
+        // Check if the CWD no longer exists
+        match self.get(CWD_ENV_VAR) {
+            Some(Expression::String(path)) => {
+                let mut path = std::path::PathBuf::from(path);
+                while !path.exists() {
+                    // Keep recursing up the parent chain until we find a valid CWD
+                    path.pop();
+                    if path == std::path::PathBuf::from("/") {
+                        // If we reach the root directory, we can't go further up
+                        break;
+                    }
+                }
+                if path.exists() {
+                    // If we found a valid CWD, set it
+                    self.set_cwd(path.to_string_lossy());
+                } else {
+                    // If we didn't find a valid CWD, set it to the root directory
+                    self.set_cwd("/");
+                }
+            }
+            _ => {
+                // If CWD is not defined, set it to the current directory
+                self.set_cwd(
+                    std::env::current_dir()
+                        .unwrap_or_default()
+                        .to_string_lossy(),
+                );
+            }
+        }
+    }
+
     pub fn get_cwd(&self) -> String {
         match self.get(CWD_ENV_VAR) {
             Some(Expression::String(path)) => path,

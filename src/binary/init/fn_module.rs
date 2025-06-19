@@ -102,7 +102,7 @@ pub fn get() -> Expression {
             "filter a list of values with a condition function"),
         String::from("reduce") => Expression::builtin("reduce", reduce,
             "reduce a function over a list of values"),
-        String::from("?") => Expression::builtin("?", conditional,
+        String::from("cond") => Expression::builtin("cond", conditional,
         "conditionally evaluate two expressions based on the truthiness of a condition"),
     })
     .into()

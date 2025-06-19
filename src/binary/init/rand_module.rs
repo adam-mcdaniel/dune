@@ -1,6 +1,6 @@
 use common_macros::b_tree_map;
 use dune::{Environment, Error, Expression};
-use rand::{distributions::Uniform, prelude::SliceRandom, Rng};
+use rand::{distr::Uniform, prelude::SliceRandom, Rng};
 
 pub fn get() -> Expression {
     (b_tree_map! {
@@ -15,8 +15,12 @@ fn int(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Error
     super::check_exact_args_len("int", &args, 2)?;
     match (args[0].eval(env)?, args[1].eval(env)?) {
         (Expression::Integer(l), Expression::Integer(h)) => {
-            let mut rng = rand::thread_rng();
-            let n = Uniform::new(l, h);
+            let mut rng = rand::rng();
+            let n = Uniform::new(l, h).map_err(|_| {
+                Error::CustomError(
+                    "cannot create uniform distribution to select random value".into(),
+                )
+            })?;
             Ok(Expression::Integer(rng.sample(n)))
         }
         (l, h) => Err(Error::CustomError(format!(
@@ -30,8 +34,12 @@ fn choose(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Er
     super::check_exact_args_len("choose", &args, 1)?;
     match args[0].eval(env)? {
         Expression::List(list) => {
-            let mut rng = rand::thread_rng();
-            let n = Uniform::new(0, list.len());
+            let mut rng = rand::rng();
+            let n = Uniform::new(0, list.len()).map_err(|_| {
+                Error::CustomError(
+                    "cannot create uniform distribution to select random value".into(),
+                )
+            })?;
             Ok(list[rng.sample(n)].clone())
         }
         otherwise => Err(Error::CustomError(format!(
@@ -45,7 +53,7 @@ fn shuffle(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, E
     super::check_exact_args_len("shuffle", &args, 1)?;
     match args[0].eval(env)? {
         Expression::List(mut list) => {
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
             list.shuffle(&mut rng);
             Ok(list.into())
         }

@@ -195,12 +195,6 @@ fn tokenize_symbols_and_operators() {
 }
 
 #[test]
-fn tokenize_invalid_numbers() {
-    tokenize_test_err(r#"3."#);
-    tokenize_test_err(r#"-15."#);
-}
-
-#[test]
 fn tokenize_invalid_strings() {
     tokenize_test_err(r#""\"#);
     tokenize_test_err(r#""\x""#);

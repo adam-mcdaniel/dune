@@ -36,6 +36,8 @@ pub fn get() -> Expression {
             "drop the first n elements of a list"), 2),
         String::from("split-at") => Expression::builtin("split-at", split_at,
             "split a list at a given index"),
+        String::from("sort") => Expression::builtin("sort", sort,
+            "sort a list"),
         String::from("nth") => Expression::builtin("nth", nth,
             "get the nth element of a list"),
 
@@ -378,6 +380,23 @@ fn split_at(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, 
     } else {
         Err(Error::CustomError(
             "split-at requires an integer as its first argument".to_string(),
+        ))
+    }
+}
+
+fn sort(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Error> {
+    if args.len() != 1 {
+        return Err(Error::CustomError(
+            "sort requires exactly one argument".to_string(),
+        ));
+    }
+    let list = args[0].eval(env)?;
+    if let Expression::List(mut list) = list {
+        list.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        Ok(Expression::List(list))
+    } else {
+        Err(Error::CustomError(
+            "sort requires a list as its argument".to_string(),
         ))
     }
 }
