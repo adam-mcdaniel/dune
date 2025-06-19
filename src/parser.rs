@@ -292,6 +292,14 @@ fn parse_none(input: Tokens<'_>) -> IResult<Tokens<'_>, (), SyntaxError> {
     }
 }
 
+fn parse_glob(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
+    let (input, _) = text("?")(input)?;
+
+    map(parse_expression_prec_two, |x| {
+        Expression::Apply(Box::new(Expression::Symbol("?".to_string())), vec![x])
+    })(input)
+}
+
 fn parse_quote(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
     let (input, _) = text("'")(input)?;
 
@@ -819,6 +827,7 @@ fn parse_expression_prec_two(input: Tokens<'_>) -> IResult<Tokens<'_>, Expressio
 fn parse_expression_prec_one(input: Tokens<'_>) -> IResult<Tokens<'_>, Expression, SyntaxError> {
     alt((
         parse_group,
+        parse_glob,
         parse_quote,
         parse_map,
         parse_block,

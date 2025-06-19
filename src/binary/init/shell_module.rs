@@ -1,4 +1,4 @@
-use rand::seq::SliceRandom;
+use rand::prelude::*;
 use std::env::current_exe;
 
 use common_macros::b_tree_map;
@@ -21,7 +21,8 @@ pub fn get() -> Expression {
             // Choose a random suggestion from the `help/suggestions.txt` file.
             let suggestions = include_str!("../help/suggestions.txt");
             let suggestions = suggestions.split('\n').collect::<Vec<&str>>();
-            let suggestion = suggestions.choose(&mut rand::thread_rng()).unwrap();
+            let mut rng = rand::rng();
+            let suggestion = suggestions.choose(&mut rng).unwrap();
             Expression::String(suggestion.to_string())
         },
         String::from("license") => Expression::String("APACHE-2.0".to_string()),

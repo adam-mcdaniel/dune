@@ -4,12 +4,12 @@ mod binary;
 
 use dune::{parse_script, Diagnostic, Environment, Error, Expression, SyntaxError, TokenKind};
 
-use clap::{arg, crate_authors, crate_description, App};
+use clap::{arg, crate_authors, crate_description, Command};
 
 use rustyline::completion::{Completer, FilenameCompleter, Pair as PairComplete};
-use rustyline::config::OutputStreamType;
-use rustyline::highlight::Highlighter;
+use rustyline::highlight::{CmdKind, Highlighter};
 use rustyline::hint::{Hinter, HistoryHinter};
+use rustyline::history::DefaultHistory;
 use rustyline::validate::{
     MatchingBracketValidator, ValidationContext, ValidationResult, Validator,
 };
@@ -37,18 +37,18 @@ fn get_history_path() -> Option<PathBuf> {
     Some(home.join(".dune-history"))
 }
 
-fn new_editor(env: &Environment) -> Editor<DuneHelper> {
+fn new_editor(env: &Environment) -> Editor<DuneHelper, DefaultHistory> {
     let config = Config::builder()
         .history_ignore_dups(true)
+        .unwrap()
         .history_ignore_space(true)
         .auto_add_history(false)
         .completion_type(CompletionType::List)
         .edit_mode(EditMode::Emacs)
         .check_cursor_position(true)
-        .output_stream(OutputStreamType::Stdout)
         .build();
 
-    let mut rl = Editor::with_config(config);
+    let mut rl = Editor::with_config(config).expect("Failed to create editor");
     let h = DuneHelper {
         completer: FilenameCompleter::new(),
         hinter: HistoryHinter {},
@@ -81,7 +81,7 @@ fn strip_ansi_escapes(text: impl ToString) -> String {
     result
 }
 
-fn readline(prompt: impl ToString, rl: &mut Editor<DuneHelper>) -> String {
+fn readline(prompt: impl ToString, rl: &mut Editor<DuneHelper, DefaultHistory>) -> String {
     let prompt = prompt.to_string();
     loop {
         // This MUST be called to update the prompt.
@@ -357,7 +357,7 @@ impl Highlighter for DuneHelper {
         Owned(syntax_highlight(line))
     }
 
-    fn highlight_char(&self, line: &str, _pos: usize) -> bool {
+    fn highlight_char(&self, line: &str, _pos: usize, _kind: CmdKind) -> bool {
         syntax_highlight(line) != line
     }
 }
@@ -443,7 +443,7 @@ fn parse(input: &str) -> Result<Expression, Error> {
 }
 
 fn repl(
-    atomic_rl: Arc<Mutex<Editor<DuneHelper>>>,
+    atomic_rl: Arc<Mutex<Editor<DuneHelper, DefaultHistory>>>,
     atomic_env: Arc<Mutex<Environment>>,
 ) -> Result<(), Error> {
     let mut lines = vec![];
@@ -479,7 +479,8 @@ fn repl(
 
         match parse(&text) {
             Ok(expr) => {
-                rl.add_history_entry(text.as_str());
+                rl.add_history_entry(text.as_str())
+                    .map_err(|_| Error::CustomError("Failed to add history entry".into()))?;
                 if let Some(path) = &history_path {
                     if rl.save_history(path).is_err() {
                         eprintln!("Failed to save history");
@@ -525,7 +526,8 @@ fn repl(
                     eprintln!("{}", e);
                     lines = vec![];
                 } else {
-                    rl.add_history_entry(text.as_str());
+                    rl.add_history_entry(text.as_str())
+                        .map_err(|_| Error::CustomError("Failed to add history entry".into()))?;
                 }
             }
         }
@@ -544,7 +546,7 @@ fn run_file(path: PathBuf, env: &mut Environment) -> Result<Expression, Error> {
 }
 
 fn main() -> Result<(), Error> {
-    let matches = App::new(
+    let matches = Command::new(
         r#"
         888                            
         888                            
@@ -560,14 +562,14 @@ fn main() -> Result<(), Error> {
     .about(crate_description!())
     .args(&[
         arg!([FILE] "Execute a given input file"),
-        arg!(-i --interactive "Start an interactive REPL"),
+        arg!(-i --interactive ... "Start an interactive REPL").required(false),
         arg!(-x --exec <INPUT> ... "Execute a given input string")
-            .multiple_values(true)
+            .num_args(1..)
             .required(false),
     ])
     .get_matches();
-    let mut env = Environment::new();
 
+    let mut env = Environment::new();
     binary::init(&mut env);
 
     parse("let clear = _ ~> console@clear ()")?.eval(&mut env)?;
@@ -593,24 +595,22 @@ fn main() -> Result<(), Error> {
     )?
     .eval(&mut env)?;
 
-    if matches.is_present("FILE") {
-        let path = PathBuf::from(matches.value_of("FILE").unwrap());
+    if matches.contains_id("FILE") {
+        let path = PathBuf::from(matches.get_one::<String>("FILE").unwrap());
 
         if let Err(e) = run_file(path, &mut env) {
             eprintln!("{}", e)
         }
 
-        if !matches.is_present("interactive") && !matches.is_present("exec") {
-            return Ok(());
-        }
+        return Ok(());
     }
 
-    if matches.is_present("exec") {
+    if matches.contains_id("exec") {
         match run_text(
             &matches
-                .values_of("exec")
+                .get_many::<String>("exec")
                 .unwrap()
-                .map(String::from)
+                .cloned()
                 .collect::<Vec<_>>()
                 .join(" "),
             &mut env,
@@ -625,9 +625,7 @@ fn main() -> Result<(), Error> {
             Err(e) => eprintln!("{}", e),
         }
 
-        if !matches.is_present("interactive") {
-            return Ok(());
-        }
+        return Ok(());
     }
 
     if let Some(home_dir) = dirs::home_dir() {
@@ -642,6 +640,8 @@ fn main() -> Result<(), Error> {
                 if let Err(e) = std::fs::write(&prelude_path, DEFAULT_PRELUDE) {
                     eprintln!("Error while writing prelude: {}", e);
                 }
+            } else {
+                eprintln!("Skipping prelude setup.");
             }
 
             if let Err(e) = run_text(INTRO_PRELUDE, &mut env) {
@@ -656,6 +656,8 @@ fn main() -> Result<(), Error> {
                 if let Err(e) = run_text(INTRO_PRELUDE, &mut env) {
                     eprintln!("Error while running introduction prelude: {}", e);
                 }
+            } else {
+                eprintln!("Skipping prelude setup.");
             }
         }
     }

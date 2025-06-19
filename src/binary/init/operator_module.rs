@@ -43,6 +43,51 @@ pub fn get(env: &mut Environment) -> Expression {
     tmp.define_builtin("+", add_builtin, "add two expressions");
 
     tmp.define_builtin(
+        "?",
+        |args, env| {
+            // Get the argument to the question mark.
+            let mut result = vec![];
+            for arg in args {
+                match arg.eval(env)? {
+                    // Perform a glob expansion on a symbol or string.
+                    Expression::Symbol(ref s) | Expression::String(ref s) => {
+                        // If the argument is a symbol or string, perform glob expansion.
+                        let mut paths = vec![];
+                        for entry in glob::glob(s)
+                            .map_err(|e| Error::CustomError(format!("glob error: {}", e)))?
+                        {
+                            match entry {
+                                Ok(path) => {
+                                    // If the glob entry is valid, add it to the paths.
+                                    paths.push(Expression::String(
+                                        path.to_string_lossy().to_string(),
+                                    ));
+                                }
+                                Err(e) => {
+                                    // If the glob entry is invalid, return an error.
+                                    return Err(Error::CustomError(format!("glob error: {}", e)));
+                                }
+                            }
+                        }
+                        for path in paths {
+                            // Add the globbed path to the result.
+                            result.push(path);
+                        }
+                    }
+                    _ => {
+                        // If the argument is not a symbol or string, return it as is.
+                        return Ok(arg);
+                    }
+                }
+            }
+
+            // If we have any results, return them as a list.
+            Ok(Expression::List(result))
+        },
+        "perform glob expansion",
+    );
+
+    tmp.define_builtin(
         "-",
         |args, env| {
             // If there are two expressions or more, subtract them

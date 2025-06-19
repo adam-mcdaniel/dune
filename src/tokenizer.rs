@@ -49,9 +49,9 @@ fn parse_token(input: Input) -> TokenizationResult<'_, (Token, Diagnostic)> {
             map_valid_token(short_operator, TokenKind::Operator),
             map_valid_token(bool_literal, TokenKind::BooleanLiteral),
             map_valid_token(comment, TokenKind::Comment),
+            map_valid_token(symbol, TokenKind::Symbol),
             string_literal,
             number_literal,
-            map_valid_token(symbol, TokenKind::Symbol),
             map_valid_token(whitespace, TokenKind::Whitespace),
         ))(input)
         .unwrap_or_else(|_| {
@@ -188,17 +188,22 @@ fn bool_literal(input: Input<'_>) -> TokenizationResult<'_> {
 }
 
 fn symbol(input: Input<'_>) -> TokenizationResult<'_> {
-    let len = input
-        .chars()
-        .take_while(|&c| is_symbol_char(c))
-        .map(char::len_utf8)
-        .sum();
+    let symbol_chars = input.chars().take_while(|&c| is_symbol_char(c));
+
+    let len = symbol_chars.clone().map(char::len_utf8).sum::<usize>();
+
+    let result = input.split_at(len);
+    let symbol = result.1.to_str(input.as_original_str());
+
+    if symbol.parse::<i64>().is_ok() || symbol.parse::<f64>().is_ok() {
+        return Err(NOT_FOUND);
+    }
 
     if len == 0 {
         return Err(NOT_FOUND);
     }
 
-    Ok(input.split_at(len))
+    Ok(result)
 }
 
 fn whitespace(input: Input<'_>) -> TokenizationResult<'_> {
@@ -345,7 +350,7 @@ fn is_symbol_char(c: char) -> bool {
     macro_rules! special_char_pattern {
         () => {
             '_' | '+' | '-' | '.' | '~' | '\\' | '/' | '?' |
-            '&' | '<' | '>' | '$' | '%' | '#' | '^' | ':'
+            '&' | '<' | '>' | '$' | '%' | '#' | '^' | ':' | '*' | '!'
         };
     }
 

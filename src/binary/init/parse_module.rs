@@ -74,8 +74,10 @@ fn json_to_expr(val: JsonValue) -> Expression {
 fn parse_toml(args: Vec<Expression>, env: &mut Environment) -> Result<Expression, Error> {
     super::check_exact_args_len("toml", &args, 1)?;
     let text = args[0].eval(env)?.to_string();
-    if let Ok(val) = text.parse::<toml::Value>() {
-        Ok(toml_to_expr(val))
+    if let Ok(val) = text.parse::<toml::Table>() {
+        Ok(Expression::Map(
+            val.into_iter().map(|(k, v)| (k, toml_to_expr(v))).collect(),
+        ))
     } else {
         Err(Error::CustomError(format!(
             "could not parse `{}` as TOML",

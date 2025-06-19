@@ -311,7 +311,7 @@ impl fmt::Display for Expression {
                         _ => {
                             // Format the value to the width of the terminal / 5
                             let formatted = format!("{:?}", val);
-                            let w = specified_width / 3;
+                            let w = specified_width * 2 / 3;
                             t.add_row(row!(key, textwrap::fill(&formatted, w),));
                         }
                     }
@@ -470,6 +470,7 @@ impl Expression {
     }
 
     pub fn eval(&self, env: &mut Environment) -> Result<Self, Error> {
+        env.fix_cwd();
         self.clone().eval_mut(env, 0)
     }
 
